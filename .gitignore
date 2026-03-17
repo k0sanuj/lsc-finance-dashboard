@@ -1,0 +1,44 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+.vercel/
+
+# Local data and exports
+tmp/
+uploads/
+exports/
+*.csv
+*.xlsx
+*.xls
+
+# Database artifacts
+*.sqlite
+*.sqlite3
+
+# Test outputs
+playwright-report/
+test-results/
+
+# Local workspace artifacts
+.pnpm-store/
+.neon

@@ -1,0 +1,72 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { executeAdmin, queryRowsAdmin } from "@lsc/db";
+import { requireRole } from "../../../lib/auth";
+
+function normalizeWhitespace(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function redirectToTeamManagement(status: "success" | "error" | "info", message: string) {
+  redirect(
+    `/tbr/team-management?status=${encodeURIComponent(status)}&message=${encodeURIComponent(message)}`
+  );
+}
+
+export async function createTeamAction(formData: FormData) {
+  await requireRole(["super_admin", "finance_admin"]);
+  const teamName = normalizeWhitespace(String(formData.get("teamName") ?? ""));
+  const teamCode = normalizeWhitespace(String(formData.get("teamCode") ?? "")).toUpperCase();
+  const description = normalizeWhitespace(String(formData.get("description") ?? "")) || null;
+
+  if (!teamName || !teamCode) {
+    redirectToTeamManagement("error", "Team name and code are required.");
+  }
+
+  const companyRows = await queryRowsAdmin<{ id: string }>(
+    `select id from companies where code = 'TBR'::company_code limit 1`
+  );
+  const companyId = companyRows[0]?.id;
+
+  if (!companyId) {
+    redirectToTeamManagement("error", "TBR company record was not found.");
+  }
+
+  await executeAdmin(
+    `insert into app_teams (company_id, team_code, team_name, description)
+     values ($1, $2, $3, $4)
+     on conflict (company_id, team_code) do update
+       set team_name = excluded.team_name,
+           description = excluded.description,
+           updated_at = now()`,
+    [companyId, teamCode, teamName, description]
+  );
+
+  revalidatePath("/tbr/team-management");
+  revalidatePath("/tbr");
+  redirectToTeamManagement("success", "Team saved.");
+}
+
+export async function assignUserToTeamAction(formData: FormData) {
+  await requireRole(["super_admin", "finance_admin"]);
+  const teamId = normalizeWhitespace(String(formData.get("teamId") ?? ""));
+  const userId = normalizeWhitespace(String(formData.get("userId") ?? ""));
+  const membershipRole = normalizeWhitespace(String(formData.get("membershipRole") ?? "member"));
+
+  if (!teamId || !userId) {
+    redirectToTeamManagement("error", "Team and user are required for assignment.");
+  }
+
+  await executeAdmin(
+    `insert into team_memberships (team_id, app_user_id, membership_role)
+     values ($1, $2, $3::team_membership_role)
+     on conflict (team_id, app_user_id) do update
+       set membership_role = excluded.membership_role`,
+    [teamId, userId, membershipRole]
+  );
+
+  revalidatePath("/tbr/team-management");
+  redirectToTeamManagement("success", "User assigned to team.");
+}

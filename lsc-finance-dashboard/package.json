@@ -1,0 +1,40 @@
+{
+  "name": "lsc-finance-dashboard",
+  "private": true,
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "deploy:preview": "node scripts/deploy-preview.mjs",
+    "lint": "pnpm --filter web lint",
+    "typecheck": "pnpm --filter web typecheck",
+    "db:apply": "node scripts/apply-sql.mjs sql/001_initial_schema.sql sql/002_derived_views.sql sql/003_seed_reference_data.sql sql/005_document_intelligence.sql sql/006_contract_source_document.sql sql/007_auth_and_teams.sql sql/010_document_intake_events.sql",
+    "db:apply:document-intake": "node scripts/apply-sql.mjs sql/010_document_intake_events.sql",
+    "db:apply:auth": "node scripts/apply-sql.mjs sql/007_auth_and_teams.sql",
+    "db:setup-roles": "node scripts/apply-sql.mjs sql/004_roles_and_grants.sql",
+    "import:csv": "node scripts/import-csv.mjs",
+    "import:xlsx": "node scripts/import-xlsx.mjs",
+    "normalize:e1-payables": "node scripts/normalize-e1-payables.mjs",
+    "normalize:race-expenses": "node scripts/normalize-race-expenses.mjs",
+    "normalize:revenue": "node scripts/normalize-revenue.mjs",
+    "seed:document-analysis": "node scripts/seed-document-analysis.mjs",
+    "auth:bootstrap-admin": "node scripts/bootstrap-admin-user.mjs",
+    "db:apply:expense-workflow": "node scripts/apply-sql.mjs sql/008_expense_management.sql",
+    "seed:expense-management": "node scripts/seed-expense-management.mjs",
+    "db:apply:invoice-workflow": "node scripts/apply-sql.mjs sql/009_invoice_workflow.sql",
+    "seed:invoice-workflow": "node scripts/seed-invoice-workflow.mjs",
+    "db:apply:race-budgets": "node scripts/apply-sql.mjs sql/013_race_budget_rules.sql sql/014_race_budget_rule_units.sql"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.18.0",
+    "next": "^15.0.0",
+    "pnpm": "^10.32.1",
+    "vercel": "^50.32.1"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1009.0",
+    "@aws-sdk/s3-request-presigner": "^3.1009.0",
+    "pg": "^8.20.0",
+    "xlsx": "^0.18.5"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "tbr-sponsor-revenue-sample",
+  "companyCode": "TBR",
+  "sourceSystem": "google_sheets_csv",
+  "sourceName": "TBR Sponsor Revenue Sample",
+  "sourceIdentifier": "tbr-sponsor-revenue-sample-v1",
+  "documentType": "sheet_row",
+  "csvPath": "../sanitized-fixtures/tbr-sponsor-revenue.sample.csv",
+  "rowKeyColumn": "sponsor_name",
+  "canonicalTargetTable": "revenue_records"
+}

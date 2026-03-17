@@ -1,0 +1,11 @@
+{
+  "name": "tbr-event-invoices-template",
+  "companyCode": "TBR",
+  "sourceSystem": "google_sheets_csv",
+  "sourceName": "TBR Event Invoices",
+  "sourceIdentifier": "replace-this-with-a-real-sheet-version-id",
+  "documentType": "sheet_row",
+  "csvPath": "../raw/replace-with-real-file.csv",
+  "rowKeyColumn": "invoice_number",
+  "canonicalTargetTable": "invoices"
+}

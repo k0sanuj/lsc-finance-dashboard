@@ -1,0 +1,262 @@
+{
+  "name": "tbr-bootstrap-workbooks",
+  "companyCode": "TBR",
+  "sourceSystem": "xlsx_upload",
+  "documentType": "manual_upload",
+  "workbooks": [
+    {
+      "workbookPath": "/Users/anujsingh/Downloads/Data for App/LSC - E1 Payments Summaries.xlsx",
+      "documentType": "manual_upload",
+      "canonicalTargetTable": "invoices",
+      "includeSheets": [
+        "Season 1",
+        "Season 2",
+        "Season 3",
+        "Spare parts Provision S2 ",
+        "Email sent on Apr3"
+      ],
+      "tags": {
+        "finance_stream": "payables",
+        "operating_workflow": "e1_vendor_payables",
+        "record_granularity": "invoice_summary",
+        "source_role": "primary",
+        "counterparty_type": "E1"
+      }
+    },
+    {
+      "workbookPath": "/Users/anujsingh/Downloads/Data for App/TBR Financial Plan_ 2024-25.xlsx",
+      "documentType": "manual_upload",
+      "canonicalTargetTable": "expenses",
+      "includeSheets": [
+        "Summary Sheets",
+        "Season 1",
+        "Season 2",
+        "Jeddah",
+        "Milan",
+        "Venice",
+        "Puerto Banus",
+        "Raw Estimates"
+      ],
+      "tags": {
+        "finance_stream": "planning_control",
+        "operating_workflow": "season_planning_control",
+        "record_granularity": "season_and_race_summary",
+        "source_role": "primary"
+      }
+    },
+    {
+      "workbookPath": "/Users/anujsingh/Downloads/Data for App/Reimbursement and Bill Reports - Jeddah S1.xlsx",
+      "documentType": "expense_report",
+      "canonicalTargetTable": "expenses",
+      "includeSheets": [
+        "Lisa Battaglia",
+        "Favas",
+        "AK",
+        "John Peters"
+      ],
+      "tags": {
+        "finance_stream": "race_ops_costs",
+        "operating_workflow": "race_reimbursement_management",
+        "record_granularity": "transaction_detail",
+        "source_role": "primary",
+        "season": "S1",
+        "race": "Jeddah"
+      }
+    },
+    {
+      "workbookPath": "/Users/anujsingh/Downloads/Data for App/Reimbursements and Bill Reports - Milan S1.xlsx",
+      "documentType": "expense_report",
+      "canonicalTargetTable": "expenses",
+      "includeSheets": [
+        "SARA",
+        "JP",
+        "Favas"
+      ],
+      "tags": {
+        "finance_stream": "race_ops_costs",
+        "operating_workflow": "race_reimbursement_management",
+        "record_granularity": "transaction_detail",
+        "source_role": "primary",
+        "season": "S1",
+        "race": "Milan"
+      }
+    },
+    {
+      "workbookPath": "/Users/anujsingh/Downloads/Data for App/Reimbursements and Bills Report - Venice S1.xlsx",
+      "documentType": "expense_report",
+      "canonicalTargetTable": "expenses",
+      "includeSheets": [
+        "Venice Overall Expense Report",
+        "LISA",
+        "JP Expense Report",
+        "Duncan"
+      ],
+      "tags": {
+        "finance_stream": "race_ops_costs",
+        "operating_workflow": "race_reimbursement_management",
+        "record_granularity": "transaction_detail",
+        "source_role": "primary",
+        "season": "S1",
+        "race": "Venice"
+      }
+    },
+    {
+      "workbookPath": "/Users/anujsingh/Downloads/Data for App/Reimbursements and Bill S2 Jeddah.xlsx",
+      "documentType": "expense_report",
+      "canonicalTargetTable": "expenses",
+      "includeSheets": [
+        "Summary Sheet",
+        "Budgeting",
+        "Prepaid Expenses",
+        "SARA",
+        "Anandh",
+        "Sayan",
+        "JP",
+        "Favas"
+      ],
+      "tags": {
+        "finance_stream": "race_ops_costs",
+        "operating_workflow": "race_reimbursement_management",
+        "record_granularity": "transaction_detail",
+        "source_role": "primary",
+        "season": "S2",
+        "race": "Jeddah"
+      }
+    },
+    {
+      "workbookPath": "/Users/anujsingh/Downloads/Data for App/Reimbursements and Bill S2 DOha.xlsx",
+      "documentType": "expense_report",
+      "canonicalTargetTable": "expenses",
+      "includeSheets": [
+        "Sara",
+        "JP",
+        "Anandh ",
+        "Jairish",
+        "Favas Reports "
+      ],
+      "tags": {
+        "finance_stream": "race_ops_costs",
+        "operating_workflow": "race_reimbursement_management",
+        "record_granularity": "transaction_detail",
+        "source_role": "primary",
+        "season": "S2",
+        "race": "Doha"
+      }
+    },
+    {
+      "workbookPath": "/Users/anujsingh/Downloads/Data for App/Reimbursements and Bill S2 Dubrovnik.xlsx",
+      "documentType": "expense_report",
+      "canonicalTargetTable": "expenses",
+      "includeSheets": [
+        "JP",
+        "Favas Reports ",
+        "Sara",
+        "anandh expensify report",
+        "Naveen ",
+        "Jairish"
+      ],
+      "tags": {
+        "finance_stream": "race_ops_costs",
+        "operating_workflow": "race_reimbursement_management",
+        "record_granularity": "transaction_detail",
+        "source_role": "primary",
+        "season": "S2",
+        "race": "Dubrovnik"
+      }
+    },
+    {
+      "workbookPath": "/Users/anujsingh/Downloads/Data for App/Reimbursements and Bill S2 Monaco.xlsx",
+      "documentType": "expense_report",
+      "canonicalTargetTable": "expenses",
+      "includeSheets": [
+        "Sara Summary Sheet",
+        "Sara",
+        "Anandh Monaco ",
+        "Jairish",
+        "Sayan Monaco Expenses",
+        "Roghith",
+        "Naveen Monaco"
+      ],
+      "tags": {
+        "finance_stream": "race_ops_costs",
+        "operating_workflow": "race_reimbursement_management",
+        "record_granularity": "transaction_detail",
+        "source_role": "primary",
+        "season": "S2",
+        "race": "Monaco"
+      }
+    },
+    {
+      "workbookPath": "/Users/anujsingh/Downloads/Data for App/Reimbursements and Bill S2 Lagos.xlsx",
+      "documentType": "expense_report",
+      "canonicalTargetTable": "expenses",
+      "includeSheets": [
+        "Anandh ",
+        "Sara",
+        "Jairish"
+      ],
+      "tags": {
+        "finance_stream": "race_ops_costs",
+        "operating_workflow": "race_reimbursement_management",
+        "record_granularity": "transaction_detail",
+        "source_role": "primary",
+        "season": "S2",
+        "race": "Lagos"
+      }
+    },
+    {
+      "workbookPath": "/Users/anujsingh/Downloads/Data for App/Reimbursements and Bill S2 Miami.xlsx",
+      "documentType": "expense_report",
+      "canonicalTargetTable": "expenses",
+      "includeSheets": [
+        "Sara Summary Sheet",
+        "Sara",
+        "Anandh ",
+        "Jairish",
+        "Naveen Monaco",
+        "Sara - Miami",
+        "roghith"
+      ],
+      "tags": {
+        "finance_stream": "race_ops_costs",
+        "operating_workflow": "race_reimbursement_management",
+        "record_granularity": "transaction_detail",
+        "source_role": "primary",
+        "season": "S2",
+        "race": "Miami"
+      }
+    },
+    {
+      "workbookPath": "/Users/anujsingh/Downloads/Data for App/John Peeters Expense Report JP's Copy S2 2025 (1).xlsx",
+      "documentType": "expense_report",
+      "canonicalTargetTable": "expenses",
+      "includeSheets": [
+        "TBR-JP Accounting",
+        "JP Races Expenses Accounting"
+      ],
+      "tags": {
+        "finance_stream": "reconciliation",
+        "operating_workflow": "person_reconciliation_dues",
+        "record_granularity": "person_rollup",
+        "source_role": "supplemental",
+        "person": "John Peters"
+      }
+    },
+    {
+      "workbookPath": "/Users/anujsingh/Downloads/Data for App/Sayan Expense Report .xlsx",
+      "documentType": "expense_report",
+      "canonicalTargetTable": "expenses",
+      "includeSheets": [
+        "Foreign_Transactions_Summary",
+        "Lagos and Miami S2"
+      ],
+      "tags": {
+        "finance_stream": "reconciliation",
+        "operating_workflow": "person_reconciliation_dues",
+        "record_granularity": "person_rollup",
+        "source_role": "supplemental",
+        "person": "Sayan"
+      }
+    }
+  ]
+}

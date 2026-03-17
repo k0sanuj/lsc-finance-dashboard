@@ -1,0 +1,11 @@
+{
+  "name": "tbr-personal-expenses-template",
+  "companyCode": "TBR",
+  "sourceSystem": "google_sheets_csv",
+  "sourceName": "TBR Personal Expenses",
+  "sourceIdentifier": "replace-this-with-a-real-sheet-version-id",
+  "documentType": "expense_report",
+  "csvPath": "../raw/replace-with-real-file.csv",
+  "rowKeyColumn": "expense_id",
+  "canonicalTargetTable": "expenses"
+}
