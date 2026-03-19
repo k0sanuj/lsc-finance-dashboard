@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
   typedRoutes: true,
   outputFileTracingRoot: path.join(dirname, "../.."),
   outputFileTracingExcludes: {
-    "*": ["node_modules/@swc/helpers/**"],
+    "*": ["./node_modules/**"],
   },
   transpilePackages: ["@lsc/db"],
   async headers() {
