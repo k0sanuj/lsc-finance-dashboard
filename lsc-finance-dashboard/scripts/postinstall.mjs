@@ -61,6 +61,25 @@ const locations = [
 ];
 
 let fixed = false;
+
+// Also search filesystem for @swc/helpers
+try {
+  const { execSync } = await import("child_process");
+  const found = execSync("find / -path '*/@swc/helpers/package.json' -maxdepth 8 2>/dev/null | head -10 || echo 'NOT FOUND'", { encoding: "utf8" }).trim();
+  console.log("postinstall: find result:", found);
+
+  if (found && found !== "NOT FOUND") {
+    for (const pkgPath of found.split("\n")) {
+      if (!pkgPath.endsWith("/package.json")) continue;
+      const swcDir = pkgPath.replace("/package.json", "");
+      const parentNodeModules = swcDir.replace("/@swc/helpers", "");
+      console.log("postinstall: trying fix at", parentNodeModules);
+      if (fixSwcHelpers(parentNodeModules)) fixed = true;
+    }
+  }
+} catch (e) {
+  console.log("postinstall: find error:", e.message);
+}
 for (const loc of locations) {
   if (fixSwcHelpers(loc)) fixed = true;
 }
