@@ -3,6 +3,7 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useCallback, useEffect } from "react";
 import type { AppUserRole } from "../lib/auth";
 
 type NavItem = {
@@ -15,6 +16,7 @@ type NavItem = {
 type NavGroup = {
   label: string;
   items: NavItem[];
+  collapsed?: boolean;
 };
 
 type SessionShellProps = {
@@ -61,126 +63,158 @@ function getNavGroups(role: AppUserRole | null): NavGroup[] {
       ]
     },
     {
-      label: "TBR User View",
+      label: "TBR Operations",
       items: [
         { href: "/tbr/my-expenses", label: "My Expenses", roles: ["super_admin", "finance_admin"] },
-        { href: "/tbr/races", label: "Races", roles: ["super_admin", "finance_admin"] }
-      ]
-    },
-    {
-      label: "TBR Admin",
-      items: [
-        { href: "/tbr/expense-management", label: "Review Console", roles: ["super_admin", "finance_admin"] },
+        { href: "/tbr/races", label: "Races", roles: ["super_admin", "finance_admin"] },
+        { href: "/tbr/expense-management", label: "Expense Review", roles: ["super_admin", "finance_admin"] },
         { href: "/tbr/invoice-hub", label: "Invoice Hub", roles: ["super_admin", "finance_admin"] },
         { href: "/tbr/team-management", label: "Team Management", roles: ["super_admin", "finance_admin"] }
       ]
     },
     {
-      label: "Finance Ops",
+      label: "Finance",
       items: [
-        { href: "/costs", label: "Costs", roles: ["super_admin", "finance_admin", "viewer"] },
-        { href: "/payments", label: "Payments", roles: ["super_admin", "finance_admin"] },
-        { href: "/documents", label: "Documents", roles: ["super_admin", "finance_admin"] },
+        { href: "/costs/TBR" as Route, label: "Costs", roles: ["super_admin", "finance_admin", "viewer"] },
+        { href: "/payments/TBR" as Route, label: "Payments", roles: ["super_admin", "finance_admin"] },
+        { href: "/documents/TBR" as Route, label: "Documents", roles: ["super_admin", "finance_admin"] }
+      ]
+    },
+    {
+      label: "Strategy",
+      items: [
         {
-          href: "/commercial-goals",
+          href: "/commercial-goals/TBR" as Route,
           label: "Commercial Goals",
           roles: ["super_admin", "finance_admin", "commercial_user", "viewer"]
-        }
+        },
+        { href: "/ai-analysis", label: "AI Analysis", roles: ["super_admin", "finance_admin"] }
       ]
     },
     {
       label: "System",
       items: [
-        { href: "/ai-analysis", label: "AI Analysis", roles: ["super_admin", "finance_admin"] },
         { href: "/agent-graph", label: "Agent Graph", roles: ["super_admin", "finance_admin"] },
         { href: "/workflow-graph", label: "Workflow Graph", roles: ["super_admin", "finance_admin"] }
-      ]
+      ],
+      collapsed: true
     }
   ];
 }
 
-function getWorkspaceLabel(pathname: string) {
+type BreadcrumbSegment = { label: string; href?: string };
+
+function getBreadcrumbs(pathname: string): BreadcrumbSegment[] {
+  const crumbs: BreadcrumbSegment[] = [];
+
+  if (pathname === "/" || pathname === "/login") return crumbs;
+
   if (pathname.startsWith("/tbr/races/")) {
-    return "TBR / Race Workspace";
-  }
-  if (pathname.startsWith("/tbr/races")) {
-    return "TBR / Races";
-  }
-  if (pathname.startsWith("/tbr/my-expenses")) {
-    return "TBR / My Expenses";
-  }
-  if (pathname.startsWith("/tbr/expense-management")) {
-    return "TBR Admin / Review Console";
-  }
-  if (pathname.startsWith("/tbr/invoice-hub")) {
-    return "TBR Admin / Invoice Hub";
-  }
-  if (pathname.startsWith("/tbr/team-management")) {
-    return "TBR Admin / Team Management";
-  }
-  if (pathname.startsWith("/tbr")) {
-    return "TBR / Overview";
-  }
-  if (pathname.startsWith("/fsp")) {
-    return "FSP";
-  }
-  if (pathname.startsWith("/commercial-goals")) {
-    return pathname.startsWith("/commercial-goals/FSP") ? "Commercial Goals / FSP" : pathname.startsWith("/commercial-goals/TBR") ? "Commercial Goals / TBR" : "Commercial Goals";
-  }
-  if (pathname.startsWith("/costs")) {
-    return pathname.startsWith("/costs/FSP") ? "Costs / FSP" : pathname.startsWith("/costs/TBR") ? "Costs / TBR" : "Costs";
-  }
-  if (pathname.startsWith("/payments")) {
-    return pathname.startsWith("/payments/FSP") ? "Payments / FSP" : pathname.startsWith("/payments/TBR") ? "Payments / TBR" : "Payments";
-  }
-  if (pathname.startsWith("/documents")) {
-    return pathname.startsWith("/documents/FSP") ? "Documents / FSP" : pathname.startsWith("/documents/TBR") ? "Documents / TBR" : "Documents";
-  }
-  if (pathname.startsWith("/ai-analysis")) {
-    return "AI Analysis";
-  }
-  if (pathname.startsWith("/agent-graph")) {
-    return "Agent Graph";
-  }
-  if (pathname.startsWith("/workflow-graph")) {
-    return "Workflow Graph";
+    crumbs.push({ label: "TBR", href: "/tbr" });
+    crumbs.push({ label: "Races", href: "/tbr/races" });
+    crumbs.push({ label: "Race Detail" });
+  } else if (pathname.startsWith("/tbr/expense-management/")) {
+    crumbs.push({ label: "TBR", href: "/tbr" });
+    crumbs.push({ label: "Expense Review", href: "/tbr/expense-management" });
+    crumbs.push({ label: "Submission Detail" });
+  } else if (pathname.startsWith("/tbr/")) {
+    crumbs.push({ label: "TBR", href: "/tbr" });
+    const sub = pathname.replace("/tbr/", "").split("/")[0];
+    const labels: Record<string, string> = {
+      races: "Races",
+      "my-expenses": "My Expenses",
+      "expense-management": "Expense Review",
+      "invoice-hub": "Invoice Hub",
+      "team-management": "Team Management"
+    };
+    if (labels[sub]) crumbs.push({ label: labels[sub] });
+  } else if (pathname.startsWith("/costs/")) {
+    const company = pathname.split("/")[2];
+    crumbs.push({ label: "Finance" });
+    crumbs.push({ label: `Costs / ${company || ""}` });
+  } else if (pathname.startsWith("/payments/")) {
+    const company = pathname.split("/")[2];
+    crumbs.push({ label: "Finance" });
+    crumbs.push({ label: `Payments / ${company || ""}` });
+  } else if (pathname.startsWith("/documents/")) {
+    const company = pathname.split("/")[2];
+    crumbs.push({ label: "Finance" });
+    crumbs.push({ label: `Documents / ${company || ""}` });
+  } else if (pathname.startsWith("/commercial-goals/")) {
+    const company = pathname.split("/")[2];
+    crumbs.push({ label: "Strategy" });
+    crumbs.push({ label: `Commercial Goals / ${company || ""}` });
+  } else if (pathname.startsWith("/ai-analysis")) {
+    crumbs.push({ label: "Strategy" });
+    crumbs.push({ label: "AI Analysis" });
   }
 
-  return "Overview";
+  return crumbs;
+}
+
+function getWorkspaceLabel(pathname: string) {
+  if (pathname.startsWith("/tbr/races/")) return "Race Workspace";
+  if (pathname.startsWith("/tbr/races")) return "Races";
+  if (pathname.startsWith("/tbr/my-expenses")) return "My Expenses";
+  if (pathname.startsWith("/tbr/expense-management/")) return "Submission Review";
+  if (pathname.startsWith("/tbr/expense-management")) return "Expense Review";
+  if (pathname.startsWith("/tbr/invoice-hub")) return "Invoice Hub";
+  if (pathname.startsWith("/tbr/team-management")) return "Team Management";
+  if (pathname.startsWith("/tbr")) return "TBR Overview";
+  if (pathname.startsWith("/fsp")) return "FSP";
+  if (pathname.startsWith("/commercial-goals")) {
+    return pathname.includes("/FSP") ? "Commercial Goals / FSP" : pathname.includes("/TBR") ? "Commercial Goals / TBR" : "Commercial Goals";
+  }
+  if (pathname.startsWith("/costs")) {
+    return pathname.includes("/FSP") ? "Costs / FSP" : pathname.includes("/TBR") ? "Costs / TBR" : "Costs";
+  }
+  if (pathname.startsWith("/payments")) {
+    return pathname.includes("/FSP") ? "Payments / FSP" : pathname.includes("/TBR") ? "Payments / TBR" : "Payments";
+  }
+  if (pathname.startsWith("/documents")) {
+    return pathname.includes("/FSP") ? "Documents / FSP" : pathname.includes("/TBR") ? "Documents / TBR" : "Documents";
+  }
+  if (pathname.startsWith("/ai-analysis")) return "AI Analysis";
+  if (pathname.startsWith("/agent-graph")) return "Agent Graph";
+  if (pathname.startsWith("/workflow-graph")) return "Workflow Graph";
+  return "Portfolio Overview";
 }
 
 function getInitials(fullName?: string) {
-  if (!fullName) {
-    return "LS";
-  }
-
-  const parts = fullName
-    .split(/\s+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
+  if (!fullName) return "LS";
+  const parts = fullName.split(/\s+/).map((p) => p.trim()).filter(Boolean);
+  return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
 }
 
 export function SessionShell({ children, user }: SessionShellProps) {
   const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
+  // Close sidebar on navigation
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
+
+  // Close sidebar on escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSidebarOpen(false);
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, []);
 
   if (pathname === "/login") {
     return <>{children}</>;
   }
 
   const filterItem = (item: NavItem): NavItem | null => {
-    if (user && !item.roles.includes(user.role)) {
-      return null;
-    }
-
+    if (user && !item.roles.includes(user.role)) return null;
     const filteredChildren = item.children
       ?.map((child) => filterItem(child))
       .filter((child): child is NavItem => child !== null);
-
     return {
       ...item,
       children: filteredChildren && filteredChildren.length > 0 ? filteredChildren : undefined
@@ -194,11 +228,33 @@ export function SessionShell({ children, user }: SessionShellProps) {
     }))
     .filter((group) => group.items.length > 0);
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = (href: string) => {
+    if (href === "/") return pathname === "/";
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
+  const breadcrumbs = getBreadcrumbs(pathname);
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      {/* Mobile sidebar toggle */}
+      <button
+        className="sidebar-toggle"
+        onClick={() => setSidebarOpen((v) => !v)}
+        aria-label={sidebarOpen ? "Close navigation" : "Open navigation"}
+        type="button"
+      >
+        {sidebarOpen ? "\u2715" : "\u2630"}
+      </button>
+
+      {/* Mobile backdrop */}
+      <div
+        className={`sidebar-backdrop ${sidebarOpen ? "visible" : ""}`}
+        onClick={closeSidebar}
+        role="presentation"
+      />
+
+      <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="brand-block">
           <span className="brand-kicker">League Sports Co</span>
           <h1>Finance Operating System</h1>
@@ -247,7 +303,21 @@ export function SessionShell({ children, user }: SessionShellProps) {
       <main className="main">
         <div className="workspace-topbar">
           <div className="workspace-title-block">
-            <span className="section-kicker">Current workspace</span>
+            {breadcrumbs.length > 0 && (
+              <nav className="breadcrumb" aria-label="Breadcrumb">
+                <Link href="/">Home</Link>
+                {breadcrumbs.map((crumb, i) => (
+                  <span key={i}>
+                    <span className="breadcrumb-sep">/</span>
+                    {crumb.href ? (
+                      <Link href={crumb.href as Route}>{crumb.label}</Link>
+                    ) : (
+                      <span>{crumb.label}</span>
+                    )}
+                  </span>
+                ))}
+              </nav>
+            )}
             <strong>{getWorkspaceLabel(pathname)}</strong>
           </div>
           <div className="profile-chip">

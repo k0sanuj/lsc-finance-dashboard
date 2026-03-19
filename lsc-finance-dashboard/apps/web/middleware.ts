@@ -23,6 +23,13 @@ export async function middleware(request: NextRequest) {
   const secret = process.env.AUTH_SESSION_SECRET;
 
   if (!secret) {
+    // Auth secret is required — redirect to login with error
+    if (!isPublicPath(pathname)) {
+      console.error("[middleware] AUTH_SESSION_SECRET is not configured. Authentication disabled is not allowed.");
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("error", "Auth is not configured. Contact your administrator.");
+      return NextResponse.redirect(loginUrl);
+    }
     return NextResponse.next();
   }
 

@@ -135,6 +135,64 @@ export default async function TbrRaceDetailPage({ params, searchParams }: RaceDe
         </div>
       </section>
 
+      {/* Race P&L Summary — unified financial view */}
+      {session.role !== "team_member" ? (
+        <section className="card compact-section-card">
+          <div className="card-title-row">
+            <div>
+              <span className="section-kicker">Race P&L</span>
+              <h3>Financial summary</h3>
+            </div>
+            <div className="inline-actions">
+              <Link className="ghost-link" href={`/costs/TBR?race=${raceId}`}>
+                Cost breakdown
+              </Link>
+              <Link className="ghost-link" href="/payments/TBR">
+                Payables
+              </Link>
+            </div>
+          </div>
+          <div className="stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+            <div className="metric-card">
+              <div className="metric-topline">
+                <span className="metric-label">Revenue</span>
+                <span className={`pill signal-pill ${Number(race.recognizedRevenue?.replace(/[^0-9.-]/g, "") ?? 0) > 0 ? "signal-good" : "signal-muted"}`}>
+                  recognized
+                </span>
+              </div>
+              <div className="metric-value">{race.recognizedRevenue}</div>
+            </div>
+            <div className="metric-card">
+              <div className="metric-topline">
+                <span className="metric-label">Total Cost</span>
+              </div>
+              <div className="metric-value">{race.totalCost}</div>
+              <span className="metric-note">
+                Invoices: {race.eventInvoices} · Reimbursements: {race.reimbursements}
+              </span>
+            </div>
+            <div className="metric-card">
+              <div className="metric-topline">
+                <span className="metric-label">Open Payables</span>
+                <span className={`pill signal-pill ${Number(race.openPayables?.replace(/[^0-9.-]/g, "") ?? 0) > 0 ? "signal-warn" : "signal-good"}`}>
+                  {race.openInvoiceCount} invoices
+                </span>
+              </div>
+              <div className="metric-value">{race.openPayables}</div>
+            </div>
+            <div className="metric-card">
+              <div className="metric-topline">
+                <span className="metric-label">Expense Pipeline</span>
+              </div>
+              <div className="metric-value">{race.submittedExpenses}</div>
+              <span className="metric-note">
+                Approved: {race.approvedExpenses} · Pending receipts: {race.pendingReceipts}
+              </span>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <RaceExpenseReportBuilder raceId={raceId} raceName={race.name} rows={billQueue} />
 
       <section className="card compact-section-card">
