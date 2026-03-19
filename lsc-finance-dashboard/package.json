@@ -38,6 +38,9 @@
     "xlsx": "^0.18.5"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp"]
+    "onlyBuiltDependencies": ["esbuild", "sharp"],
+    "overrides": {
+      "@swc/helpers": "0.5.13"
+    }
   }
 }
