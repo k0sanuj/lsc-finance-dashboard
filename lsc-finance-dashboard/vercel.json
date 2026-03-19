@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "installCommand": "npm install --legacy-peer-deps",
-  "buildCommand": "cd apps/web && npx next build && cd ../.. && rm -rf .next && cp -R apps/web/.next .next",
+  "installCommand": "npm exec -- pnpm install --no-frozen-lockfile && node -e \"const fs=require('fs'),p=require('path');const d=p.join('node_modules','@swc','helpers','_');if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});fs.readdirSync(p.join('node_modules','@swc','helpers')).filter(f=>f.startsWith('_')&&f!=='_').forEach(f=>{const t=p.join(d,f);if(!fs.existsSync(t)){fs.mkdirSync(t,{recursive:true});fs.writeFileSync(p.join(t,'package.json'),JSON.stringify({main:'../../esm/'+f+'.js'}))}})\"",
+  "buildCommand": "npm exec -- pnpm --filter web build && rm -rf .next && cp -R apps/web/.next .next",
   "devCommand": "npm exec -- pnpm --filter web dev"
 }
