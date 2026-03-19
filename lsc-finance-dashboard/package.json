@@ -34,11 +34,15 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1009.0",
     "@aws-sdk/s3-request-presigner": "^3.1009.0",
+    "@swc/helpers": "0.5.13",
     "pg": "^8.20.0",
     "xlsx": "^0.18.5"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp"],
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ],
     "overrides": {
       "@swc/helpers": "0.5.13"
     }

@@ -17,6 +17,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.1009.0
         version: 3.1009.0
+      '@swc/helpers':
+        specifier: 0.5.13
+        version: 0.5.13
       pg:
         specifier: ^8.20.0
         version: 8.20.0
