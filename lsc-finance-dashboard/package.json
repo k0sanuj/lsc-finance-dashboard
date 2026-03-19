@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@types/pg": "^8.18.0",
-    "next": "15.3.3",
+    "next": "^15.0.0",
     "pnpm": "^10.32.1",
     "vercel": "^50.32.1"
   },
@@ -36,10 +36,5 @@
     "@aws-sdk/s3-request-presigner": "^3.1009.0",
     "pg": "^8.20.0",
     "xlsx": "^0.18.5"
-  },
-  "pnpm": {
-    "overrides": {
-      "@swc/helpers": "0.5.12"
-    }
   }
 }
