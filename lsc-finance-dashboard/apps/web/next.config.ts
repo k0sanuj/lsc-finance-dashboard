@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
   typedRoutes: true,
   outputFileTracingRoot: path.join(dirname, "../.."),
   transpilePackages: ["@lsc/db"],
+  serverExternalPackages: ["@swc/helpers"],
   async headers() {
     return [
       {
