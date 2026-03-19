@@ -7,6 +7,9 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig: NextConfig = {
   typedRoutes: true,
   outputFileTracingRoot: path.join(dirname, "../.."),
+  outputFileTracingExcludes: {
+    "*": ["node_modules/@swc/helpers/**"],
+  },
   transpilePackages: ["@lsc/db"],
   async headers() {
     return [
