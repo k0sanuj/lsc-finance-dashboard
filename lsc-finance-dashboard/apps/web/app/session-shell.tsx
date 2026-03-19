@@ -254,7 +254,7 @@ export function SessionShell({ children, user }: SessionShellProps) {
         role="presentation"
       />
 
-      <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
+      <aside className={`sidebar ${sidebarOpen ? "open" : ""}`} aria-label="Main navigation">
         <div className="brand-block">
           <span className="brand-kicker">League Sports Co</span>
           <h1>Finance Operating System</h1>
@@ -300,7 +300,7 @@ export function SessionShell({ children, user }: SessionShellProps) {
           </button>
         </form>
       </aside>
-      <main className="main">
+      <main className="main" id="main-content">
         <div className="workspace-topbar">
           <div className="workspace-title-block">
             {breadcrumbs.length > 0 && (
