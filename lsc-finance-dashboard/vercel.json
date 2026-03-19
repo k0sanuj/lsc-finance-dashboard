@@ -2,12 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "builds": [
     {
-      "src": "package.json",
-      "use": "@vercel/next@4.4.2",
-      "config": {
-        "installCommand": "npm exec -- pnpm install --frozen-lockfile",
-        "buildCommand": "npm exec -- pnpm --filter web build && rm -rf .next && cp -R apps/web/.next .next"
-      }
+      "src": "apps/web/package.json",
+      "use": "@vercel/next@4.4.2"
     }
+  ],
+  "installCommand": "npm exec -- pnpm install --frozen-lockfile",
+  "routes": [
+    { "src": "/(.*)", "dest": "/apps/web/$1" }
   ]
 }
