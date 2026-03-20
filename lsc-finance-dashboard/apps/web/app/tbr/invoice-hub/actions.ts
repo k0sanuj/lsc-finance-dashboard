@@ -21,6 +21,14 @@ function redirectToInvoiceHub(status: "success" | "error" | "info", message: str
   );
 }
 
+function revalidateInvoicePaths() {
+  revalidatePath("/payments");
+  revalidatePath("/tbr");
+  revalidatePath("/tbr/invoice-hub");
+  revalidatePath("/tbr/expense-management");
+  revalidatePath("/tbr/my-expenses");
+}
+
 export async function createInvoiceIntakeAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
   const session = await requireSession();
@@ -32,6 +40,8 @@ export async function createInvoiceIntakeAction(formData: FormData) {
   const totalAmount = parseAmount(String(formData.get("totalAmount") ?? "0"));
   const categoryHint = normalizeWhitespace(String(formData.get("categoryHint") ?? "")) || null;
   const operatorNote = normalizeWhitespace(String(formData.get("operatorNote") ?? "")) || null;
+  const paymentType = normalizeWhitespace(String(formData.get("paymentType") ?? "direct"));
+  const paidByUserId = normalizeWhitespace(String(formData.get("paidByUserId") ?? "")) || null;
 
   if (!vendorName || totalAmount <= 0) {
     redirectToInvoiceHub("error", "Vendor name and a positive amount are required.");
@@ -44,6 +54,21 @@ export async function createInvoiceIntakeAction(formData: FormData) {
 
   if (!companyId) {
     redirectToInvoiceHub("error", "TBR company record was not found.");
+  }
+
+  // Build the operator note with reimbursement context
+  const isReimbursement = paymentType === "reimbursement";
+  let fullNote = operatorNote ?? "";
+
+  if (isReimbursement && paidByUserId) {
+    const userRows = await queryRowsAdmin<{ full_name: string }>(
+      `select full_name from app_users where id = $1 limit 1`,
+      [paidByUserId]
+    );
+    const paidByName = userRows[0]?.full_name ?? "Unknown";
+    fullNote = `[REIMBURSEMENT] Paid by: ${paidByName}. ${fullNote}`.trim();
+  } else if (isReimbursement) {
+    fullNote = `[REIMBURSEMENT] ${fullNote}`.trim();
   }
 
   await executeAdmin(
@@ -61,13 +86,40 @@ export async function createInvoiceIntakeAction(formData: FormData) {
        submitted_at
      )
      values ($1, $2, $3, 'submitted', $4, $5, $6, $7, $8, $9, now())`,
-    [companyId, raceEventId || null, session.id, vendorName, invoiceNumber, dueDate || null, totalAmount, categoryHint, operatorNote]
+    [companyId, raceEventId || null, session.id, vendorName, invoiceNumber, dueDate || null, totalAmount, categoryHint, fullNote || null]
   );
 
-  revalidatePath("/payments");
-  revalidatePath("/tbr");
-  revalidatePath("/tbr/invoice-hub");
-  redirectToInvoiceHub("success", "Invoice intake created.");
+  // If reimbursement, create an expense submission linked to this invoice
+  if (isReimbursement && paidByUserId) {
+    const submitterId = paidByUserId;
+    await executeAdmin(
+      `insert into expense_submissions (
+         company_id,
+         race_event_id,
+         submitted_by_user_id,
+         submission_status,
+         submission_title,
+         operator_note,
+         submitted_at
+       )
+       values ($1, $2, $3, 'submitted', $4, $5, now())`,
+      [
+        companyId,
+        raceEventId || null,
+        submitterId,
+        `Reimbursement: ${vendorName} - $${totalAmount}`,
+        `Auto-created from Invoice Hub. ${fullNote}`
+      ]
+    );
+  }
+
+  revalidateInvoicePaths();
+  redirectToInvoiceHub(
+    "success",
+    isReimbursement
+      ? "Invoice intake created and reimbursement flagged for the expense pipeline."
+      : "Invoice intake created."
+  );
 }
 
 export async function updateInvoiceIntakeStatusAction(formData: FormData) {
@@ -90,7 +142,7 @@ export async function updateInvoiceIntakeStatusAction(formData: FormData) {
     [intakeId, nextStatus, session.id]
   );
 
-  revalidatePath("/tbr/invoice-hub");
+  revalidateInvoicePaths();
   redirectToInvoiceHub(
     "success",
     nextStatus === "rejected" ? "Invoice intake rejected." : "Invoice intake moved into review."
@@ -116,6 +168,7 @@ export async function approveAndPostInvoiceIntakeAction(formData: FormData) {
     total_amount: string;
     operator_note: string | null;
     canonical_invoice_id: string | null;
+    source_document_id: string | null;
   }>(
     `select
        id,
@@ -126,7 +179,8 @@ export async function approveAndPostInvoiceIntakeAction(formData: FormData) {
        due_date::text,
        total_amount::text,
        operator_note,
-       canonical_invoice_id
+       canonical_invoice_id,
+       source_document_id
      from invoice_intakes
      where id = $1
      limit 1`,
@@ -143,6 +197,7 @@ export async function approveAndPostInvoiceIntakeAction(formData: FormData) {
     redirectToInvoiceHub("info", "This invoice intake has already been posted.");
   }
 
+  // Create or find the vendor counterparty
   const counterpartyRows = await queryRowsAdmin<{ id: string }>(
     `insert into sponsors_or_customers (
        company_id,
@@ -161,12 +216,16 @@ export async function approveAndPostInvoiceIntakeAction(formData: FormData) {
 
   const sponsorOrCustomerId = counterpartyRows[0]?.id;
 
+  // Determine if this is a reimbursement
+  const isReimbursement = (intake.operator_note ?? "").includes("[REIMBURSEMENT]");
+
+  // Post to canonical invoices
   const invoiceRows = await queryRowsAdmin<{ id: string }>(
     `insert into invoices (
        company_id,
        sponsor_or_customer_id,
-       owner_id,
        race_event_id,
+       source_document_id,
        direction,
        invoice_number,
        invoice_status,
@@ -177,12 +236,13 @@ export async function approveAndPostInvoiceIntakeAction(formData: FormData) {
        total_amount,
        notes
      )
-     values ($1, $2, null, $3, 'payable', $4, 'issued', current_date, $5, 'USD', $6, $6, $7)
+     values ($1, $2, $3, $4, 'payable', $5, 'issued', current_date, $6, 'USD', $7, $7, $8)
      returning id`,
     [
       intake.company_id,
       sponsorOrCustomerId ?? null,
       intake.race_event_id,
+      intake.source_document_id,
       intake.invoice_number,
       intake.due_date,
       intake.total_amount,
@@ -196,6 +256,7 @@ export async function approveAndPostInvoiceIntakeAction(formData: FormData) {
     redirectToInvoiceHub("error", "Canonical payable invoice posting failed.");
   }
 
+  // Update the intake record
   await executeAdmin(
     `update invoice_intakes
      set intake_status = 'posted',
@@ -208,8 +269,38 @@ export async function approveAndPostInvoiceIntakeAction(formData: FormData) {
     [intakeId, canonicalInvoiceId, session.id]
   );
 
-  revalidatePath("/payments");
-  revalidatePath("/tbr");
-  revalidatePath("/tbr/invoice-hub");
-  redirectToInvoiceHub("success", "Invoice intake approved and posted into payable invoices.");
+  // If reimbursement, also create an expense record linked to this invoice
+  if (isReimbursement) {
+    await executeAdmin(
+      `insert into expenses (
+         company_id,
+         invoice_id,
+         race_event_id,
+         vendor_name,
+         expense_status,
+         expense_date,
+         currency_code,
+         amount,
+         description,
+         is_reimbursable
+       )
+       values ($1, $2, $3, $4, 'approved', current_date, 'USD', $5, $6, true)`,
+      [
+        intake.company_id,
+        canonicalInvoiceId,
+        intake.race_event_id,
+        intake.vendor_name,
+        intake.total_amount,
+        `Reimbursable expense from Invoice Hub: ${intake.vendor_name}`
+      ]
+    );
+  }
+
+  revalidateInvoicePaths();
+  redirectToInvoiceHub(
+    "success",
+    isReimbursement
+      ? "Invoice approved, posted to payables, and reimbursement expense created."
+      : "Invoice intake approved and posted into payable invoices."
+  );
 }

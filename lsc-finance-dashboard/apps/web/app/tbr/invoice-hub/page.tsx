@@ -9,7 +9,7 @@ import {
   getInvoiceApprovalQueue,
   getInvoiceWorkflowSummary
 } from "@lsc/db";
-import { requireRole } from "../../../lib/auth";
+import { requireRole, requireSession } from "../../../lib/auth";
 import {
   approveAndPostInvoiceIntakeAction,
   createInvoiceIntakeAction,
@@ -21,7 +21,6 @@ import { ModalLauncher } from "../../components/modal-launcher";
 import {
   formatDocumentWorkflowForSelection
 } from "../../lib/shared-workspace";
-import { formatWorkflowContextLabel } from "../../lib/workflow-labels";
 
 type InvoiceHubPageProps = {
   searchParams?: Promise<{
@@ -51,6 +50,7 @@ type QueueRow = {
 type SourceQueueRow = {
   id?: string;
   intakeEventId?: string;
+  sourceDocumentId?: string;
   documentName: string;
   documentType: string;
   status: string;
@@ -62,6 +62,8 @@ type SourceQueueRow = {
   updateSummary?: string;
   originCountry?: string;
   currencyCode?: string;
+  previewAvailable?: boolean;
+  previewDataUrl?: string | null;
 };
 
 function parseCurrency(value: string) {
@@ -76,18 +78,19 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
   const session = await requireRole(["super_admin", "finance_admin"]);
   const params = searchParams ? await searchParams : undefined;
   const selectedAnalysisRunId = params?.analysisRunId ?? undefined;
+
   const [summary, queue, formOptions, sourceQueue, documentDetail, documentFields, postingEvents] = await Promise.all([
     getInvoiceWorkflowSummary(),
     getInvoiceApprovalQueue(),
     getExpenseFormOptions(),
-    getDocumentAnalysisQueue(),
+    getDocumentAnalysisQueue(session.id),
     selectedAnalysisRunId ? getDocumentAnalysisDetail(selectedAnalysisRunId, session.id) : Promise.resolve(null),
     selectedAnalysisRunId ? getDocumentExtractedFields(selectedAnalysisRunId) : Promise.resolve([]),
     selectedAnalysisRunId ? getDocumentPostingEvents(selectedAnalysisRunId) : Promise.resolve([])
   ]);
+
   const status = params?.status ?? null;
   const message = params?.message ?? null;
-
   const workflowSummary = summary as WorkflowMetric[];
   const intakeQueue = queue as QueueRow[];
   const sourceRuns = (sourceQueue as SourceQueueRow[]).filter((item) => {
@@ -100,48 +103,23 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
         "vendor-invoices"
     );
   });
-  const highestPayable = [...intakeQueue].sort(
-    (left, right) => parseCurrency(right.totalAmount) - parseCurrency(left.totalAmount)
-  )[0] ?? null;
-  const inReviewCount = intakeQueue.filter((row) => row.status === "in_review").length;
-  const submittedCount = intakeQueue.filter((row) => row.status === "submitted").length;
-  const postedCount = intakeQueue.filter((row) => row.status === "posted").length;
-  const workflowInsights = [
-    {
-      title: highestPayable
-        ? `${highestPayable.vendor} is the largest currently staged payable`
-        : "No staged payable is standing out yet",
-      summary: highestPayable
-        ? `${highestPayable.totalAmount} is the largest currently visible line in the intake queue.`
-        : "As invoice intake grows, this card should call out the vendor with the biggest current payable exposure."
-    },
-    {
-      title: `${submittedCount} intakes are still waiting for first review`,
-      summary:
-        "Those rows should move into review only after vendor, amount, due date, and race context look complete."
-    },
-    {
-      title: `${inReviewCount} are in review and ${postedCount} are already posted`,
-      summary:
-        "Keep intake, review, and posting separate so the due tracker remains traceable back to source documents."
-    }
-  ];
+
+  const pendingReview = intakeQueue.filter((r) => r.status === "submitted" || r.status === "in_review");
+  const totalPending = pendingReview.reduce((s, r) => s + parseCurrency(r.totalAmount), 0);
 
   return (
     <div className="page-grid">
+      {/* Header */}
       <section className="hero">
-        <span className="eyebrow">TBR admin</span>
-        <h2>Invoice Hub</h2>
+        <span className="eyebrow">TBR Invoice Hub</span>
+        <h2>Payables &amp; Invoices</h2>
         <p>
-          Use this page to stage payable invoices, review them, and post them into the canonical payable
-          ledger that feeds Payments and the TBR operating view.
+          Upload invoices (single or bulk), review AI-extracted data, flag reimbursements,
+          and post approved payables to the canonical ledger.
         </p>
         <div className="hero-actions">
-          <Link className="ghost-link" href="/payments/TBR">
-            Open payments
-          </Link>
-          <Link className="ghost-link" href={"/documents/TBR?view=vendor-invoices" as Route}>
-            Open source documents
+          <Link className="ghost-link" href="/payments/TBR" as={"/payments/TBR" as Route}>
+            Payments tracker
           </Link>
         </div>
       </section>
@@ -153,40 +131,65 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
         </section>
       ) : null}
 
+      {/* Metrics */}
       <section className="stats-grid compact-stats">
         {workflowSummary.map((item) => (
           <article className="metric-card" key={item.label}>
             <div className="metric-topline">
-              <span className="metric-label">Invoice workflow</span>
-              <span className="badge">{item.label}</span>
+              <span className="metric-label">{item.label}</span>
             </div>
             <div className="metric-value">{item.value}</div>
             <div className="metric-subvalue">{item.detail}</div>
           </article>
         ))}
+        <article className="metric-card">
+          <div className="metric-topline">
+            <span className="metric-label">Pending review</span>
+          </div>
+          <div className="metric-value">{pendingReview.length}</div>
+          <div className="metric-subvalue">
+            ${totalPending.toLocaleString()} total pending
+          </div>
+        </article>
       </section>
 
-      <section className="grid-two">
-        <article className="card compact-section-card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">Step 1</span>
-              <h3>Choose how you want to add the payable</h3>
-            </div>
-            <span className="pill">Actions</span>
+      {/* Upload Section — single unified entry point */}
+      <section className="card compact-section-card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">Upload invoices</span>
+            <h3>Add payables — single or bulk</h3>
           </div>
-          <div className="support-grid">
+          <div className="inline-actions">
             <ModalLauncher
-              triggerLabel="Create intake"
-              title="Create payable intake"
-              description="Enter the core payable fields directly when you already know the vendor, amount, and race context."
+              triggerLabel="Upload invoices"
+              title="Upload invoice documents"
+              description="Upload one or multiple invoice files. AI will scan each document, extract vendor, amount, dates, and create draft payable records for your review."
+              eyebrow="AI-powered intake"
+            >
+              <DocumentAnalyzerPanel
+                title="Upload invoices"
+                description="Drop single or multiple invoice files. Each will be scanned by AI and staged as a draft payable for review. Toggle 'Reimbursement' if an employee paid and needs to be reimbursed."
+                redirectPath="/tbr/invoice-hub"
+                notePlaceholder="E.g.: E1 Lagos catering invoices. Mark any that are reimbursements."
+                workflowTag="Invoice intake"
+                workflowContext="invoice-hub"
+                allowMultiple
+                showSubmissionMode
+                variant="plain"
+              />
+            </ModalLauncher>
+            <ModalLauncher
+              triggerLabel="Manual entry"
+              title="Create payable manually"
+              description="Enter invoice details directly when you already know the vendor, amount, and context."
               eyebrow="Manual intake"
             >
               <form action={createInvoiceIntakeAction} className="stack-form">
                 <div className="grid-two">
                   <label className="field">
                     <span>Vendor</span>
-                    <input name="vendorName" placeholder="E1 or vendor name" required />
+                    <input name="vendorName" placeholder="Vendor or supplier name" required />
                   </label>
                   <label className="field">
                     <span>Invoice number</span>
@@ -207,7 +210,7 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
                   <label className="field">
                     <span>Race</span>
                     <select name="raceEventId" defaultValue="">
-                      <option value="">Select race</option>
+                      <option value="">Select race (optional)</option>
                       {formOptions.races.map((race) => (
                         <option key={race.id} value={race.id}>
                           {race.label}
@@ -216,9 +219,9 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
                     </select>
                   </label>
                   <label className="field">
-                    <span>Category hint</span>
+                    <span>Category</span>
                     <select name="categoryHint" defaultValue="">
-                      <option value="">Select category hint</option>
+                      <option value="">Select category (optional)</option>
                       {formOptions.categories.map((category) => (
                         <option key={category.id} value={category.label}>
                           {category.label}
@@ -227,91 +230,70 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
                     </select>
                   </label>
                 </div>
+                <div className="grid-two">
+                  <label className="field">
+                    <span>Payment type</span>
+                    <select name="paymentType" defaultValue="direct">
+                      <option value="direct">Direct payable — TBR pays vendor</option>
+                      <option value="reimbursement">Reimbursement — employee paid, TBR reimburses</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Paid by (if reimbursement)</span>
+                    <select name="paidByUserId" defaultValue="">
+                      <option value="">Select team member</option>
+                      {formOptions.users.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
                 <label className="field">
-                  <span>Operator note</span>
+                  <span>Notes</span>
                   <textarea
                     name="operatorNote"
-                    rows={3}
-                    placeholder="Context for finance review or payment planning."
+                    rows={2}
+                    placeholder="Context for finance review."
                   />
                 </label>
-                <div className="process-step compact-process-step">
-                  <span className="process-step-index">Updates</span>
-                  <strong>This creates a staged invoice intake row first</strong>
-                  <span className="muted">
-                    After approval, the payable invoice posts into canonical invoices and then appears in the
-                    Payments workflow.
-                  </span>
-                </div>
                 <button className="action-button primary" type="submit">
                   Create invoice intake
                 </button>
               </form>
             </ModalLauncher>
-
-            <ModalLauncher
-              triggerLabel="Analyze document"
-              title="Analyze invoice document"
-              description="Upload an E1 invoice, vendor bill, or reimbursement invoice and keep the source mapping attached."
-              eyebrow="Source-backed intake"
-            >
-              <DocumentAnalyzerPanel
-                title="Analyze invoice document"
-                description="Upload an E1 invoice, vendor bill, or Drive-exported payable source here. The analyzer should classify it and prefill the finance review path."
-                redirectPath="/tbr/invoice-hub"
-                notePlaceholder="Example: E1 Lagos catering invoice, payable, due this month."
-                workflowTag="Invoice analyzer"
-                workflowContext="invoice-hub"
-                variant="plain"
-              />
-            </ModalLauncher>
           </div>
-        </article>
-
-        <article className="card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">AI comments</span>
-              <h3>What the payable workflow is saying</h3>
-            </div>
-            <span className="pill">Context aware</span>
-          </div>
-          <div className="info-grid">
-            {workflowInsights.map((insight) => (
-              <div className="process-step" key={insight.title}>
-                <span className="process-step-index">AI</span>
-                <strong>{insight.title}</strong>
-                <span className="muted">{insight.summary}</span>
-              </div>
-            ))}
-          </div>
-        </article>
+        </div>
+        <p>
+          Upload invoice documents for AI scanning, or enter details manually.
+          Each invoice is staged as a draft — review and approve below before it posts to the payable ledger.
+        </p>
       </section>
 
-      <section className="grid-two">
-        <article className="card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">Step 2</span>
-              <h3>Review source-backed invoice runs</h3>
+      {/* Scanned documents — AI results */}
+      {sourceRuns.length > 0 && (
+        <section className="grid-two">
+          <article className="card">
+            <div className="card-title-row">
+              <div>
+                <span className="section-kicker">AI scan results</span>
+                <h3>Scanned documents</h3>
+              </div>
+              <span className="pill">{sourceRuns.length} documents</span>
             </div>
-            <span className="pill">{sourceRuns.length} runs</span>
-          </div>
-          <div className="table-wrapper clean-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Document</th>
-                  <th>Category</th>
-                  <th>Workflow</th>
-                  <th>When</th>
-                  <th>Country / currency</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sourceRuns.length > 0 ? (
-                  sourceRuns.map((row) => (
+            <div className="table-wrapper clean-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Document</th>
+                    <th>Type</th>
+                    <th>Country / Currency</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sourceRuns.map((row) => (
                     <tr key={row.intakeEventId ?? row.id}>
                       <td>
                         {row.id ? (
@@ -322,70 +304,63 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
                           row.documentName
                         )}
                       </td>
-                      <td>{row.intakeCategory ?? "Unmapped"}</td>
-                      <td>{formatWorkflowContextLabel(row.workflowContext)}</td>
-                      <td>{row.createdAt ?? "Unknown"}</td>
+                      <td>{row.intakeCategory ?? row.documentType}</td>
                       <td>
-                        {row.originCountry ?? "Unknown"} / {row.currencyCode ?? "Unknown"}
+                        {row.originCountry ?? "—"} / {row.currencyCode ?? "—"}
                       </td>
                       <td>
-                        <div className="inline-actions">
-                          <span className="pill">{row.intakeStatus ?? row.status}</span>
-                          {row.updateSummary ? <span className="pill subtle-pill">mapped</span> : null}
-                        </div>
+                        <span className={`pill ${row.intakeStatus === "posted" || row.status === "approved" ? "signal-pill signal-good" : "subtle-pill"}`}>
+                          {formatStatusLabel(row.intakeStatus ?? row.status)}
+                        </span>
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="muted" colSpan={6}>
-                      No source-backed invoice runs yet. Use document analysis above when you want the intake to stay attached to the uploaded file.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </article>
-
-        {selectedAnalysisRunId ? (
-          <DocumentAnalysisSummary
-            detail={documentDetail}
-            fields={documentFields}
-            postingEvents={postingEvents}
-            title="Selected invoice source run"
-          />
-        ) : (
-          <section className="card compact-section-card">
-            <div className="process-step">
-              <span className="process-step-index">Selected detail</span>
-              <strong>Open one source run only when you need the extracted invoice detail</strong>
-              <span className="muted">
-                Keep the document preview, extracted fields, and posting history quiet until a specific source-backed invoice run is intentionally opened.
-              </span>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </section>
-        )}
-      </section>
+          </article>
 
+          {selectedAnalysisRunId ? (
+            <DocumentAnalysisSummary
+              detail={documentDetail}
+              fields={documentFields}
+              postingEvents={postingEvents}
+              title="Document detail"
+            />
+          ) : (
+            <section className="card compact-section-card">
+              <div className="process-step">
+                <span className="process-step-index">Tip</span>
+                <strong>Click a document name to view extracted fields</strong>
+                <span className="muted">
+                  The AI extraction shows vendor, amount, dates, and other fields pulled from the document.
+                </span>
+              </div>
+            </section>
+          )}
+        </section>
+      )}
+
+      {/* Payable intake queue — review and approve */}
       <article className="card">
         <div className="card-title-row">
           <div>
-            <span className="section-kicker">Step 3</span>
-            <h3>Review the payable intake queue</h3>
+            <span className="section-kicker">Review &amp; approve</span>
+            <h3>Payable intake queue</h3>
           </div>
-          <span className="pill">{intakeQueue.length} rows</span>
+          <span className="pill">{intakeQueue.length} invoices</span>
         </div>
         <div className="table-wrapper clean-table">
           <table>
             <thead>
               <tr>
                 <th>Vendor</th>
-                <th>Invoice</th>
+                <th>Invoice #</th>
                 <th>Race</th>
                 <th>Due</th>
-                <th>Total</th>
-                <th>Status / action</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -398,53 +373,62 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
                         {row.sourceLabel ? <span className="bill-subnote">{row.sourceLabel}</span> : null}
                       </div>
                     </td>
-                    <td>{row.invoiceNumber}</td>
+                    <td>{row.invoiceNumber || "—"}</td>
                     <td>{row.race}</td>
                     <td>{row.dueDate}</td>
-                    <td>{row.totalAmount}</td>
+                    <td><strong>{row.totalAmount}</strong></td>
+                    <td>
+                      <span className={`pill ${
+                        row.status === "posted" ? "signal-pill signal-good" :
+                        row.status === "rejected" ? "signal-pill signal-risk" :
+                        row.status === "in_review" ? "signal-pill signal-warn" :
+                        "subtle-pill"
+                      }`}>
+                        {formatStatusLabel(row.status)}
+                      </span>
+                    </td>
                     <td>
                       <div className="inline-actions">
-                        <span className="pill">{formatStatusLabel(row.status)}</span>
-                        {row.status === "submitted" ? (
+                        {row.status === "submitted" && (
                           <>
+                            <form action={approveAndPostInvoiceIntakeAction}>
+                              <input name="intakeId" type="hidden" value={row.id} />
+                              <button className="action-button primary" type="submit">
+                                Approve
+                              </button>
+                            </form>
                             <form action={updateInvoiceIntakeStatusAction}>
                               <input name="intakeId" type="hidden" value={row.id} />
                               <input name="nextStatus" type="hidden" value="in_review" />
                               <button className="action-button secondary" type="submit">
-                                Start review
-                              </button>
-                            </form>
-                            <form action={approveAndPostInvoiceIntakeAction}>
-                              <input name="intakeId" type="hidden" value={row.id} />
-                              <button className="action-button primary" type="submit">
-                                Approve and post
+                                Review
                               </button>
                             </form>
                             <form action={updateInvoiceIntakeStatusAction}>
                               <input name="intakeId" type="hidden" value={row.id} />
                               <input name="nextStatus" type="hidden" value="rejected" />
-                              <button className="action-button secondary" type="submit">
+                              <button className="danger-link" type="submit">
                                 Reject
                               </button>
                             </form>
                           </>
-                        ) : null}
-                        {row.status === "in_review" ? (
+                        )}
+                        {row.status === "in_review" && (
                           <form action={approveAndPostInvoiceIntakeAction}>
                             <input name="intakeId" type="hidden" value={row.id} />
                             <button className="action-button primary" type="submit">
-                              Post now
+                              Approve &amp; post
                             </button>
                           </form>
-                        ) : null}
+                        )}
                       </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td className="muted" colSpan={6}>
-                    No invoice intakes yet. Start with a manual intake or document analysis above.
+                  <td className="muted" colSpan={7}>
+                    No invoices in the queue. Upload documents or create a manual entry above.
                   </td>
                 </tr>
               )}
@@ -452,16 +436,6 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
           </table>
         </div>
       </article>
-
-      <section className="card compact-section-card">
-        <div className="process-step">
-          <span className="process-step-index">Step 4</span>
-          <strong>Post only after both the payable queue and the source run make sense together</strong>
-          <span className="muted">
-            The clean sequence here is: intake the source, review the extracted invoice facts, stage the payable row, then post into canonical invoices.
-          </span>
-        </div>
-      </section>
     </div>
   );
 }

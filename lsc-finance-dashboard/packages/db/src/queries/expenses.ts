@@ -605,7 +605,7 @@ export async function getRaceBudgetRules(raceEventId: string | null | undefined)
 
 export async function getExpenseFormOptions() {
   if (getBackend() === "database") {
-    const [raceRows, teamRows, categoryRows] = await Promise.all([
+    const [raceRows, teamRows, categoryRows, userRows] = await Promise.all([
       queryRows<ExpenseFormOptionSource>(
         `select id, name as label
          from race_events
@@ -623,19 +623,27 @@ export async function getExpenseFormOptions() {
          from cost_categories
          where company_id in (select id from companies where code = 'TBR'::company_code)
          order by name`
+      ),
+      queryRows<ExpenseFormOptionSource>(
+        `select id, full_name as label
+         from app_users
+         where is_active = true
+         order by full_name`
       )
     ]);
 
     return {
       races: raceRows satisfies ExpenseFormOption[],
       teams: teamRows satisfies ExpenseFormOption[],
-      categories: categoryRows satisfies ExpenseFormOption[]
+      categories: categoryRows satisfies ExpenseFormOption[],
+      users: userRows satisfies ExpenseFormOption[]
     };
   }
 
   return {
     races: [] satisfies ExpenseFormOption[],
     teams: [] satisfies ExpenseFormOption[],
-    categories: [] satisfies ExpenseFormOption[]
+    categories: [] satisfies ExpenseFormOption[],
+    users: [] satisfies ExpenseFormOption[]
   };
 }
