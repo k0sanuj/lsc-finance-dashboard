@@ -154,6 +154,60 @@ textarea {
   color: rgba(248, 242, 232, 0.86);
 }
 
+/* Company toggle button */
+.nav-company-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8f2e8;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.nav-company-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.nav-company-toggle.active {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.nav-company-toggle .nav-label {
+  color: rgba(245, 239, 230, 0.9);
+  font-size: 0.78rem;
+}
+
+.nav-chevron {
+  font-size: 0.7rem;
+  color: rgba(245, 239, 230, 0.5);
+}
+
+.nav-company-content {
+  display: grid;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.nav-subsection {
+  display: grid;
+  gap: 6px;
+}
+
+.nav-sublabel {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  color: rgba(245, 239, 230, 0.45);
+  padding-left: 14px;
+}
+
 .sidebar-note {
   display: grid;
   gap: 8px;

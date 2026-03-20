@@ -6,17 +6,22 @@ import { usePathname } from "next/navigation";
 import { useState, useCallback, useEffect } from "react";
 import type { AppUserRole } from "../lib/auth";
 
-type NavItem = {
+type NavLink = {
   href: Route;
   label: string;
   roles: AppUserRole[];
-  children?: NavItem[];
 };
 
-type NavGroup = {
+type NavSection = {
   label: string;
-  items: NavItem[];
-  collapsed?: boolean;
+  links: NavLink[];
+};
+
+type CompanyNav = {
+  href: Route;
+  label: string;
+  roles: AppUserRole[];
+  sections: NavSection[];
 };
 
 type SessionShellProps = {
@@ -27,129 +32,76 @@ type SessionShellProps = {
   } | null;
 };
 
-function getNavGroups(role: AppUserRole | null): NavGroup[] {
-  if (role === "team_member") {
-    return [
-      {
-        label: "TBR Workspace",
-        items: [
-          { href: "/tbr", label: "Overview", roles: ["team_member"] },
-          { href: "/tbr/my-expenses", label: "My Expenses", roles: ["team_member"] },
-          { href: "/tbr/races", label: "Races", roles: ["team_member"] }
-        ]
-      }
-    ];
-  }
+const ALL_ADMIN: AppUserRole[] = ["super_admin", "finance_admin"];
+const ALL_ROLES: AppUserRole[] = ["super_admin", "finance_admin", "commercial_user", "viewer"];
 
-  return [
-    {
-      label: "Portfolio",
-      items: [
-        {
-          href: "/",
-          label: "Overview",
-          roles: ["super_admin", "finance_admin", "commercial_user", "viewer"]
-        },
-        {
-          href: "/tbr",
-          label: "TBR",
-          roles: ["super_admin", "finance_admin", "commercial_user", "viewer"]
-        },
-        {
-          href: "/fsp",
-          label: "FSP",
-          roles: ["super_admin", "finance_admin", "commercial_user", "viewer"]
-        }
-      ]
-    },
-    {
-      label: "TBR Operations",
-      items: [
-        { href: "/tbr/my-expenses", label: "My Expenses", roles: ["super_admin", "finance_admin"] },
-        { href: "/tbr/races", label: "Races", roles: ["super_admin", "finance_admin"] },
-        { href: "/tbr/expense-management", label: "Expense Review", roles: ["super_admin", "finance_admin"] },
-        { href: "/tbr/invoice-hub", label: "Invoice Hub", roles: ["super_admin", "finance_admin"] },
-        { href: "/tbr/team-management", label: "Team Management", roles: ["super_admin", "finance_admin"] }
-      ]
-    },
-    {
-      label: "Finance",
-      items: [
-        { href: "/costs/TBR" as Route, label: "Costs", roles: ["super_admin", "finance_admin", "viewer"] },
-        { href: "/payments/TBR" as Route, label: "Payments", roles: ["super_admin", "finance_admin"] },
-        { href: "/documents/TBR" as Route, label: "Documents", roles: ["super_admin", "finance_admin"] }
-      ]
-    },
-    {
-      label: "Strategy",
-      items: [
-        {
-          href: "/commercial-goals/TBR" as Route,
-          label: "Commercial Goals",
-          roles: ["super_admin", "finance_admin", "commercial_user", "viewer"]
-        },
-        { href: "/ai-analysis", label: "AI Analysis", roles: ["super_admin", "finance_admin"] }
-      ]
-    },
-    {
-      label: "System",
-      items: [
-        { href: "/agent-graph", label: "Agent Graph", roles: ["super_admin", "finance_admin"] },
-        { href: "/workflow-graph", label: "Workflow Graph", roles: ["super_admin", "finance_admin"] }
-      ],
-      collapsed: true
-    }
-  ];
+function getTbrNav(): CompanyNav {
+  return {
+    href: "/tbr",
+    label: "TBR",
+    roles: ALL_ROLES,
+    sections: [
+      {
+        label: "Operations",
+        links: [
+          { href: "/tbr/my-expenses", label: "My Expenses", roles: ALL_ADMIN },
+          { href: "/tbr/races", label: "Races", roles: ALL_ADMIN },
+          { href: "/tbr/expense-management", label: "Expense Review", roles: ALL_ADMIN },
+          { href: "/tbr/invoice-hub", label: "Invoice Hub", roles: ALL_ADMIN },
+          { href: "/tbr/team-management", label: "Team Management", roles: ALL_ADMIN },
+        ],
+      },
+      {
+        label: "Finance",
+        links: [
+          { href: "/costs/TBR" as Route, label: "Costs", roles: [...ALL_ADMIN, "viewer"] },
+          { href: "/payments/TBR" as Route, label: "Payments", roles: ALL_ADMIN },
+          { href: "/documents/TBR" as Route, label: "Documents", roles: ALL_ADMIN },
+        ],
+      },
+      {
+        label: "Strategy",
+        links: [
+          { href: "/commercial-goals/TBR" as Route, label: "Commercial Goals", roles: ALL_ROLES },
+          { href: "/ai-analysis", label: "AI Analysis", roles: ALL_ADMIN },
+        ],
+      },
+    ],
+  };
 }
 
-type BreadcrumbSegment = { label: string; href?: string };
+function getFspNav(): CompanyNav {
+  return {
+    href: "/fsp",
+    label: "FSP",
+    roles: ALL_ROLES,
+    sections: [
+      {
+        label: "Planning",
+        links: [
+          { href: "/commercial-goals/FSP" as Route, label: "Commercial Goals", roles: ALL_ROLES },
+          { href: "/documents/FSP" as Route, label: "Documents", roles: ALL_ADMIN },
+        ],
+      },
+    ],
+  };
+}
 
-function getBreadcrumbs(pathname: string): BreadcrumbSegment[] {
-  const crumbs: BreadcrumbSegment[] = [];
-
-  if (pathname === "/" || pathname === "/login") return crumbs;
-
-  if (pathname.startsWith("/tbr/races/")) {
-    crumbs.push({ label: "TBR", href: "/tbr" });
-    crumbs.push({ label: "Races", href: "/tbr/races" });
-    crumbs.push({ label: "Race Detail" });
-  } else if (pathname.startsWith("/tbr/expense-management/")) {
-    crumbs.push({ label: "TBR", href: "/tbr" });
-    crumbs.push({ label: "Expense Review", href: "/tbr/expense-management" });
-    crumbs.push({ label: "Submission Detail" });
-  } else if (pathname.startsWith("/tbr/")) {
-    crumbs.push({ label: "TBR", href: "/tbr" });
-    const sub = pathname.replace("/tbr/", "").split("/")[0];
-    const labels: Record<string, string> = {
-      races: "Races",
-      "my-expenses": "My Expenses",
-      "expense-management": "Expense Review",
-      "invoice-hub": "Invoice Hub",
-      "team-management": "Team Management"
-    };
-    if (labels[sub]) crumbs.push({ label: labels[sub] });
-  } else if (pathname.startsWith("/costs/")) {
-    const company = pathname.split("/")[2];
-    crumbs.push({ label: "Finance" });
-    crumbs.push({ label: `Costs / ${company || ""}` });
-  } else if (pathname.startsWith("/payments/")) {
-    const company = pathname.split("/")[2];
-    crumbs.push({ label: "Finance" });
-    crumbs.push({ label: `Payments / ${company || ""}` });
-  } else if (pathname.startsWith("/documents/")) {
-    const company = pathname.split("/")[2];
-    crumbs.push({ label: "Finance" });
-    crumbs.push({ label: `Documents / ${company || ""}` });
-  } else if (pathname.startsWith("/commercial-goals/")) {
-    const company = pathname.split("/")[2];
-    crumbs.push({ label: "Strategy" });
-    crumbs.push({ label: `Commercial Goals / ${company || ""}` });
-  } else if (pathname.startsWith("/ai-analysis")) {
-    crumbs.push({ label: "Strategy" });
-    crumbs.push({ label: "AI Analysis" });
-  }
-
-  return crumbs;
+function getTeamMemberNav(): CompanyNav {
+  return {
+    href: "/tbr",
+    label: "TBR",
+    roles: ["team_member"],
+    sections: [
+      {
+        label: "My Work",
+        links: [
+          { href: "/tbr/my-expenses", label: "My Expenses", roles: ["team_member"] },
+          { href: "/tbr/races", label: "Races", roles: ["team_member"] },
+        ],
+      },
+    ],
+  };
 }
 
 function getWorkspaceLabel(pathname: string) {
@@ -162,22 +114,46 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/tbr/team-management")) return "Team Management";
   if (pathname.startsWith("/tbr")) return "TBR Overview";
   if (pathname.startsWith("/fsp")) return "FSP";
-  if (pathname.startsWith("/commercial-goals")) {
-    return pathname.includes("/FSP") ? "Commercial Goals / FSP" : pathname.includes("/TBR") ? "Commercial Goals / TBR" : "Commercial Goals";
-  }
-  if (pathname.startsWith("/costs")) {
-    return pathname.includes("/FSP") ? "Costs / FSP" : pathname.includes("/TBR") ? "Costs / TBR" : "Costs";
-  }
-  if (pathname.startsWith("/payments")) {
-    return pathname.includes("/FSP") ? "Payments / FSP" : pathname.includes("/TBR") ? "Payments / TBR" : "Payments";
-  }
-  if (pathname.startsWith("/documents")) {
-    return pathname.includes("/FSP") ? "Documents / FSP" : pathname.includes("/TBR") ? "Documents / TBR" : "Documents";
-  }
+  if (pathname.startsWith("/commercial-goals")) return "Commercial Goals";
+  if (pathname.startsWith("/costs")) return "Costs";
+  if (pathname.startsWith("/payments")) return "Payments";
+  if (pathname.startsWith("/documents")) return "Documents";
   if (pathname.startsWith("/ai-analysis")) return "AI Analysis";
   if (pathname.startsWith("/agent-graph")) return "Agent Graph";
   if (pathname.startsWith("/workflow-graph")) return "Workflow Graph";
   return "Portfolio Overview";
+}
+
+function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string }> {
+  if (pathname === "/" || pathname === "/login") return [];
+
+  const crumbs: Array<{ label: string; href?: string }> = [];
+
+  if (pathname.startsWith("/tbr/races/")) {
+    crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Races", href: "/tbr/races" }, { label: "Race Detail" });
+  } else if (pathname.startsWith("/tbr/expense-management/")) {
+    crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Expense Review", href: "/tbr/expense-management" }, { label: "Submission" });
+  } else if (pathname.startsWith("/tbr/")) {
+    crumbs.push({ label: "TBR", href: "/tbr" });
+    const sub = pathname.replace("/tbr/", "").split("/")[0];
+    const labels: Record<string, string> = {
+      races: "Races", "my-expenses": "My Expenses", "expense-management": "Expense Review",
+      "invoice-hub": "Invoice Hub", "team-management": "Team Management",
+    };
+    if (labels[sub]) crumbs.push({ label: labels[sub] });
+  } else if (pathname.startsWith("/costs/")) {
+    crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Costs" });
+  } else if (pathname.startsWith("/payments/")) {
+    crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Payments" });
+  } else if (pathname.startsWith("/documents/")) {
+    crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Documents" });
+  } else if (pathname.startsWith("/commercial-goals/")) {
+    crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Commercial Goals" });
+  } else if (pathname.startsWith("/ai-analysis")) {
+    crumbs.push({ label: "TBR", href: "/tbr" }, { label: "AI Analysis" });
+  }
+
+  return crumbs;
 }
 
 function getInitials(fullName?: string) {
@@ -189,15 +165,24 @@ function getInitials(fullName?: string) {
 export function SessionShell({ children, user }: SessionShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [expandedCompany, setExpandedCompany] = useState<string | null>(null);
 
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
-  // Close sidebar on navigation
+  // Auto-expand company based on current path
+  useEffect(() => {
+    if (pathname.startsWith("/tbr") || pathname.startsWith("/costs") || pathname.startsWith("/payments") || pathname.startsWith("/documents") || pathname.startsWith("/commercial-goals") || pathname.startsWith("/ai-analysis")) {
+      setExpandedCompany("TBR");
+    } else if (pathname.startsWith("/fsp")) {
+      setExpandedCompany("FSP");
+    }
+  }, [pathname]);
+
+  // Close sidebar on navigation (mobile)
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
 
-  // Close sidebar on escape
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") setSidebarOpen(false);
@@ -210,34 +195,31 @@ export function SessionShell({ children, user }: SessionShellProps) {
     return <>{children}</>;
   }
 
-  const filterItem = (item: NavItem): NavItem | null => {
-    if (user && !item.roles.includes(user.role)) return null;
-    const filteredChildren = item.children
-      ?.map((child) => filterItem(child))
-      .filter((child): child is NavItem => child !== null);
-    return {
-      ...item,
-      children: filteredChildren && filteredChildren.length > 0 ? filteredChildren : undefined
-    };
-  };
+  const role = user?.role ?? null;
 
-  const allowedGroups = getNavGroups(user?.role ?? null)
-    .map((group) => ({
-      ...group,
-      items: group.items.map((item) => filterItem(item)).filter((item): item is NavItem => item !== null)
-    }))
-    .filter((group) => group.items.length > 0);
+  // Build company navs based on role
+  const companies: CompanyNav[] = role === "team_member"
+    ? [getTeamMemberNav()]
+    : [getTbrNav(), getFspNav()];
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
+  const isCompanyActive = (company: CompanyNav) => {
+    if (isActive(company.href)) return true;
+    return company.sections.some((s) => s.links.some((l) => isActive(l.href)));
+  };
+
+  const toggleCompany = (label: string) => {
+    setExpandedCompany((prev) => (prev === label ? null : label));
+  };
+
   const breadcrumbs = getBreadcrumbs(pathname);
 
   return (
     <div className="app-shell">
-      {/* Mobile sidebar toggle */}
       <button
         className="sidebar-toggle"
         onClick={() => setSidebarOpen((v) => !v)}
@@ -247,7 +229,6 @@ export function SessionShell({ children, user }: SessionShellProps) {
         {sidebarOpen ? "\u2715" : "\u2630"}
       </button>
 
-      {/* Mobile backdrop */}
       <div
         className={`sidebar-backdrop ${sidebarOpen ? "visible" : ""}`}
         onClick={closeSidebar}
@@ -257,39 +238,97 @@ export function SessionShell({ children, user }: SessionShellProps) {
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`} aria-label="Main navigation">
         <div className="brand-block">
           <span className="brand-kicker">League Sports Co</span>
-          <h1>Finance Operating System</h1>
-          <p>
-            Consolidated portfolio control for LSC, with TBR as the active operating cockpit and
-            FSP kept structured for expansion.
-          </p>
+          <h1>Finance OS</h1>
         </div>
+
         <nav>
-          {allowedGroups.map((group) => (
-            <div className="nav-group" key={group.label}>
-              <span className="nav-label">{group.label}</span>
+          {/* Portfolio — always visible */}
+          <div className="nav-group">
+            <span className="nav-label">Portfolio</span>
+            <ul className="nav-list">
+              <li className="nav-item">
+                <Link className={pathname === "/" ? "active" : ""} href="/">
+                  Overview
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Company sections — expandable */}
+          {companies.map((company) => {
+            const expanded = expandedCompany === company.label;
+            const active = isCompanyActive(company);
+
+            return (
+              <div className="nav-group" key={company.label}>
+                <button
+                  className={`nav-company-toggle ${active ? "active" : ""}`}
+                  onClick={() => toggleCompany(company.label)}
+                  type="button"
+                  aria-expanded={expanded}
+                >
+                  <span className="nav-label">{company.label}</span>
+                  <span className="nav-chevron">{expanded ? "▾" : "▸"}</span>
+                </button>
+
+                {expanded && (
+                  <div className="nav-company-content">
+                    {/* Company overview link */}
+                    <ul className="nav-list">
+                      <li className="nav-item">
+                        <Link className={pathname === company.href ? "active" : ""} href={company.href}>
+                          Overview
+                        </Link>
+                      </li>
+                    </ul>
+
+                    {/* Sub-sections */}
+                    {company.sections
+                      .map((section) => ({
+                        ...section,
+                        links: section.links.filter((l) => !role || l.roles.includes(role)),
+                      }))
+                      .filter((section) => section.links.length > 0)
+                      .map((section) => (
+                        <div className="nav-subsection" key={section.label}>
+                          <span className="nav-sublabel">{section.label}</span>
+                          <ul className="nav-sublist">
+                            {section.links.map((link) => (
+                              <li key={link.href}>
+                                <Link className={isActive(link.href) ? "active" : ""} href={link.href}>
+                                  {link.label}
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* System — only for admins */}
+          {role && ALL_ADMIN.includes(role) && (
+            <div className="nav-group">
+              <span className="nav-label">System</span>
               <ul className="nav-list">
-                {group.items.map((item) => (
-                  <li className="nav-item" key={item.href}>
-                    <Link className={isActive(item.href) ? "active" : ""} href={item.href}>
-                      {item.label}
-                    </Link>
-                    {item.children ? (
-                      <ul className="nav-sublist">
-                        {item.children.map((child) => (
-                          <li key={child.href}>
-                            <Link className={isActive(child.href) ? "active" : ""} href={child.href}>
-                              {child.label}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </li>
-                ))}
+                <li className="nav-item">
+                  <Link className={isActive("/agent-graph") ? "active" : ""} href="/agent-graph">
+                    Agent Graph
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <Link className={isActive("/workflow-graph") ? "active" : ""} href="/workflow-graph">
+                    Workflow Graph
+                  </Link>
+                </li>
               </ul>
             </div>
-          ))}
+          )}
         </nav>
+
         <div className="sidebar-note">
           <strong>{user?.fullName ?? "Signed in"}</strong>
           <span>{user ? `Role: ${user.role.replace(/_/g, " ")}` : "Authenticated operator"}</span>
@@ -300,6 +339,7 @@ export function SessionShell({ children, user }: SessionShellProps) {
           </button>
         </form>
       </aside>
+
       <main className="main" id="main-content">
         <div className="workspace-topbar">
           <div className="workspace-title-block">
