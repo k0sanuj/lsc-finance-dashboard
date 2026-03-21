@@ -42,3 +42,4 @@ test-results/
 # Local workspace artifacts
 .pnpm-store/
 .neon
+.vercel
