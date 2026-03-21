@@ -99,12 +99,18 @@ function buildInlinePreviewDataUrl(buffer: Buffer, mimeType: string) {
 
 function getS3Client() {
   if (!globalThis.__lscDocumentS3Client) {
+    const accessKeyId = (process.env.AWS_ACCESS_KEY_ID ?? "").trim().replace(/[\r\n]/g, "");
+    const secretAccessKey = (process.env.AWS_SECRET_ACCESS_KEY ?? "").trim().replace(/[\r\n]/g, "");
+
     globalThis.__lscDocumentS3Client = new S3Client({
       region: getConfiguredRegion() ?? "us-east-1",
       endpoint: getConfiguredEndpoint() ?? undefined,
       forcePathStyle: ["1", "true", "yes"].includes(
         (process.env.S3_FORCE_PATH_STYLE ?? "").trim().toLowerCase()
-      )
+      ),
+      ...(accessKeyId && secretAccessKey
+        ? { credentials: { accessKeyId, secretAccessKey } }
+        : {})
     });
   }
 
