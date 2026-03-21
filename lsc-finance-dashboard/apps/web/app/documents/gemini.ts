@@ -4,7 +4,7 @@ const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
 const FALLBACK_GEMINI_MODEL = "gemini-2.5-flash";
 const MAX_INLINE_BYTES = 8 * 1024 * 1024;
 const MAX_TEXT_CHARS = 12000;
-const DEFAULT_MAX_OUTPUT_TOKENS = 1400;
+const DEFAULT_MAX_OUTPUT_TOKENS = 2000;
 
 export type GeminiAnalyzerContext = {
   analysisVersion: string;
