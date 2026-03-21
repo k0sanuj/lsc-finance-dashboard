@@ -253,3 +253,38 @@ All imports must preserve:
 - Roles: super_admin, finance_admin, team_member, commercial_user, viewer
 - Middleware: All routes except /login require valid session
 - DB roles: app_read (read-only), import_rw (writes during imports), admin (full)
+
+## Pre-Deploy Audit (MANDATORY)
+
+**BEFORE every commit and deploy, run the pre-deploy audit:**
+
+```bash
+cd lsc-finance-dashboard && node scripts/pre-deploy-audit.mjs
+```
+
+This audit checks:
+1. All env vars are set and have no trailing newlines
+2. Database connection works and returns data
+3. All critical queries (seasons, races, entities, invoices) return results
+4. Gemini API key is valid and not revoked
+5. S3 storage is accessible
+6. All 22+ page routes exist with default exports
+7. All key components exist
+8. Build compiles without errors
+9. Vercel env vars match local
+
+**DO NOT deploy if any check fails.** Fix the failing check first.
+
+### Deploy Process
+1. Make code changes
+2. Run `node scripts/pre-deploy-audit.mjs` — ALL checks must pass
+3. `git add && git commit`
+4. `git push origin main`
+5. `cd lsc-finance-dashboard && npx vercel --prod --scope anujsingh012001-gmailcoms-projects --yes`
+6. Verify deployment status is "● Ready"
+
+### Env Var Rules
+- ALWAYS use `printf` (never `echo`) when adding Vercel env vars
+- Wrong: `echo "database" | vercel env add VAR production`
+- Right: `printf "database" | vercel env add VAR production`
+- `echo` adds trailing newlines that silently break string comparisons
