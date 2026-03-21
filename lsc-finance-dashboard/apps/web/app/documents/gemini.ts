@@ -192,6 +192,34 @@ function buildPrompt(
     );
   }
 
+  // Invoice Hub specific context
+  const workflow = String(context?.workflow?.raw ?? "").toLowerCase();
+  if (workflow.includes("invoice-hub") || workflow.includes("invoice")) {
+    lines.push(
+      "INVOICE HUB CONTEXT: This document is being uploaded to the Invoice Hub for payable processing.",
+      "Priority extraction fields for invoices:",
+      "1. vendor_name — who issued the invoice (the vendor/supplier name)",
+      "2. invoice_number — the invoice reference number",
+      "3. invoice_date or issue_date — when the invoice was issued",
+      "4. due_date — when payment is due",
+      "5. total_amount — the total payable amount",
+      "6. currency_code — 3-letter ISO code (USD, AED, EUR, etc.)",
+      "7. payment_status — is this paid, unpaid, partially paid, or overdue?",
+      "8. paid_by — if someone already paid this (e.g. an employee who needs reimbursement), extract their name",
+      "9. category — what type of expense is this (catering, travel, licensing, equipment, etc.)",
+      "10. description — brief description of what the invoice is for",
+      "",
+      "If the document shows someone has already paid (e.g. a receipt showing a card payment by an individual),",
+      "classify it as a Reimbursement Report and extract the paid_by person's name.",
+      "If it's an unpaid vendor bill, classify as Vendor Invoice.",
+      "",
+      "For the operator note, if it mentions reimbursement or a person who paid, extract that as paid_by field.",
+      "Map vendor_name to canonicalTargetTable: sponsors_or_customers, canonicalTargetColumn: name.",
+      "Map total_amount to canonicalTargetTable: invoices, canonicalTargetColumn: total_amount.",
+      "Map invoice_number to canonicalTargetTable: invoices, canonicalTargetColumn: invoice_number."
+    );
+  }
+
   return lines.join("\n");
 }
 
@@ -270,7 +298,7 @@ export async function analyzeDocumentWithGemini(params: {
   note: string | null;
   context: GeminiAnalyzerContext | null;
 }) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = (process.env.GEMINI_API_KEY ?? "").trim().replace(/[\r\n]/g, "");
 
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not configured.");

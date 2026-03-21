@@ -66,7 +66,7 @@ type AiInsight = {
 };
 
 async function generateGeminiInsights(metrics: OverviewMetric[]): Promise<AiInsight[]> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = (process.env.GEMINI_API_KEY ?? "").trim().replace(/[\r\n]/g, "");
   if (!apiKey) return [];
 
   const model = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
