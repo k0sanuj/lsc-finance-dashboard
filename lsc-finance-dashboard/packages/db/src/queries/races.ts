@@ -337,3 +337,26 @@ export async function getTbrRaceCardById(raceId: string) {
     status: totalCost > 0 ? "Live finance data" : "Schedule only"
   } satisfies RaceCardRow;
 }
+
+export type NextUpcomingRaceRow = {
+  id: string;
+  seasonYear: number;
+};
+
+export async function getNextUpcomingTbrRace(): Promise<NextUpcomingRaceRow | null> {
+  if (getBackend() === "database") {
+    const rows = await queryRows<{ id: string; season_year: number }>(
+      `select re.id, re.season_year
+       from race_events re
+       join companies c on c.id = re.company_id
+       where c.code = 'TBR'::company_code
+         and re.event_start_date >= current_date
+       order by re.event_start_date asc
+       limit 1`
+    );
+    if (rows.length > 0) {
+      return { id: rows[0].id, seasonYear: rows[0].season_year };
+    }
+  }
+  return null;
+}

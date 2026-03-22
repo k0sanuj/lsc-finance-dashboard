@@ -3,6 +3,7 @@ import {
   getExpenseApprovalQueue,
   getExpenseFormOptions,
   getExpenseWorkflowSummary,
+  getNextUpcomingTbrRace,
   getRaceBudgetRules,
   getTbrRaceCards,
   getTbrSeasonSummaries,
@@ -39,10 +40,25 @@ export default async function ExpenseManagementPage({
   await requireRole(["super_admin", "finance_admin"]);
 
   const params = searchParams ? await searchParams : undefined;
-  const selectedSeason = params?.season ? Number(params.season) : null;
-  const selectedRaceId = params?.raceId ?? "";
+  const hasAnyFilter =
+    params?.season !== undefined ||
+    params?.raceId !== undefined ||
+    params?.submitterId !== undefined ||
+    params?.submissionStatus !== undefined;
+
+  let selectedSeason = params?.season ? Number(params.season) : null;
+  let selectedRaceId = params?.raceId ?? "";
   const selectedSubmitterId = params?.submitterId ?? "";
   const selectedStatus = params?.submissionStatus ?? "";
+
+  // Auto-select the next upcoming race when no filters have been applied
+  if (!hasAnyFilter) {
+    const nextRace = await getNextUpcomingTbrRace();
+    if (nextRace) {
+      selectedSeason = nextRace.seasonYear;
+      selectedRaceId = nextRace.id;
+    }
+  }
 
   const [summary, queue, formOptions, seasons, users, seasonRaceCards] = await Promise.all([
     getExpenseWorkflowSummary(),
@@ -96,12 +112,7 @@ export default async function ExpenseManagementPage({
     <div className="page-grid">
       <section className="hero">
         <span className="eyebrow">TBR approval dashboard</span>
-        <h2>Load race budgets first, then review reports against them.</h2>
-        <p>
-          This is the finance-admin approval console for TBR. Pick a season and race, load the
-          approved per-diems or caps for that event, then review submitted reports against those
-          thresholds.
-        </p>
+        <h2>Review expense submissions against approved race budgets.</h2>
       </section>
 
       {message ? (
@@ -127,8 +138,7 @@ export default async function ExpenseManagementPage({
       <section className="card compact-section-card">
         <div className="card-title-row">
           <div>
-            <span className="section-kicker">Step 1</span>
-            <h3>Choose the review context</h3>
+            <h3>Filters</h3>
           </div>
           <Link className="ghost-link" href="/tbr/expense-management">
             Clear filters
@@ -186,9 +196,6 @@ export default async function ExpenseManagementPage({
             <button className="action-button primary" type="submit">
               Apply filters
             </button>
-            <span className="muted">
-              Start by narrowing the queue to one season and one race so budget rules and review decisions stay grounded.
-            </span>
           </div>
         </form>
       </section>
@@ -197,8 +204,7 @@ export default async function ExpenseManagementPage({
         <article className="card compact-section-card">
           <div className="card-title-row">
             <div>
-              <span className="section-kicker">Step 2</span>
-              <h3>Load approved race budgets and per-diems</h3>
+              <h3>Race budgets and per-diems</h3>
             </div>
             <span className="pill">{selectedRaceId ? selectedRaceLabel : "Choose race first"}</span>
           </div>
@@ -222,9 +228,6 @@ export default async function ExpenseManagementPage({
                   <strong>{raceBudgetRules.filter((rule) => rule.ruleKind === "approved charge").length}</strong>
                 </div>
               </div>
-              <p className="table-note">
-                Save the common race thresholds here: food/day, on-site travel/day, accommodation/day, visas, and any approved caps. The queue below will compare every report against these limits.
-              </p>
               <RaceBudgetRuleBuilder
                 categories={formOptions.categories}
                 raceEventId={selectedRaceId}
@@ -233,20 +236,13 @@ export default async function ExpenseManagementPage({
               />
             </>
           ) : (
-            <div className="process-step">
-              <span className="process-step-index">Next</span>
-              <strong>Select one race in the filters first</strong>
-              <span className="muted">
-                The budget dashboard only appears after a race is chosen, because every approved threshold is race-specific.
-              </span>
-            </div>
+            <p className="muted">Select a race to manage its budget rules.</p>
           )}
         </article>
 
         <article className="card compact-section-card">
           <div className="card-title-row">
             <div>
-              <span className="section-kicker">Saved rules</span>
               <h3>Current budget table</h3>
             </div>
             <span className="pill">{raceBudgetRules.length} rules</span>
@@ -299,131 +295,83 @@ export default async function ExpenseManagementPage({
               </table>
             </div>
           ) : (
-            <div className="process-step">
-              <span className="process-step-index">Rules</span>
-              <strong>No race chosen yet</strong>
-              <span className="muted">
-                Once you select a race, this table becomes the source of truth for its approved per-diems and caps.
-              </span>
-            </div>
+            <p className="muted">Select a race to view its budget rules.</p>
           )}
         </article>
       </section>
 
-      <section className="grid-two">
-        <article className="card compact-section-card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">Step 3</span>
-              <h3>Review the queue against the approved rules</h3>
-            </div>
-            <span className="pill">{queue.length} reports</span>
+      <section className="card compact-section-card">
+        <div className="card-title-row">
+          <div>
+            <h3>Approval queue</h3>
           </div>
-          <div className="table-wrapper clean-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Submission</th>
-                  <th>Season</th>
-                  <th>Race</th>
-                  <th>Submitter</th>
-                  <th>Submitted</th>
-                  <th>Total</th>
-                  <th>Budget signal</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {queue.length > 0 ? (
-                  queue.map((row) => (
-                    <tr key={row.id}>
-                      <td>{row.title}</td>
-                      <td>{row.seasonLabel}</td>
-                      <td>{row.race}</td>
-                      <td>{row.submitter}</td>
-                      <td>{row.submittedAt}</td>
-                      <td>{row.totalAmount}</td>
-                      <td>
-                        <div className="inline-actions">
-                          <span className={`pill signal-pill signal-${row.budgetSignalTone}`}>
-                            {row.budgetSignalLabel}
-                          </span>
-                          <span className="pill subtle-pill">{row.matchedBudgetCount} matched</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="pill subtle-pill">{row.statusLabel}</span>
-                      </td>
-                      <td>
-                        <div className="inline-actions">
-                          <Link className="ghost-link" href={`/tbr/expense-management/${row.id}`}>
-                            Open review
-                          </Link>
-                          {row.status === "submitted" ? (
-                            <form action={updateExpenseSubmissionStatusAction}>
-                              <input name="submissionId" type="hidden" value={row.id} />
-                              <input name="nextStatus" type="hidden" value="in_review" />
-                              <input name="returnPath" type="hidden" value={returnPath} />
-                              <button className="action-button secondary" type="submit">
-                                Start review
-                              </button>
-                            </form>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="muted" colSpan={9}>
-                      No submissions matched the current filter set.
+          <span className="pill">{queue.length} reports</span>
+        </div>
+        <div className="table-wrapper clean-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Submission</th>
+                <th>Season</th>
+                <th>Race</th>
+                <th>Submitter</th>
+                <th>Submitted</th>
+                <th>Total</th>
+                <th>Budget signal</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {queue.length > 0 ? (
+                queue.map((row) => (
+                  <tr key={row.id}>
+                    <td>{row.title}</td>
+                    <td>{row.seasonLabel}</td>
+                    <td>{row.race}</td>
+                    <td>{row.submitter}</td>
+                    <td>{row.submittedAt}</td>
+                    <td>{row.totalAmount}</td>
+                    <td>
+                      <div className="inline-actions">
+                        <span className={`pill signal-pill signal-${row.budgetSignalTone}`}>
+                          {row.budgetSignalLabel}
+                        </span>
+                        <span className="pill subtle-pill">{row.matchedBudgetCount} matched</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="pill subtle-pill">{row.statusLabel}</span>
+                    </td>
+                    <td>
+                      <div className="inline-actions">
+                        <Link className="ghost-link" href={`/tbr/expense-management/${row.id}`}>
+                          Open review
+                        </Link>
+                        {row.status === "submitted" ? (
+                          <form action={updateExpenseSubmissionStatusAction}>
+                            <input name="submissionId" type="hidden" value={row.id} />
+                            <input name="nextStatus" type="hidden" value="in_review" />
+                            <input name="returnPath" type="hidden" value={returnPath} />
+                            <button className="action-button secondary" type="submit">
+                              Start review
+                            </button>
+                          </form>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </article>
-
-        <article className="card compact-section-card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">Review loop</span>
-              <h3>How finance admins should use this page</h3>
-            </div>
-          </div>
-          <div className="info-grid">
-            <div className="process-step">
-              <span className="process-step-index">1</span>
-              <strong>Pick the race first</strong>
-              <span className="muted">
-                Admins should not review TBR expense reports without the race context loaded.
-              </span>
-            </div>
-            <div className="process-step">
-              <span className="process-step-index">2</span>
-              <strong>Load approved budgets and per-diems</strong>
-              <span className="muted">
-                Save the common thresholds for the race before you start making approval decisions.
-              </span>
-            </div>
-            <div className="process-step">
-              <span className="process-step-index">3</span>
-              <strong>Use the budget signal in the queue</strong>
-              <span className="muted">
-                Green means below budget, yellow means close, and red means the report is over the approved rule.
-              </span>
-            </div>
-            <div className="process-step">
-              <span className="process-step-index">4</span>
-              <strong>Open one report and decide</strong>
-              <span className="muted">
-                Then approve, reject, or request clarification with the budget context visible in the detail view.
-              </span>
-            </div>
-          </div>
-        </article>
+                ))
+              ) : (
+                <tr>
+                  <td className="muted" colSpan={9}>
+                    No submissions matched the current filter set.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );

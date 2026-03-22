@@ -22,19 +22,13 @@ export default async function OverviewPage() {
     1,
     ...monthlyCashFlow.flatMap((row) => [parseCurrency(row.cashIn), parseCurrency(row.cashOut)])
   );
-  const tbrEntity = entitySnapshots.find((entity) => entity.code === "TBR");
-  const fspEntity = entitySnapshots.find((entity) => entity.code === "FSP");
 
   return (
     <div className="page-grid">
       <section className="hero portfolio-hero">
         <div className="hero-copy">
           <span className="eyebrow">Portfolio overview</span>
-          <h2>LSC at a glance. TBR and FSP beneath it.</h2>
-          <p>
-            This is the holding-company layer. Keep the numbers clear by business unit, then move
-            into TBR for season, race, invoice, and expense operations.
-          </p>
+          <h2>LSC consolidated portfolio — TBR operating, FSP structured for expansion.</h2>
         </div>
         <div className="hero-actions">
           <Link className="solid-link" href="/tbr">
@@ -126,37 +120,6 @@ export default async function OverviewPage() {
           </div>
         </article>
 
-        <article className="card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">Operating split</span>
-              <h3>How to read the portfolio</h3>
-            </div>
-          </div>
-          <div className="info-grid">
-            <div className="process-step">
-              <span className="process-step-index">TBR</span>
-              <strong>{tbrEntity?.revenue ?? "$0"} revenue</strong>
-              <span className="muted">
-                Live race-linked cost, invoices, payments, and expense operations are active here.
-              </span>
-            </div>
-            <div className="process-step">
-              <span className="process-step-index">FSP</span>
-              <strong>{fspEntity?.status ?? "Schema ready"}</strong>
-              <span className="muted">
-                Keep the category visible and structured, but do not overload it before launch data exists.
-              </span>
-            </div>
-            <div className="process-step">
-              <span className="process-step-index">Next move</span>
-              <strong>Go one level deeper</strong>
-              <span className="muted">
-                Use TBR for seasonal and race-level finance operations. Use FSP for placeholder structure and future planning.
-              </span>
-            </div>
-          </div>
-        </article>
       </section>
 
       <section className="card">

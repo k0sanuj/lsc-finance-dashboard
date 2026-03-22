@@ -112,11 +112,7 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
       {/* Header */}
       <section className="hero">
         <span className="eyebrow">TBR Invoice Hub</span>
-        <h2>Payables &amp; Invoices</h2>
-        <p>
-          Upload invoices (single or bulk), review AI-extracted data, flag reimbursements,
-          and post approved payables to the canonical ledger.
-        </p>
+        <h2>Upload, scan, and approve payable invoices.</h2>
         <div className="hero-actions">
           <Link className="ghost-link" href="/payments/TBR" as={"/payments/TBR" as Route}>
             Payments tracker
@@ -265,10 +261,7 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
             </ModalLauncher>
           </div>
         </div>
-        <p>
-          Upload invoice documents for AI scanning, or enter details manually.
-          Each invoice is staged as a draft — review and approve below before it posts to the payable ledger.
-        </p>
+        <p>Upload documents for AI scanning or enter details manually — drafts appear in the queue below.</p>
       </section>
 
       {/* Scanned documents — AI results */}

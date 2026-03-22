@@ -25,11 +25,7 @@ export default async function TbrPage() {
         <section className="hero portfolio-hero tbr-hero">
           <div className="hero-copy">
             <span className="eyebrow">TBR user console</span>
-            <h2>Open your race work. Submit clean expense evidence.</h2>
-            <p>
-              Use this surface only for your own TBR work: open a race, upload bills or receipts,
-              and track your own submissions without seeing team-wide financial data.
-            </p>
+            <h2>Submit expenses and track your race reimbursements.</h2>
           </div>
           <div className="hero-actions">
             <Link className="solid-link" href="/tbr/my-expenses">
@@ -45,7 +41,7 @@ export default async function TbrPage() {
           <article className="tool-card primary-tool-card">
             <span className="section-kicker">Primary path</span>
             <h3>My Expenses</h3>
-            <p>Track only your own expense reports, bill uploads, and their current statuses.</p>
+            <p>Track your expense reports and submission statuses.</p>
             <Link className="solid-link" href="/tbr/my-expenses">
               Open my expenses
             </Link>
@@ -54,7 +50,7 @@ export default async function TbrPage() {
           <article className="tool-card">
             <span className="section-kicker">Race entry</span>
             <h3>Races</h3>
-            <p>Pick a season, open one race, and submit bills or receipts in that event context.</p>
+            <p>Browse races and submit bills or receipts.</p>
             <Link className="ghost-link" href="/tbr/races">
               Browse races
             </Link>
@@ -89,31 +85,6 @@ export default async function TbrPage() {
           </div>
         </section>
 
-        <section className="card compact-section-card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">How it works</span>
-              <h3>Your TBR user flow</h3>
-            </div>
-          </div>
-          <div className="info-grid">
-            <div className="process-step">
-              <span className="process-step-index">1</span>
-              <strong>Open a race</strong>
-              <span className="muted">Pick the event you are currently working on.</span>
-            </div>
-            <div className="process-step">
-              <span className="process-step-index">2</span>
-              <strong>Upload bills or receipts</strong>
-              <span className="muted">Upload one or many files and let AI extract only the bill facts needed.</span>
-            </div>
-            <div className="process-step">
-              <span className="process-step-index">3</span>
-              <strong>Track your own status</strong>
-              <span className="muted">Wait for finance review without seeing admin-only company financial data.</span>
-            </div>
-          </div>
-        </section>
       </div>
     );
   }
@@ -123,11 +94,7 @@ export default async function TbrPage() {
       <section className="hero portfolio-hero tbr-hero">
           <div className="hero-copy">
             <span className="eyebrow">TBR admin console</span>
-            <h2>Keep admin finance separate from user submission work.</h2>
-            <p>
-              This surface is for confidential TBR finance operations only: financial overview,
-              review workflows, invoice capture, and team setup.
-            </p>
+            <h2>TBR finance and operations dashboard.</h2>
           </div>
         <div className="hero-actions">
           <Link className="solid-link" href="/tbr/expense-management">
@@ -152,7 +119,6 @@ export default async function TbrPage() {
               maximumFractionDigits: 0
             }).format(recognizedRevenue)}
           </div>
-          <div className="metric-subvalue">Recognized sponsorship and prize revenue currently posted into TBR.</div>
         </article>
         <article className="metric-card">
           <div className="metric-topline">
@@ -160,7 +126,6 @@ export default async function TbrPage() {
             <span className="badge">Approved cost</span>
           </div>
           <div className="metric-value">{latestSeason?.cost ?? "$0"}</div>
-          <div className="metric-subvalue">Season-level cost from approved expenses and race-linked invoices.</div>
         </article>
         <article className="metric-card">
           <div className="metric-topline">
@@ -168,7 +133,6 @@ export default async function TbrPage() {
             <span className="badge">Open payables</span>
           </div>
           <div className="metric-value">{latestSeason?.openPayables ?? "$0"}</div>
-          <div className="metric-subvalue">Payables that still need finance action for the active operating season.</div>
         </article>
         <article className="metric-card">
           <div className="metric-topline">
@@ -176,7 +140,6 @@ export default async function TbrPage() {
             <span className="badge">Seasons</span>
           </div>
           <div className="metric-value">{seasons.length}</div>
-          <div className="metric-subvalue">Use seasons to open races, then drill down to each race’s user workflow.</div>
         </article>
       </section>
 
@@ -184,7 +147,7 @@ export default async function TbrPage() {
           <article className="tool-card">
             <span className="section-kicker">User-facing branch</span>
             <h3>User console</h3>
-            <p>See the exact user workspace that operators use for races, bills, and submissions.</p>
+            <p>View the operator workspace for races and submissions.</p>
             <Link className="ghost-link" href="/tbr/my-expenses">
               Open user console
             </Link>
@@ -193,7 +156,7 @@ export default async function TbrPage() {
           <article className="tool-card">
             <span className="section-kicker">Finance admin</span>
             <h3>Review console</h3>
-            <p>Review, approve, reject, or request clarification on submitted expense reports.</p>
+            <p>Review and approve submitted expense reports.</p>
             <Link className="ghost-link" href="/tbr/expense-management">
               Open review console
             </Link>
@@ -202,7 +165,7 @@ export default async function TbrPage() {
           <article className="tool-card">
             <span className="section-kicker">Finance admin</span>
             <h3>Invoice hub</h3>
-            <p>Capture E1 and vendor invoices without mixing payable intake into the user branch.</p>
+            <p>Capture and process vendor invoices.</p>
             <Link className="ghost-link" href="/tbr/invoice-hub">
               Open invoice hub
             </Link>

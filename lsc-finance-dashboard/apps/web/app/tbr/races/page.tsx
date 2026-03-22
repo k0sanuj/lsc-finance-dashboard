@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getTbrRaceCards, getTbrSeasonSummaries } from "@lsc/db";
+import { getTbrRaceCards, getTbrSeasonSummaries, queryRows } from "@lsc/db";
 import { requireRole } from "../../../lib/auth";
 
 type TbrRacesPageProps = {
@@ -8,12 +8,45 @@ type TbrRacesPageProps = {
   }>;
 };
 
+/**
+ * Find the season that contains the next upcoming race (event_start_date >= today).
+ * Falls back to the latest season if no upcoming races exist.
+ */
+async function getDefaultSeasonYear(seasons: { seasonYear: number }[]): Promise<number> {
+  if (seasons.length === 0) return 2025;
+
+  try {
+    const rows = await queryRows<{ season_year: number }>(
+      `select re.season_year
+       from race_events re
+       join companies c on c.id = re.company_id
+       where c.code = 'TBR'::company_code
+         and re.season_year is not null
+         and re.event_start_date >= current_date
+       order by re.event_start_date asc
+       limit 1`
+    );
+
+    if (rows.length > 0) {
+      const match = seasons.find((s) => s.seasonYear === rows[0].season_year);
+      if (match) return match.seasonYear;
+    }
+  } catch {
+    // fall through to latest season
+  }
+
+  return seasons.at(-1)?.seasonYear ?? seasons[0]?.seasonYear ?? 2025;
+}
+
 export default async function TbrRacesPage({ searchParams }: TbrRacesPageProps) {
   await requireRole(["super_admin", "finance_admin", "team_member"]);
   const params = searchParams ? await searchParams : undefined;
   const seasons = await getTbrSeasonSummaries();
-  const selectedSeason =
-    Number(params?.season) || seasons.at(-1)?.seasonYear || seasons[0]?.seasonYear || 2025;
+
+  const selectedSeason = params?.season
+    ? Number(params.season)
+    : await getDefaultSeasonYear(seasons);
+
   const [raceCards, selectedSeasonSummary] = await Promise.all([
     getTbrRaceCards(selectedSeason),
     Promise.resolve(seasons.find((season) => season.seasonYear === selectedSeason) ?? seasons.at(-1) ?? null)
@@ -24,11 +57,7 @@ export default async function TbrRacesPage({ searchParams }: TbrRacesPageProps) 
       <section className="hero portfolio-hero tbr-hero">
         <div className="hero-copy">
           <span className="eyebrow">TBR races</span>
-          <h2>Pick a season. Open one race.</h2>
-          <p>
-            This page is only for choosing the event context you are working in. Open one race card
-            to submit bills and receipts there.
-          </p>
+          <h2>Pick a season and open a race to submit bills.</h2>
         </div>
         <div className="hero-actions">
           <Link className="solid-link" href="/tbr">
@@ -86,6 +115,7 @@ export default async function TbrRacesPage({ searchParams }: TbrRacesPageProps) 
                   <span>{race.countryName}</span>
                 </span>
               </div>
+              <p className="race-date-label">{race.eventDate}</p>
               <p>{race.location}</p>
               <div className="race-metrics compact-race-metrics">
                 <div>
