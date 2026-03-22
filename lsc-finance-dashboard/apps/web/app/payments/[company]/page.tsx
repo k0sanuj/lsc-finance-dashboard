@@ -52,25 +52,25 @@ const workstreams = [
   {
     key: "overview",
     title: "Payment overview",
-    description: "Start with volume, open amount, and the current payment posture for the chosen company.",
+    description: "Volume, open amount, and payment posture.",
     badge: "Step 1"
   },
   {
     key: "tracker",
     title: "Due tracker",
-    description: "Move into the invoice-by-invoice payable queue once the high-level posture is clear.",
+    description: "Invoice-by-invoice payable queue.",
     badge: "Step 2"
   },
   {
     key: "intake",
     title: "Invoice intake",
-    description: "Add payable source documents in a categorized popup, then review their queue mapping and downstream impact.",
+    description: "Add payable source documents.",
     badge: "Step 3"
   },
   {
     key: "settlement",
     title: "Settlement path",
-    description: "Keep settlement as its own phase instead of mixing it with source capture.",
+    description: "Payment execution and reconciliation.",
     badge: "Step 4"
   }
 ] as const;
@@ -111,7 +111,7 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
         <CompanyWorkspaceShell
           basePath="/payments"
           companyCode={companyCode}
-          description="FSP payment operations should stay light until real platform bills and settlement flows exist."
+          description="FSP payment workspace — no live payables yet."
           eyebrow="FSP payments"
           selectedView={selectedView}
           title="Future of Sports payment workspace"
@@ -122,21 +122,9 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
             <div className="card-title-row">
               <div>
                 <span className="section-kicker">Selected company</span>
-                <h3>Keep the payable structure ready for launch</h3>
+                <h3>FSP payables will appear once platform bills exist</h3>
               </div>
               <span className="badge">Placeholder</span>
-            </div>
-            <div className="info-grid">
-              <div className="process-step">
-                <span className="process-step-index">Invoices</span>
-                <strong>Platform vendor bills</strong>
-                <span className="muted">Hosting, tooling, and product vendors will enter here once FSP is live.</span>
-              </div>
-              <div className="process-step">
-                <span className="process-step-index">Settlement</span>
-                <strong>Execution stays downstream</strong>
-                <span className="muted">Keep payment timing and settlement controls separate from intake.</span>
-              </div>
             </div>
           </article>
         </section>
@@ -160,35 +148,23 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
     .sort((left, right) => parseCurrency(right.amount) - parseCurrency(left.amount))
     .slice(0, 6);
   const payableMax = Math.max(1, ...topPayables.map((row) => parseCurrency(row.amount)));
-  const paymentInsights = [
-    {
-      title:
-        topPayables[0] != null
-          ? `${topPayables[0].vendor} is the largest currently surfaced payable`
-          : "The payable queue is still light",
-      summary:
-        topPayables[0] != null
-          ? `${topPayables[0].amount} is the highest open line in the current queue.`
-          : "As invoice intake grows, this section should call out the largest vendor exposure."
-    },
-    {
-      title: `${issuedCount} invoices are issued and ${partiallyPaidCount} are already in motion`,
-      summary:
-        "Use this to separate invoices that still need first action from invoices already part-way through settlement."
-    },
-    {
-      title: "Keep settlement downstream from intake",
-      summary:
-        "The operator path should still be intake first, then queue tracking, then explicit settlement and reconciliation."
-    }
-  ];
+  const paymentInsight = {
+    title:
+      topPayables[0] != null
+        ? `${topPayables[0].vendor} is the largest currently surfaced payable`
+        : "The payable queue is still light",
+    summary:
+      topPayables[0] != null
+        ? `${topPayables[0].amount} is the highest open line in the current queue.`
+        : "As invoice intake grows, this section should call out the largest vendor exposure."
+  };
 
   return (
     <div className="page-grid">
       <CompanyWorkspaceShell
         basePath="/payments"
         companyCode={companyCode}
-        description="Now that the company is fixed, move through the payment overview, due tracker, invoice intake, and settlement path in order."
+        description="TBR payment workspace across overview, tracking, intake, and settlement."
         eyebrow="TBR payments"
         selectedView={selectedView}
         title="Team Blue Rising payment workspace"
@@ -211,7 +187,6 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
                 <span className="badge">Open payables</span>
               </div>
               <div className="metric-value">{upcomingPayments.length}</div>
-              <div className="metric-subvalue">Invoices currently sitting in the live due tracker.</div>
             </article>
             <article className="metric-card">
               <div className="metric-topline">
@@ -219,7 +194,6 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
                 <span className="badge">USD</span>
               </div>
               <div className="metric-value">${openAmount.toLocaleString("en-US")}</div>
-              <div className="metric-subvalue">Total payable amount currently surfaced in the queue.</div>
             </article>
             <article className="metric-card">
               <div className="metric-topline">
@@ -227,7 +201,6 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
                 <span className="badge">Attention</span>
               </div>
               <div className="metric-value">{partiallyPaidCount}</div>
-              <div className="metric-subvalue">Invoices already in motion but not yet fully settled.</div>
             </article>
             <article className="metric-card">
               <div className="metric-topline">
@@ -235,7 +208,6 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
                 <span className="badge">Waiting action</span>
               </div>
               <div className="metric-value">{issuedCount}</div>
-              <div className="metric-subvalue">Invoices that still need first operational movement.</div>
             </article>
           </section>
 
@@ -271,20 +243,11 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
             <article className="card">
               <div className="card-title-row">
                 <div>
-                  <span className="section-kicker">AI comments</span>
-                  <h3>Payment posture for the chosen company</h3>
+                  <strong>{paymentInsight.title}</strong>
                 </div>
                 <span className="pill">Context aware</span>
               </div>
-              <div className="info-grid">
-                {paymentInsights.map((insight) => (
-                  <div className="process-step" key={insight.title}>
-                    <span className="process-step-index">AI</span>
-                    <strong>{insight.title}</strong>
-                    <span className="muted">{insight.summary}</span>
-                  </div>
-                ))}
-              </div>
+              <span className="muted">{paymentInsight.summary}</span>
             </article>
           </section>
         </>
@@ -299,7 +262,6 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
                 <span className="badge">Tracker</span>
               </div>
               <div className="metric-value">{upcomingPayments.length}</div>
-              <div className="metric-subvalue">Invoices currently visible in the due tracker.</div>
             </article>
             <article className="metric-card">
               <div className="metric-topline">
@@ -359,18 +321,10 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
             <article className="card compact-section-card">
               <div className="card-title-row">
                 <div>
-                  <span className="section-kicker">Step 3</span>
-                  <h3>Add one payable document into the TBR invoice intake flow</h3>
+                  <span className="section-kicker">Invoice intake</span>
+                  <h3>Add payable document</h3>
                 </div>
                 <span className="pill">Popup</span>
-              </div>
-              <div className="process-step">
-                <span className="process-step-index">Categorized intake</span>
-                <strong>Use vendor and reimbursement invoice categories instead of a generic upload</strong>
-                <span className="muted">
-                  The popup should save intake fields, show the platform areas affected, and then place the
-                  result back into this payable queue.
-                </span>
               </div>
               <div className="hero-actions">
                 <ModalLauncher
@@ -454,48 +408,25 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
               postingEvents={postingEvents}
               title="Selected payable analysis run"
             />
-          ) : (
-            <section className="card compact-section-card">
-              <div className="process-step">
-                <span className="process-step-index">Step 4</span>
-                <strong>Select one payable run only when you need the detail</strong>
-                <span className="muted">
-                  The selected detail should show the saved intake fields, extracted values, and platform
-                  areas affected by that payable document.
-                </span>
-              </div>
-            </section>
-          )}
+          ) : null}
         </>
       ) : null}
 
       {selectedView === "settlement" ? (
         <section className="grid-two">
           <article className="card compact-section-card">
-            <div className="process-step">
-              <span className="process-step-index">Step 4</span>
-              <strong>Settlement should remain its own execution layer</strong>
-              <span className="muted">
-                Capture and approve invoices first. Keep final payment execution and reconciliation downstream from intake.
-              </span>
-            </div>
-          </article>
-          <article className="card compact-section-card">
             <div className="support-grid">
               <Link className="workflow-tile" href="/tbr/invoice-hub">
                 <span className="process-step-index">Capture</span>
                 <strong>Go to invoice hub</strong>
-                <span className="muted">Return to source capture if the payable queue is missing context or approval state.</span>
               </Link>
               <Link className="workflow-tile" href={buildCompanyPath("/payments", "TBR", { view: "tracker" }) as Route}>
                 <span className="process-step-index">Track</span>
                 <strong>Return to due tracker</strong>
-                <span className="muted">Stay on the queue until explicit settlement controls are implemented.</span>
               </Link>
               <Link className="workflow-tile" href={buildCompanyPath("/payments", "TBR", { view: "intake" }) as Route}>
                 <span className="process-step-index">Source</span>
                 <strong>Return to payable intake</strong>
-                <span className="muted">Add or inspect the supporting invoice runs if settlement is missing source context.</span>
               </Link>
             </div>
           </article>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getDocumentAnalysisQueue, getMyExpenseSubmissions, getTbrRaceCards, getTbrSeasonSummaries } from "@lsc/db";
+import { getDocumentAnalysisQueue, getMyExpenseSubmissions } from "@lsc/db";
 import { requireRole, requireSession } from "../../../lib/auth";
 import { createReimbursementInvoiceAction } from "../expense-management/actions";
 
@@ -16,16 +16,12 @@ type RecentBillRow = {
 export default async function MyExpensesPage() {
   await requireRole(["super_admin", "finance_admin", "team_member"]);
   const session = await requireSession();
-  const seasons = await getTbrSeasonSummaries();
-  const activeSeason = seasons.at(-1) ?? null;
-  const [submissions, queue, raceCards] = (await Promise.all([
+  const [submissions, queue] = (await Promise.all([
     getMyExpenseSubmissions(session.id),
-    getDocumentAnalysisQueue(session.id, "tbr-race:"),
-    activeSeason ? getTbrRaceCards(activeSeason.seasonYear) : Promise.resolve([])
+    getDocumentAnalysisQueue(session.id, "tbr-race:")
   ])) as [
     Awaited<ReturnType<typeof getMyExpenseSubmissions>>,
-    RecentBillRow[],
-    Awaited<ReturnType<typeof getTbrRaceCards>>
+    RecentBillRow[]
   ];
 
   return (
@@ -33,11 +29,7 @@ export default async function MyExpensesPage() {
       <section className="hero portfolio-hero tbr-hero">
         <div className="hero-copy">
           <span className="eyebrow">My expenses</span>
-          <h2>Track your submissions. Then jump into the right race.</h2>
-          <p>
-            This is your personal TBR expense workspace: your report-level submissions, your recent
-            bills and receipts, and a direct path into the race you are working on.
-          </p>
+          <h2>Your expense submissions and analyzed receipts.</h2>
         </div>
         <div className="hero-actions">
           <Link className="solid-link" href="/tbr/races">
@@ -46,49 +38,6 @@ export default async function MyExpensesPage() {
           <Link className="ghost-link" href="/tbr">
             Back to TBR
           </Link>
-        </div>
-      </section>
-
-      <section className="card compact-section-card">
-        <div className="card-title-row">
-          <div>
-            <span className="section-kicker">Races</span>
-            <h3>{activeSeason?.seasonLabel ?? "Current season"} race entry</h3>
-          </div>
-          <Link className="ghost-link" href="/tbr/races">
-            Browse all races
-          </Link>
-        </div>
-        <div className="race-grid compact-race-grid">
-          {raceCards.length > 0 ? (
-            raceCards.map((race) => (
-              <Link className="race-card compact-race-card" href={`/tbr/races/${race.id}`} key={race.id}>
-                <div className="race-card-top">
-                  <div>
-                    <span className="section-kicker">Race</span>
-                    <h3>{race.name}</h3>
-                  </div>
-                  <span className="flag-pill">
-                    <span>{race.countryFlag}</span>
-                    <span>{race.countryName}</span>
-                  </span>
-                </div>
-                <p>{race.location}</p>
-                <div className="race-metrics compact-race-metrics">
-                  <div>
-                    <span>Date</span>
-                    <strong>{race.eventDate}</strong>
-                  </div>
-                  <div>
-                    <span>Action</span>
-                    <strong>Open race</strong>
-                  </div>
-                </div>
-              </Link>
-            ))
-          ) : (
-            <div className="empty-note">No race cards are available for the current season yet.</div>
-          )}
         </div>
       </section>
 

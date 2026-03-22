@@ -51,25 +51,25 @@ const workstreams = [
   {
     key: "snapshot",
     title: "Snapshot",
-    description: "Read the company pace and commercial gap before drilling into any detail.",
+    description: "Company pace and commercial gap.",
     badge: "Step 1"
   },
   {
     key: "targets",
     title: "Target path",
-    description: "Use the monthly target table only after the company context is clear.",
+    description: "Monthly target table.",
     badge: "Step 2"
   },
   {
     key: "owners",
     title: "Owner accountability",
-    description: "Check owner performance only after target pace and gap are understood.",
+    description: "Owner performance against the plan.",
     badge: "Step 3"
   },
   {
     key: "source-docs",
     title: "Source documents",
-    description: "Add sponsorship and prize documents through a categorized popup, then inspect their saved impact.",
+    description: "Sponsorship and prize document intake.",
     badge: "Step 4"
   }
 ] as const;
@@ -104,7 +104,7 @@ export default async function CommercialGoalsCompanyPage({
         <CompanyWorkspaceShell
           basePath="/commercial-goals"
           companyCode={companyCode}
-          description="FSP commercial planning stays visible but deliberately light until real launch targets exist."
+          description="FSP commercial workspace — no live targets yet."
           eyebrow="FSP commercial"
           selectedView={selectedView}
           title="Future of Sports commercial workspace"
@@ -115,21 +115,9 @@ export default async function CommercialGoalsCompanyPage({
             <div className="card-title-row">
               <div>
                 <span className="section-kicker">Selected company</span>
-                <h3>Keep the planning structure ready for launch</h3>
+                <h3>FSP commercial targets will appear once launch planning is active</h3>
               </div>
               <span className="badge">Placeholder</span>
-            </div>
-            <div className="info-grid">
-              <div className="process-step">
-                <span className="process-step-index">Plan</span>
-                <strong>Subscriber and MRR targets</strong>
-                <span className="muted">FSP will track recurring revenue, subscribers, and channel mix once launch planning is real.</span>
-              </div>
-              <div className="process-step">
-                <span className="process-step-index">Owners</span>
-                <strong>Launch accountability</strong>
-                <span className="muted">Owner scorecards should mirror TBR once commercial operations are active.</span>
-              </div>
             </div>
           </article>
         </section>
@@ -179,36 +167,21 @@ export default async function CommercialGoalsCompanyPage({
       parseCurrency(right.closedRevenue) - parseCurrency(left.closedRevenue)
   )[0] ?? null;
   const strongestMonth = [...targetRows].sort((left, right) => right.actualValue - left.actualValue)[0] ?? null;
-  const commercialInsights = [
-    {
-      title: strongestMonth
-        ? `${strongestMonth.month} is currently the strongest closing month`
-        : "No closed commercial month is leading yet",
-      summary: strongestMonth
-        ? `${strongestMonth.actual} is currently the best closed month against the plan.`
-        : "As target rows fill in, this section should call out the strongest and weakest pacing periods."
-    },
-    {
-      title: strongestOwner
-        ? `${strongestOwner.owner} is leading owner accountability`
-        : "Owner accountability is still quiet",
-      summary: strongestOwner
-        ? `${strongestOwner.closedRevenue} is the strongest closed-value contribution in the owner table.`
-        : "Once commercial ownership expands, this section should call out who is carrying the plan."
-    },
-    {
-      title: `$${totalGap.toLocaleString("en-US")} still sits between the current plan and the closed value`,
-      summary:
-        "Use the target table and source-document queue together so commercial pacing stays grounded in actual contracts and prize documents."
-    }
-  ];
+  const commercialInsight = {
+    title: strongestMonth
+      ? `${strongestMonth.month} is currently the strongest closing month`
+      : "No closed commercial month is leading yet",
+    summary: strongestMonth
+      ? `${strongestMonth.actual} is currently the best closed month against the plan.`
+      : "As target rows fill in, this section should call out the strongest pacing period."
+  };
 
   return (
     <div className="page-grid">
       <CompanyWorkspaceShell
         basePath="/commercial-goals"
         companyCode={companyCode}
-        description="Now that the company is fixed, read the commercial snapshot first and only then move into monthly targets or owner accountability."
+        description="TBR commercial workspace across targets, owners, and source documents."
         eyebrow="TBR commercial"
         selectedView={selectedView}
         title="Team Blue Rising commercial workspace"
@@ -231,7 +204,6 @@ export default async function CommercialGoalsCompanyPage({
                 <span className="badge">TBR</span>
               </div>
               <div className="metric-value">${totalTarget.toLocaleString("en-US")}</div>
-              <div className="metric-subvalue">Target value across the current commercial plan.</div>
             </article>
             <article className="metric-card">
               <div className="metric-topline">
@@ -239,7 +211,6 @@ export default async function CommercialGoalsCompanyPage({
                 <span className="badge">Actual</span>
               </div>
               <div className="metric-value">${totalActual.toLocaleString("en-US")}</div>
-              <div className="metric-subvalue">Recognized value already closed against the target path.</div>
             </article>
             <article className="metric-card">
               <div className="metric-topline">
@@ -247,7 +218,6 @@ export default async function CommercialGoalsCompanyPage({
                 <span className="badge">To close</span>
               </div>
               <div className="metric-value">${totalGap.toLocaleString("en-US")}</div>
-              <div className="metric-subvalue">What still needs to close for the current plan to land.</div>
             </article>
             <article className="metric-card">
               <div className="metric-topline">
@@ -291,20 +261,11 @@ export default async function CommercialGoalsCompanyPage({
             <article className="card">
               <div className="card-title-row">
                 <div>
-                  <span className="section-kicker">AI comments</span>
-                  <h3>Commercial posture for the chosen company</h3>
+                  <strong>{commercialInsight.title}</strong>
                 </div>
                 <span className="pill">Context aware</span>
               </div>
-              <div className="info-grid">
-                {commercialInsights.map((insight) => (
-                  <div className="process-step" key={insight.title}>
-                    <span className="process-step-index">AI</span>
-                    <strong>{insight.title}</strong>
-                    <span className="muted">{insight.summary}</span>
-                  </div>
-                ))}
-              </div>
+              <span className="muted">{commercialInsight.summary}</span>
             </article>
           </section>
         </>
@@ -319,7 +280,6 @@ export default async function CommercialGoalsCompanyPage({
                 <span className="badge">Target path</span>
               </div>
               <div className="metric-value">{commercialGoals.length}</div>
-              <div className="metric-subvalue">Months currently included in the target plan.</div>
             </article>
             <article className="metric-card">
               <div className="metric-topline">
@@ -374,7 +334,6 @@ export default async function CommercialGoalsCompanyPage({
                 <span className="badge">Accountability</span>
               </div>
               <div className="metric-value">{partnerPerformance.length}</div>
-              <div className="metric-subvalue">Owners currently measured against the commercial plan.</div>
             </article>
             <article className="metric-card">
               <div className="metric-topline">
@@ -426,18 +385,10 @@ export default async function CommercialGoalsCompanyPage({
             <article className="card compact-section-card">
               <div className="card-title-row">
                 <div>
-                  <span className="section-kicker">Step 4</span>
-                  <h3>Add sponsorship, prize, or commercial source documents in one categorized flow</h3>
+                  <span className="section-kicker">Commercial intake</span>
+                  <h3>Add commercial source document</h3>
                 </div>
                 <span className="pill">Popup</span>
-              </div>
-              <div className="process-step">
-                <span className="process-step-index">Commercial intake</span>
-                <strong>Use a categorized popup so contracts and prize statements map cleanly before they touch revenue logic</strong>
-                <span className="muted">
-                  The saved intake fields and platform-update map should stay attached to each run so revenue
-                  and target changes are traceable later.
-                </span>
               </div>
               <div className="hero-actions">
                 <ModalLauncher
@@ -521,18 +472,7 @@ export default async function CommercialGoalsCompanyPage({
               postingEvents={postingEvents}
               title="Selected commercial analysis run"
             />
-          ) : (
-            <section className="card compact-section-card">
-              <div className="process-step">
-                <span className="process-step-index">Detail</span>
-                <strong>Open one run only when you need its extracted and mapped detail</strong>
-                <span className="muted">
-                  The selected detail should show the saved intake fields, extracted finance values, and the
-                  platform areas that document will update.
-                </span>
-              </div>
-            </section>
-          )}
+          ) : null}
         </>
       ) : null}
     </div>

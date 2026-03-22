@@ -57,19 +57,19 @@ const workstreamsByCompany = {
     {
       key: "expense-support",
       title: "Expense support",
-      description: "Bills, receipts, and reimbursement bundles tied to TBR cost workflows.",
+      description: "Bills, receipts, and reimbursement bundles.",
       badge: "Step 1"
     },
     {
       key: "vendor-invoices",
       title: "Vendor invoices",
-      description: "E1 and vendor invoice intake that should feed payable control.",
+      description: "E1 and vendor invoice intake.",
       badge: "Step 2"
     },
     {
       key: "commercial-docs",
       title: "Commercial documents",
-      description: "Contracts, prize statements, and revenue-side source documents for TBR.",
+      description: "Contracts, prize statements, and revenue-side documents.",
       badge: "Step 3"
     }
   ],
@@ -77,19 +77,19 @@ const workstreamsByCompany = {
     {
       key: "commercial-docs",
       title: "Commercial documents",
-      description: "Subscriber, contract, and partner documents for the FSP launch layer.",
+      description: "Subscriber, contract, and partner documents.",
       badge: "Step 1"
     },
     {
       key: "vendor-invoices",
       title: "Platform bills",
-      description: "Hosting, software, and product-operating payables once FSP goes live.",
+      description: "Hosting, software, and product-operating payables.",
       badge: "Step 2"
     },
     {
       key: "expense-support",
       title: "Operations support",
-      description: "Keep the FSP document structure ready without faking density.",
+      description: "Operational expense documents.",
       badge: "Step 3"
     }
   ]
@@ -178,30 +178,17 @@ export default async function DocumentsCompanyPage({
     (item) => String(item.intakeStatus ?? item.status) === "pending_review"
   ).length;
   const previewCount = filteredQueue.filter((item) => item.previewAvailable).length;
-  const workflowSummary = [
-    {
-      title: `${filteredQueue.length} document runs currently sit in this workflow`,
-      summary:
-        "This workspace should stay narrow so expense support, invoices, and commercial documents do not blur together."
-    },
-    {
-      title: `${pendingReviewCount} runs are still waiting for review`,
-      summary:
-        "Finance should only approve or post after the workflow context and saved intake fields look correct."
-    },
-    {
-      title: `${previewCount} runs have inline preview support`,
-      summary:
-        "Image-backed receipts or scans should be visually reviewable before anyone trusts the extracted fields."
-    }
-  ];
+  const workflowInsight = {
+    title: `${filteredQueue.length} document runs currently sit in this workflow`,
+    summary: `${pendingReviewCount} pending review, ${analyzedCount} analyzed, ${previewCount} with inline preview.`
+  };
 
   return (
     <div className="page-grid">
       <CompanyWorkspaceShell
         basePath="/documents"
         companyCode={companyCode}
-        description="Now that the company is fixed, choose the exact document workflow before opening queues or extracted fields."
+        description={`${companyCode} document workspace across workflow categories.`}
         eyebrow={`${companyCode} documents`}
         selectedView={selectedView}
         title={`${companyCode === "TBR" ? "Team Blue Rising" : "Future of Sports"} document workspace`}
@@ -230,7 +217,6 @@ export default async function DocumentsCompanyPage({
             <span className="badge">Ready to inspect</span>
           </div>
           <div className="metric-value">{analyzedCount}</div>
-          <div className="metric-subvalue">Runs that already have extracted fields and saved intake mapping.</div>
         </article>
         <article className="metric-card">
           <div className="metric-topline">
@@ -238,7 +224,6 @@ export default async function DocumentsCompanyPage({
             <span className="badge">Approval</span>
           </div>
           <div className="metric-value">{pendingReviewCount}</div>
-          <div className="metric-subvalue">Runs still waiting on finance approval or posting.</div>
         </article>
         <article className="metric-card">
           <div className="metric-topline">
@@ -246,7 +231,6 @@ export default async function DocumentsCompanyPage({
             <span className="badge">Image support</span>
           </div>
           <div className="metric-value">{previewCount}</div>
-          <div className="metric-subvalue">Runs that can be visually checked on-platform.</div>
         </article>
       </section>
 
@@ -254,18 +238,10 @@ export default async function DocumentsCompanyPage({
         <article className="card compact-section-card">
           <div className="card-title-row">
             <div>
-              <span className="section-kicker">Step 3</span>
-              <h3>Open the intake for this workflow only when you are ready to add one document</h3>
+              <span className="section-kicker">Document intake</span>
+              <h3>{companyWorkstreams.find((item) => item.key === selectedView)?.title}</h3>
             </div>
             <span className="pill">Add</span>
-          </div>
-          <div className="process-step">
-            <span className="process-step-index">Workflow</span>
-            <strong>{companyWorkstreams.find((item) => item.key === selectedView)?.title}</strong>
-            <span className="muted">
-              Keep upload and analysis behind a popup. The queue and selected detail should stay visible on
-              the page, but the intake itself should only open when intentionally triggered.
-            </span>
           </div>
           <div className="hero-actions">
             <ModalLauncher
@@ -291,20 +267,11 @@ export default async function DocumentsCompanyPage({
         <article className="card">
           <div className="card-title-row">
             <div>
-              <span className="section-kicker">AI comments</span>
-              <h3>What this workflow is telling us</h3>
+              <strong>{workflowInsight.title}</strong>
             </div>
             <span className="pill">Context aware</span>
           </div>
-          <div className="info-grid">
-            {workflowSummary.map((insight) => (
-              <div className="process-step" key={insight.title}>
-                <span className="process-step-index">AI</span>
-                <strong>{insight.title}</strong>
-                <span className="muted">{insight.summary}</span>
-              </div>
-            ))}
-          </div>
+          <span className="muted">{workflowInsight.summary}</span>
         </article>
       </section>
 
@@ -410,17 +377,7 @@ export default async function DocumentsCompanyPage({
             )}
           </section>
         </>
-      ) : (
-        <section className="card compact-section-card">
-          <div className="process-step">
-            <span className="process-step-index">Step 4</span>
-            <strong>Open one document run only when you need the detail</strong>
-            <span className="muted">
-              The detailed extracted fields, preview, and posting history should stay quiet until you open a specific run.
-            </span>
-          </div>
-        </section>
-      )}
+      ) : null}
     </div>
   );
 }

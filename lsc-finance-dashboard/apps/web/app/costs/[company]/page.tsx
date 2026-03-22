@@ -51,19 +51,19 @@ const workstreams = [
   {
     key: "overview",
     title: "Cost overview",
-    description: "Read the top cost picture first: total spend, concentration, and the biggest current drivers.",
+    description: "Total spend, concentration, and top cost drivers.",
     badge: "Step 1"
   },
   {
     key: "breakdown",
     title: "Detailed breakdown",
-    description: "Move into category and race tables after the top-level picture is clear.",
+    description: "Category and race cost tables.",
     badge: "Step 2"
   },
   {
     key: "analysis",
     title: "Cost analyzer",
-    description: "Open source-backed documents and extracted fields only after the rollup or breakdown needs support.",
+    description: "Source-backed documents and extracted fields.",
     badge: "Step 3"
   }
 ] as const;
@@ -111,7 +111,7 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
         <CompanyWorkspaceShell
           basePath="/costs"
           companyCode={companyCode}
-          description="FSP should stay structured but quiet. Pick the workspace, but keep the density low until live costs exist."
+          description="FSP cost workspace — no live costs yet."
           eyebrow="FSP costs"
           selectedView={selectedView}
           title="Future of Sports cost workspace"
@@ -123,40 +123,21 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
             <div className="card-title-row">
               <div>
                 <span className="section-kicker">Selected company</span>
-                <h3>Keep FSP ready without faking live cost density</h3>
+                <h3>FSP costs will appear once operating data exists</h3>
               </div>
               <span className="badge">Placeholder</span>
             </div>
-            <div className="info-grid">
-              <div className="process-step">
-                <span className="process-step-index">Overview</span>
-                <strong>Platform and launch cost groups</strong>
-                <span className="muted">Hosting, tooling, growth spend, and launch operations should appear here once FSP starts posting real costs.</span>
-              </div>
-              <div className="process-step">
-                <span className="process-step-index">Breakdown</span>
-                <strong>Reuse the same structure later</strong>
-                <span className="muted">FSP will use the same overview, breakdown, and source-review flow as TBR once operating data exists.</span>
-              </div>
-            </div>
           </article>
-          <article className="card compact-section-card">
-            <div className="card-title-row">
-              <div>
-                <span className="section-kicker">AI comments</span>
-                <h3>What this workspace should do next</h3>
-              </div>
-            </div>
-            <div className="info-grid">
-              {costInsights.map((insight) => (
-                <div className="process-step" key={insight.title}>
-                  <span className="process-step-index">AI</span>
-                  <strong>{insight.title}</strong>
-                  <span className="muted">{insight.summary}</span>
+          {costInsights.length > 0 ? (
+            <article className="card compact-section-card">
+              <div className="card-title-row">
+                <div>
+                  <strong>{costInsights[0].title}</strong>
                 </div>
-              ))}
-            </div>
-          </article>
+              </div>
+              <span className="muted">{costInsights[0].summary}</span>
+            </article>
+          ) : null}
         </section>
       </div>
     );
@@ -210,36 +191,21 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
     : [];
   const topCategory = categoryRows[0] ?? null;
   const topRace = raceRows[0] ?? null;
-  const seasonInsights = [
-    {
-      title: topCategory
-        ? `${topCategory.name} is the biggest reimbursable cost bucket in ${selectedSeasonSummary?.seasonLabel ?? `Season ${selectedSeason}`}`
-        : `No approved reimbursement categories are active in ${selectedSeasonSummary?.seasonLabel ?? `Season ${selectedSeason}`}`,
-      summary: topCategory
-        ? `${topCategory.amount} is currently the strongest category signal inside the selected season.`
-        : "Once season-linked reimbursement rows are approved, this section should call out the dominant bucket."
-    },
-    {
-      title: topRace
-        ? `${topRace.name} is the heaviest race-cost event in the selected season`
-        : "Race cost intensity is still light in the selected season",
-      summary: topRace
-        ? `${topRace.totalCost} combines ${topRace.eventInvoices} of event invoices and ${topRace.reimbursements} of reimbursements.`
-        : "Use the race cards below once cost rows are linked to the season timeline."
-    },
-    {
-      title: "Use the analyzer only after the season and race context is clear",
-      summary:
-        "Source-backed document review should support a selected season or race question, not become the first thing you see on the page."
-    }
-  ];
+  const seasonInsight = {
+    title: topCategory
+      ? `${topCategory.name} is the biggest cost bucket in ${selectedSeasonSummary?.seasonLabel ?? `Season ${selectedSeason}`}`
+      : `No approved reimbursement categories are active in ${selectedSeasonSummary?.seasonLabel ?? `Season ${selectedSeason}`}`,
+    summary: topCategory
+      ? `${topCategory.amount} is currently the strongest category signal inside the selected season.`
+      : "Once season-linked reimbursement rows are approved, this section should call out the dominant bucket."
+  };
 
   return (
     <div className="page-grid">
       <CompanyWorkspaceShell
         basePath="/costs"
         companyCode={companyCode}
-        description="Now that the company is fixed, pick the season first, then move through overview, race breakdown, and source-backed analysis."
+        description="TBR cost workspace across seasons and races."
         eyebrow="TBR costs"
         selectedView={selectedView}
         title="Team Blue Rising cost workspace"
@@ -319,7 +285,6 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
                 <span className="badge">Season cost</span>
               </div>
               <div className="metric-value">{selectedSeasonSummary?.cost ?? "$0"}</div>
-              <div className="metric-subvalue">Season-linked TBR cost that should roll into the LSC holding-company view.</div>
             </article>
             <article className="metric-card">
               <div className="metric-topline">
@@ -327,7 +292,6 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
                 <span className="badge">Recognized</span>
               </div>
               <div className="metric-value">{selectedSeasonSummary?.revenue ?? "$0"}</div>
-              <div className="metric-subvalue">Recognized revenue for the selected TBR season.</div>
             </article>
             <article className="metric-card">
               <div className="metric-topline">
@@ -335,7 +299,6 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
                 <span className="badge">Season due</span>
               </div>
               <div className="metric-value">{selectedSeasonSummary?.openPayables ?? "$0"}</div>
-              <div className="metric-subvalue">Invoices still open inside this selected season.</div>
             </article>
             <article className="metric-card">
               <div className="metric-topline">
@@ -343,7 +306,6 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
                 <span className="badge">Season scope</span>
               </div>
               <div className="metric-value">{selectedSeasonSummary?.raceCount ?? "0"}</div>
-              <div className="metric-subvalue">Races currently tracked inside the selected season.</div>
             </article>
           </section>
 
@@ -404,30 +366,11 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
           <section className="card">
             <div className="card-title-row">
               <div>
-                <span className="section-kicker">AI comments</span>
-                <h3>Finance commentary on the selected season</h3>
+                <strong>{seasonInsight.title}</strong>
               </div>
               <span className="pill">Context aware</span>
             </div>
-            <div className="info-grid">
-              {seasonInsights.map((insight) => (
-                <div className="process-step" key={insight.title}>
-                  <span className="process-step-index">AI</span>
-                  <strong>{insight.title}</strong>
-                  <span className="muted">{insight.summary}</span>
-                </div>
-              ))}
-              {selectedRace ? (
-                <div className="process-step">
-                  <span className="process-step-index">Race</span>
-                  <strong>{selectedRace.name} is the active drilldown context</strong>
-                  <span className="muted">
-                    {selectedRace.totalCost} total cost with {selectedRace.openPayables} still open and{" "}
-                    {selectedRace.pendingReceipts} pending support files.
-                  </span>
-                </div>
-              ) : null}
-            </div>
+            <span className="muted">{seasonInsight.summary}</span>
           </section>
         </>
       ) : null}
@@ -575,19 +518,10 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
           <section className="card compact-section-card">
             <div className="card-title-row">
               <div>
-                <span className="section-kicker">AI comments</span>
-                <h3>What to look at inside the selected season</h3>
+                <strong>{seasonInsight.title}</strong>
               </div>
             </div>
-            <div className="info-grid">
-              {seasonInsights.map((insight) => (
-                <div className="process-step" key={insight.title}>
-                  <span className="process-step-index">AI</span>
-                  <strong>{insight.title}</strong>
-                  <span className="muted">{insight.summary}</span>
-                </div>
-              ))}
-            </div>
+            <span className="muted">{seasonInsight.summary}</span>
           </section>
         </>
       ) : null}
@@ -603,10 +537,6 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
                 </div>
                 <span className="pill">Source-backed</span>
               </div>
-              <p>
-                Upload a receipt, reimbursement bundle, or vendor bill only when the cost overview or
-                breakdown needs documentary support.
-              </p>
               <div className="inline-actions">
                 <ModalLauncher
                   triggerLabel="Open analyzer"
@@ -745,17 +675,7 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
               postingEvents={postingEvents}
               title={selectedRace ? `Selected ${selectedRace.name} cost analysis` : "Selected cost analysis run"}
             />
-          ) : (
-            <section className="card compact-section-card">
-              <div className="process-step">
-                <span className="process-step-index">Step 4</span>
-                <strong>Open one analysis run only when needed</strong>
-                <span className="muted">
-                  Select a queue item to inspect the receipt preview, extracted fields, and posting history for the chosen race.
-                </span>
-              </div>
-            </section>
-          )}
+          ) : null}
         </>
       ) : null}
     </div>

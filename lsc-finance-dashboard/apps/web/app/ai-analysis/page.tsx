@@ -12,19 +12,19 @@ const scopes = [
   {
     key: "portfolio",
     title: "Portfolio brief",
-    description: "Use this lens when reading LSC as the holding-company layer.",
+    description: "LSC holding-company layer.",
     badge: "Step 1"
   },
   {
     key: "tbr",
     title: "TBR operating brief",
-    description: "Use this lens when the question is about race operations, expenses, payables, or TBR pacing.",
+    description: "Race operations, expenses, payables, and pacing.",
     badge: "Step 2"
   },
   {
     key: "commercial",
     title: "Commercial brief",
-    description: "Use this lens when the question is target pace, sponsorship closure, or prize-linked revenue.",
+    description: "Target pace, sponsorship, and prize-linked revenue.",
     badge: "Step 3"
   }
 ] as const;
@@ -73,18 +73,13 @@ export default async function AiAnalysisPage({ searchParams }: AiAnalysisPagePro
     matchesScope(item.type, `${item.title} ${item.summary}`, selectedScope)
   );
   const visibleInsights = filteredInsights.length > 0 ? filteredInsights : aiInsights;
-  const selectedScopeMeta = scopes.find((scope) => scope.key === selectedScope) ?? scopes[0];
 
   return (
     <div className="page-grid">
       <section className="hero portfolio-hero">
         <div className="hero-copy">
           <span className="eyebrow">Narrative layer</span>
-          <h2>Pick the analysis lens before reading the brief.</h2>
-          <p>
-            This page should behave like a finance brief, not a raw list of AI cards. Start with
-            the scope you are asking about, then read only the insights that belong to that layer.
-          </p>
+          <h2>Pick an analysis lens, then read the brief.</h2>
         </div>
       </section>
 
@@ -99,21 +94,6 @@ export default async function AiAnalysisPage({ searchParams }: AiAnalysisPagePro
             </Link>
           </article>
         ))}
-      </section>
-
-      <section className="card compact-section-card">
-        <div className="card-title-row">
-          <div>
-            <span className="section-kicker">Selected lens</span>
-            <h3>{selectedScopeMeta.title}</h3>
-          </div>
-          <span className="pill">{visibleInsights.length} insights</span>
-        </div>
-        <div className="process-step compact-process-step">
-          <span className="process-step-index">Rule</span>
-          <strong>{selectedScopeMeta.description}</strong>
-          <span className="muted">Keep the brief scoped. Move back into the operational tabs if you need the underlying table, queue, or source-backed detail.</span>
-        </div>
       </section>
 
       <section className="card-grid">

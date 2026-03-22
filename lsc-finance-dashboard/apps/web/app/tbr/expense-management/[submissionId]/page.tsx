@@ -57,11 +57,6 @@ export default async function ExpenseSubmissionDetailPage({
       <section className="hero">
         <span className="eyebrow">Expense detail</span>
         <h2>{submission.title}</h2>
-        <p>
-          This is the finance-admin review surface for one expense report. Review the items, add a
-          finance note, and decide whether the report should be approved, rejected, or returned for
-          clarification.
-        </p>
         <div className="hero-actions">
           <Link className="ghost-link" href="/tbr/expense-management">
             Back to expense queue
@@ -81,28 +76,27 @@ export default async function ExpenseSubmissionDetailPage({
           <div className="card-title-row">
             <div>
               <span className="section-kicker">Submission summary</span>
-              <h3>Header</h3>
             </div>
             <span className="pill">{submission.status}</span>
           </div>
-          <div className="key-value-list">
-            <div className="key-value-row">
+          <div className="mini-metric-grid">
+            <div className="mini-metric">
               <span>Race</span>
               <strong>{submission.race}</strong>
             </div>
-            <div className="key-value-row">
+            <div className="mini-metric">
               <span>Submitter</span>
               <strong>{submission.submitter}</strong>
             </div>
-            <div className="key-value-row">
+            <div className="mini-metric">
               <span>Submitted</span>
               <strong>{submission.submittedAt}</strong>
             </div>
-            <div className="key-value-row">
+            <div className="mini-metric">
               <span>Total</span>
               <strong>{submission.totalAmount}</strong>
             </div>
-            <div className="key-value-row">
+            <div className="mini-metric">
               <span>Budget signal</span>
               <strong>
                 <span className={`pill signal-pill signal-${submission.budgetSignalTone}`}>
@@ -110,20 +104,16 @@ export default async function ExpenseSubmissionDetailPage({
                 </span>
               </strong>
             </div>
-            <div className="key-value-row">
-              <span>Matched rules</span>
-              <strong>{submission.matchedBudgetCount}</strong>
-            </div>
           </div>
-          <p className="table-note">{submission.operatorNote}</p>
-          <p className="table-note">{submission.reviewNote}</p>
+          {submission.operatorNote ? <p className="table-note">{submission.operatorNote}</p> : null}
+          {submission.reviewNote ? <p className="table-note">{submission.reviewNote}</p> : null}
         </article>
 
         <article className="card">
           <div className="card-title-row">
             <div>
-              <span className="section-kicker">Race budget context</span>
-              <h3>Approved thresholds for {submission.race}</h3>
+              <span className="section-kicker">Race budget</span>
+              <h3>{submission.race}</h3>
             </div>
             <span className="pill">{raceBudgetRules.length} rules</span>
           </div>
@@ -133,9 +123,6 @@ export default async function ExpenseSubmissionDetailPage({
                 <thead>
                   <tr>
                     <th>Category</th>
-                    <th>Type</th>
-                    <th>Unit</th>
-                    <th>Label</th>
                     <th>Approved amount</th>
                     <th>Close threshold</th>
                   </tr>
@@ -144,9 +131,6 @@ export default async function ExpenseSubmissionDetailPage({
                   {raceBudgetRules.map((rule) => (
                     <tr key={rule.id}>
                       <td>{rule.category}</td>
-                      <td>{rule.ruleKind}</td>
-                      <td>{rule.unitLabel}</td>
-                      <td>{rule.ruleLabel}</td>
                       <td>{rule.approvedAmountUsd}</td>
                       <td>{rule.closeThreshold}</td>
                     </tr>
@@ -155,14 +139,7 @@ export default async function ExpenseSubmissionDetailPage({
               </table>
             </div>
           ) : (
-            <div className="process-step">
-              <span className="process-step-index">No rules</span>
-              <strong>No approved budget rules are loaded for this race yet</strong>
-              <span className="muted">
-                Finance can still review the report, but the queue will not be able to compare items against a saved
-                threshold until the race budget dashboard is populated.
-              </span>
-            </div>
+            <p className="muted">No approved budget rules loaded for this race yet.</p>
           )}
         </article>
 
@@ -170,7 +147,6 @@ export default async function ExpenseSubmissionDetailPage({
           <div className="card-title-row">
             <div>
               <span className="section-kicker">Review decision</span>
-              <h3>Admin actions</h3>
             </div>
             <span className="pill subtle-pill">{submission.status}</span>
           </div>
@@ -186,7 +162,7 @@ export default async function ExpenseSubmissionDetailPage({
               <textarea
                 name="reviewNote"
                 placeholder="What finance approved, rejected, or needs clarified."
-                rows={4}
+                rows={3}
               />
             </label>
             <div className="actions-row">
@@ -255,53 +231,21 @@ export default async function ExpenseSubmissionDetailPage({
                 <strong>{item.splitCount}</strong>
               </div>
             </div>
-            <p className="table-note">{item.description}</p>
+            {item.description ? <p className="table-note">{item.description}</p> : null}
 
-            <section className="support-grid">
-              <article className="card">
-                <div className="card-title-row">
-                  <div>
-                    <span className="section-kicker">Budget comparison</span>
-                    <h4>How this item sits against the race approval</h4>
-                  </div>
-                  <span className={`pill signal-pill signal-${item.budgetStatusTone}`}>
-                    {item.budgetStatusLabel}
-                  </span>
-                </div>
-                <div className="key-value-list">
-                  <div className="key-value-row">
-                    <span>Matched rule</span>
-                    <strong>{item.budgetRuleLabel ?? "No approved rule matched"}</strong>
-                  </div>
-                  <div className="key-value-row">
-                    <span>Rule type</span>
-                    <strong>{item.budgetRuleKind ?? "No rule"}</strong>
-                  </div>
-                  <div className="key-value-row">
-                    <span>Unit basis</span>
-                    <strong>{item.budgetUnitLabel ?? "Not set"}</strong>
-                  </div>
-                  <div className="key-value-row">
-                    <span>Approved amount</span>
-                    <strong>{item.budgetApprovedAmount ?? "Not set"}</strong>
-                  </div>
-                  <div className="key-value-row">
-                    <span>Variance</span>
-                    <strong>{item.budgetVariance ?? "Not available"}</strong>
-                  </div>
-                </div>
-                <p className="table-note">
-                  {item.budgetNotes ?? "No approved race budget rule mapped for this category yet."}
-                </p>
-              </article>
-            </section>
+            <p className="table-note">
+              Budget:{" "}
+              <span className={`pill signal-pill signal-${item.budgetStatusTone}`}>
+                {item.budgetStatusLabel}
+              </span>{" "}
+              {item.budgetApprovedAmount ?? "No rule"} — {item.budgetVariance ?? "N/A"}
+            </p>
 
             <section className="grid-two">
               <article className="card">
                 <div className="card-title-row">
                   <div>
-                    <span className="section-kicker">Current allocations</span>
-                    <h4>Split Rows</h4>
+                    <span className="section-kicker">Split rows</span>
                   </div>
                   <form action={generateEqualSplitsAction}>
                     <input name="itemId" type="hidden" value={item.id} />
@@ -337,7 +281,7 @@ export default async function ExpenseSubmissionDetailPage({
                       ) : (
                         <tr>
                           <td className="muted" colSpan={3}>
-                            No split rows yet for this item.
+                            No split rows yet.
                           </td>
                         </tr>
                       )}
@@ -349,8 +293,7 @@ export default async function ExpenseSubmissionDetailPage({
               <article className="card">
                 <div className="card-title-row">
                   <div>
-                    <span className="section-kicker">Custom allocation</span>
-                    <h4>Add Split Row</h4>
+                    <span className="section-kicker">Add split row</span>
                   </div>
                 </div>
                 <form action={addExpenseSplitAction} className="stack-form">
