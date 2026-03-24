@@ -1,24 +1,28 @@
 :root {
-  --bg: #f3efe7;
+  --bg: #f7f7f8;
   --bg-deep: #0f2438;
-  --surface: rgba(255, 255, 255, 0.86);
-  --surface-strong: rgba(255, 255, 255, 0.96);
-  --surface-muted: rgba(15, 36, 56, 0.05);
-  --ink: #15202b;
-  --ink-soft: #495665;
-  --line: rgba(17, 32, 48, 0.12);
-  --line-strong: rgba(17, 32, 48, 0.2);
+  --surface: #ffffff;
+  --surface-strong: #ffffff;
+  --surface-muted: #f2f3f5;
+  --ink: #1a1a2e;
+  --ink-soft: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
   --brand: #0f3554;
   --brand-2: #1f5d84;
   --accent: #b56a3d;
-  --accent-soft: rgba(181, 106, 61, 0.12);
-  --good: #2e6b4c;
-  --warn: #8b5a24;
-  --shadow-soft: 0 20px 55px rgba(17, 32, 48, 0.08);
-  --shadow-card: 0 18px 42px rgba(17, 32, 48, 0.08);
-  --radius-xl: 30px;
-  --radius-lg: 22px;
-  --radius-md: 16px;
+  --accent-soft: rgba(181, 106, 61, 0.08);
+  --good: #16a34a;
+  --good-soft: rgba(22, 163, 74, 0.08);
+  --warn: #d97706;
+  --warn-soft: rgba(217, 119, 6, 0.08);
+  --risk: #dc2626;
+  --risk-soft: rgba(220, 38, 38, 0.08);
+  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --radius-xl: 16px;
+  --radius-lg: 12px;
+  --radius-md: 8px;
 }
 
 * {
@@ -26,12 +30,13 @@
 }
 
 html {
-  font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  background:
-    radial-gradient(circle at top left, rgba(31, 93, 132, 0.12), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(181, 106, 61, 0.12), transparent 22%),
-    var(--bg);
+  font-family: "Inter", -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
   color: var(--ink);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -59,13 +64,12 @@ textarea {
 .sidebar {
   display: grid;
   align-content: start;
-  gap: 28px;
-  padding: 28px 24px;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    linear-gradient(180deg, rgba(15, 36, 56, 0.98), rgba(11, 27, 42, 0.98)),
-    var(--bg-deep);
-  color: #f5efe6;
+  gap: 24px;
+  padding: 24px 20px;
+  border-right: 1px solid var(--line);
+  background: var(--bg-deep);
+  color: #f0f0f5;
+  overflow-y: auto;
 }
 
 .brand-block {
@@ -75,12 +79,20 @@ textarea {
 
 .brand-kicker,
 .nav-label,
-.section-kicker,
 .eyebrow {
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-size: 0.72rem;
-  color: rgba(245, 239, 230, 0.72);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(240, 240, 245, 0.6);
+}
+
+.section-kicker {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--brand-2);
 }
 
 .brand-block h1 {
@@ -292,12 +304,10 @@ textarea {
   width: min(100%, 520px);
   display: grid;
   gap: 18px;
-  padding: 28px 30px;
+  padding: 32px;
   border-radius: var(--radius-xl);
   border: 1px solid var(--line);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(232, 239, 244, 0.82)),
-    var(--surface-strong);
+  background: var(--surface);
   box-shadow: var(--shadow-soft);
 }
 
@@ -317,34 +327,20 @@ textarea {
 
 .page-header,
 .hero {
-  position: relative;
-  overflow: hidden;
   border-radius: var(--radius-xl);
   border: 1px solid var(--line);
-  padding: 28px 30px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(232, 239, 244, 0.82)),
-    var(--surface-strong);
+  padding: 28px 32px;
+  background: var(--surface);
   box-shadow: var(--shadow-soft);
-}
-
-.page-header::after,
-.hero::after {
-  content: "";
-  position: absolute;
-  inset: auto -10% -40% auto;
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(31, 93, 132, 0.16), transparent 70%);
 }
 
 .page-header h2,
 .hero h2 {
-  margin: 0 0 12px;
-  max-width: 15ch;
-  font-size: clamp(2rem, 3vw, 3rem);
-  line-height: 0.95;
+  margin: 0 0 8px;
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .page-header p,
@@ -383,11 +379,9 @@ textarea {
 .tool-card,
 .insight-card,
 .process-card {
-  position: relative;
-  overflow: hidden;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
-  padding: 20px;
+  padding: 24px;
   background: var(--surface);
   box-shadow: var(--shadow-card);
 }
@@ -467,10 +461,11 @@ textarea {
 }
 
 .metric-value {
-  font-size: clamp(1.5rem, 2vw, 2.1rem);
+  font-size: 1.8rem;
   line-height: 1;
-  margin: 10px 0 8px;
+  margin: 8px 0 6px;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .metric-subvalue {
@@ -560,20 +555,20 @@ textarea {
 .workflow-tile {
   display: grid;
   gap: 14px;
-  padding: 20px;
-  border-radius: 22px;
+  padding: 24px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.88);
+  background: var(--surface);
   box-shadow: var(--shadow-card);
-  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .entity-card:hover,
 .season-card:hover,
 .race-card:hover,
 .workflow-tile:hover {
-  transform: translateY(-1px);
-  border-color: rgba(15, 53, 84, 0.16);
+  border-color: var(--brand-2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .entity-card h3,
@@ -601,22 +596,19 @@ textarea {
 
 .entity-card.active-card,
 .workflow-tile.active {
-  border-color: rgba(31, 93, 132, 0.28);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(229, 239, 246, 0.92));
-  box-shadow: 0 18px 42px rgba(15, 53, 84, 0.12);
+  border-color: var(--brand-2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.entity-card.lsc {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(235, 242, 246, 0.9));
-}
-
+.entity-card.lsc,
 .entity-card.tbr {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(229, 239, 246, 0.92));
+  border-left: 3px solid var(--brand-2);
 }
 
 .entity-card.fsp,
 .placeholder-card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(243, 240, 234, 0.94));
+  border-left: 3px solid var(--line-strong);
+  opacity: 0.85;
 }
 
 .entity-stats,
@@ -631,10 +623,10 @@ textarea {
 .season-metrics div,
 .race-metrics div {
   display: grid;
-  gap: 5px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(15, 53, 84, 0.04);
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
 }
 
 .entity-stats span,
@@ -850,9 +842,9 @@ textarea {
 
 .table-wrapper {
   overflow-x: auto;
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--surface);
 }
 
 .table,
@@ -874,11 +866,12 @@ textarea {
 
 .table th,
 .table-wrapper th {
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-soft);
-  background: rgba(15, 36, 56, 0.04);
+  font-weight: 600;
+  background: var(--surface-muted);
 }
 
 .table tbody tr:last-child td,
@@ -953,11 +946,13 @@ textarea {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 42px;
-  padding: 10px 16px;
-  border-radius: 999px;
+  min-height: 40px;
+  padding: 9px 18px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
-  transition: transform 120ms ease, opacity 120ms ease, border-color 120ms ease;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .solid-link,
@@ -974,9 +969,14 @@ textarea {
 }
 
 .solid-link:hover,
+.action-button.primary:hover {
+  background: var(--brand-2);
+}
+
 .ghost-link:hover,
-.action-button:hover {
-  transform: translateY(-1px);
+.action-button.secondary:hover {
+  background: var(--surface-muted);
+  border-color: var(--line-strong);
 }
 
 .ghost-link:disabled,
@@ -1453,6 +1453,7 @@ textarea {
   place-items: center;
   padding: 24px;
   background: rgba(15, 36, 56, 0.4);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 
@@ -1462,13 +1463,11 @@ textarea {
   overflow: auto;
   display: grid;
   gap: 18px;
-  padding: 22px;
-  border-radius: 28px;
+  padding: 28px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--line);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(232, 239, 244, 0.88)),
-    var(--surface-strong);
-  box-shadow: 0 28px 80px rgba(15, 36, 56, 0.24);
+  background: var(--surface);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
 
 .modal-head {
@@ -1596,6 +1595,7 @@ textarea {
     inset: 0;
     z-index: 39;
     background: rgba(15, 36, 56, 0.4);
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
     opacity: 0;
     pointer-events: none;
@@ -1685,6 +1685,7 @@ textarea {
   top: 0;
   z-index: 2;
   background: rgba(235, 240, 244, 0.98);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 
