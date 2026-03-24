@@ -12,6 +12,7 @@
     "@lsc/db": "workspace:*",
     "@swc/helpers": "^0.5.15",
     "next": "^15.0.0",
+    "styled-jsx": "^5.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
