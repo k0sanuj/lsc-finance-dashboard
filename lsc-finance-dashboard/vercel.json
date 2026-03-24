@@ -3,8 +3,10 @@
   "builds": [
     {
       "src": "lsc-finance-dashboard/apps/web/package.json",
-      "use": "@vercel/next"
+      "use": "@vercel/next",
+      "config": {
+        "installCommand": "cd ../.. && npm i -g pnpm && pnpm install --no-frozen-lockfile"
+      }
     }
-  ],
-  "installCommand": "npm i -g pnpm && pnpm install --no-frozen-lockfile"
+  ]
 }
