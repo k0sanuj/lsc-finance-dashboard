@@ -1,3 +1,10 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "builds": [
+    {
+      "src": "lsc-finance-dashboard/apps/web/package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "installCommand": "npm i -g pnpm && pnpm install --no-frozen-lockfile"
 }
