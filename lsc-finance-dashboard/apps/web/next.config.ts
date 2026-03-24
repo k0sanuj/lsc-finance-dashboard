@@ -5,7 +5,7 @@ import type { NextConfig } from "next";
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
-  typedRoutes: true,
+  output: "standalone",
   outputFileTracingRoot: path.join(dirname, "../.."),
   transpilePackages: ["@lsc/db"],
   serverExternalPackages: ["@swc/helpers"],
