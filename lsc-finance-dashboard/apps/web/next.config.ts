@@ -5,9 +5,14 @@ import type { NextConfig } from "next";
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
-  outputFileTracingRoot: path.join(dirname, "../.."),
+  outputFileTracingRoot: path.join(dirname, "../../.."),
   transpilePackages: ["@lsc/db"],
   serverExternalPackages: ["@swc/helpers"],
+  experimental: {
+    turbo: {
+      root: path.join(dirname, "../.."),
+    },
+  },
   async headers() {
     return [
       {
