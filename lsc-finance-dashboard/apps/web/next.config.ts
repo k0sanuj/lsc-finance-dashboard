@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(dirname, "../.."),
   transpilePackages: ["@lsc/db"],
   serverExternalPackages: ["@swc/helpers"],
+  outputFileTracingExcludes: {
+    "*": ["node_modules/@swc/helpers/**/*"]
+  },
   async headers() {
     return [
       {
