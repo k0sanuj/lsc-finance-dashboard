@@ -8,11 +8,6 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(dirname, "../../.."),
   transpilePackages: ["@lsc/db"],
   serverExternalPackages: ["@swc/helpers"],
-  experimental: {
-    turbo: {
-      root: path.join(dirname, "../.."),
-    },
-  },
   async headers() {
     return [
       {
