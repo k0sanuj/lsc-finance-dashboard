@@ -1,9 +1,20 @@
 {
   "private": true,
+  "workspaces": ["lsc-finance-dashboard/apps/*", "lsc-finance-dashboard/packages/*"],
   "dependencies": {
-    "next": "^15.0.0"
+    "@aws-sdk/client-s3": "^3.1009.0",
+    "@aws-sdk/s3-request-presigner": "^3.1009.0",
+    "next": "^15.0.0",
+    "pg": "^8.20.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "xlsx": "^0.18.5"
   },
-  "scripts": {
-    "build": "cd lsc-finance-dashboard && npm i -g pnpm && pnpm install --no-frozen-lockfile && pnpm --filter web build && cd .. && rm -rf .next && cp -R lsc-finance-dashboard/apps/web/.next .next"
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.18.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.6.0"
   }
 }
