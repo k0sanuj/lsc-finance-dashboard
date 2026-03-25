@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "dependencies": {
+    "next": "^15.0.0"
+  },
+  "scripts": {
+    "build": "cd lsc-finance-dashboard && npm i -g pnpm && pnpm install --no-frozen-lockfile && pnpm --filter web build && cd .. && rm -rf .next && cp -R lsc-finance-dashboard/apps/web/.next .next"
+  }
+}
