@@ -56,6 +56,7 @@ function getTbrNav(): CompanyNav {
         links: [
           { href: "/costs/TBR" as Route, label: "Costs", roles: [...ALL_ADMIN, "viewer"] },
           { href: "/payments/TBR" as Route, label: "Payments", roles: ALL_ADMIN },
+          { href: "/receivables/TBR" as Route, label: "Receivables", roles: ALL_ADMIN },
           { href: "/documents/TBR" as Route, label: "Documents", roles: ALL_ADMIN },
         ],
       },
@@ -117,6 +118,7 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/commercial-goals")) return "Commercial Goals";
   if (pathname.startsWith("/costs")) return "Costs";
   if (pathname.startsWith("/payments")) return "Payments";
+  if (pathname.startsWith("/receivables")) return "Receivables";
   if (pathname.startsWith("/documents")) return "Documents";
   if (pathname.startsWith("/ai-analysis")) return "AI Analysis";
   if (pathname.startsWith("/agent-graph")) return "Agent Graph";
@@ -145,6 +147,8 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Costs" });
   } else if (pathname.startsWith("/payments/")) {
     crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Payments" });
+  } else if (pathname.startsWith("/receivables/")) {
+    crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Receivables" });
   } else if (pathname.startsWith("/documents/")) {
     crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Documents" });
   } else if (pathname.startsWith("/commercial-goals/")) {
@@ -171,7 +175,7 @@ export function SessionShell({ children, user }: SessionShellProps) {
 
   // Auto-expand company based on current path
   useEffect(() => {
-    if (pathname.startsWith("/tbr") || pathname.startsWith("/costs") || pathname.startsWith("/payments") || pathname.startsWith("/documents") || pathname.startsWith("/commercial-goals") || pathname.startsWith("/ai-analysis")) {
+    if (pathname.startsWith("/tbr") || pathname.startsWith("/costs") || pathname.startsWith("/payments") || pathname.startsWith("/receivables") || pathname.startsWith("/documents") || pathname.startsWith("/commercial-goals") || pathname.startsWith("/ai-analysis")) {
       setExpandedCompany("TBR");
     } else if (pathname.startsWith("/fsp")) {
       setExpandedCompany("FSP");

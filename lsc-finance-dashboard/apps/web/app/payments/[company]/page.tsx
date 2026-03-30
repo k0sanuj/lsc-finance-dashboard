@@ -7,6 +7,7 @@ import {
   getDocumentExtractedFields,
   getDocumentPostingEvents,
   getEntitySnapshots,
+  getEnhancedPayables,
   getUpcomingPayments
 } from "@lsc/db";
 import { CompanyWorkspaceShell } from "../../components/company-workspace-shell";
@@ -132,7 +133,22 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
     );
   }
 
-  const upcomingPayments = await getUpcomingPayments();
+  const [upcomingPayments, enhancedPayables] = await Promise.all([
+    getUpcomingPayments(),
+    getEnhancedPayables(companyCode)
+  ]);
+  const payableRows = enhancedPayables.length > 0 ? enhancedPayables : upcomingPayments.map((row) => ({
+    invoiceNumber: row.vendor,
+    dueDate: row.dueDate,
+    totalAmount: row.amount,
+    status: row.status,
+    raceName: row.race,
+    description: row.category,
+    daysOverdue: 0,
+    daysUntilDue: 0,
+    agingBucket: "current",
+    agingLabel: "Current"
+  }));
   const paymentQueue = (queue as QueueRow[]).filter((item) => {
     const workflow = String(item.workflowContext ?? "").toLowerCase();
     return (
@@ -141,21 +157,22 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
         "vendor-invoices"
     );
   });
-  const openAmount = upcomingPayments.reduce((sum, row) => sum + parseCurrency(row.amount), 0);
-  const partiallyPaidCount = upcomingPayments.filter((row) => row.status === "partially_paid").length;
-  const issuedCount = upcomingPayments.filter((row) => row.status === "issued").length;
-  const topPayables = [...upcomingPayments]
-    .sort((left, right) => parseCurrency(right.amount) - parseCurrency(left.amount))
+  const openAmount = payableRows.reduce((sum, row) => sum + parseCurrency(row.totalAmount), 0);
+  const partiallyPaidCount = payableRows.filter((row) => row.status === "partially_paid").length;
+  const issuedCount = payableRows.filter((row) => row.status === "issued").length;
+  const overdueCount = payableRows.filter((row) => row.daysOverdue > 0).length;
+  const topPayables = [...payableRows]
+    .sort((left, right) => parseCurrency(right.totalAmount) - parseCurrency(left.totalAmount))
     .slice(0, 6);
-  const payableMax = Math.max(1, ...topPayables.map((row) => parseCurrency(row.amount)));
+  const payableMax = Math.max(1, ...topPayables.map((row) => parseCurrency(row.totalAmount)));
   const paymentInsight = {
     title:
       topPayables[0] != null
-        ? `${topPayables[0].vendor} is the largest currently surfaced payable`
+        ? `${topPayables[0].invoiceNumber} is the largest currently surfaced payable`
         : "The payable queue is still light",
     summary:
       topPayables[0] != null
-        ? `${topPayables[0].amount} is the highest open line in the current queue.`
+        ? `${topPayables[0].totalAmount} is the highest open line in the current queue.${topPayables[0].daysOverdue > 0 ? ` ${topPayables[0].daysOverdue} days overdue.` : ""}`
         : "As invoice intake grows, this section should call out the largest vendor exposure."
   };
 
@@ -186,7 +203,7 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
                 <span className="metric-label">{selectedEntity?.name ?? "TBR"}</span>
                 <span className="badge">Open payables</span>
               </div>
-              <div className="metric-value">{upcomingPayments.length}</div>
+              <div className="metric-value">{payableRows.length}</div>
             </article>
             <article className="metric-card">
               <div className="metric-topline">
@@ -197,17 +214,19 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
             </article>
             <article className="metric-card">
               <div className="metric-topline">
+                <span className="metric-label">Overdue</span>
+                <span className={`pill signal-pill ${overdueCount > 0 ? "signal-risk" : "signal-good"}`}>
+                  {overdueCount > 0 ? "Action needed" : "All current"}
+                </span>
+              </div>
+              <div className="metric-value">{overdueCount}</div>
+            </article>
+            <article className="metric-card">
+              <div className="metric-topline">
                 <span className="metric-label">Partially paid</span>
                 <span className="badge">Attention</span>
               </div>
               <div className="metric-value">{partiallyPaidCount}</div>
-            </article>
-            <article className="metric-card">
-              <div className="metric-topline">
-                <span className="metric-label">Issued only</span>
-                <span className="badge">Waiting action</span>
-              </div>
-              <div className="metric-value">{issuedCount}</div>
             </article>
           </section>
 
@@ -222,17 +241,22 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
               </div>
               <div className="chart-list">
                 {topPayables.map((row) => (
-                  <div className="chart-row" key={`${row.vendor}-${row.amount}-${row.race}`}>
+                  <div className="chart-row" key={`${row.invoiceNumber}-${row.totalAmount}-${row.raceName}`}>
                     <div className="chart-meta">
-                      <strong>{row.vendor}</strong>
+                      <strong>{row.invoiceNumber}</strong>
                       <span>
-                        {row.amount} · {row.race}
+                        {row.totalAmount} · {row.raceName}
+                        {row.daysOverdue > 0
+                          ? ` · ${row.daysOverdue}d overdue`
+                          : row.daysUntilDue > 0
+                            ? ` · Due in ${row.daysUntilDue}d`
+                            : ""}
                       </span>
                     </div>
                     <div className="chart-track">
                       <div
-                        className="chart-fill secondary"
-                        style={{ width: `${Math.max(8, (parseCurrency(row.amount) / payableMax) * 100)}%` }}
+                        className={row.daysOverdue > 60 ? "chart-fill risk" : row.daysOverdue > 0 ? "chart-fill warn" : "chart-fill secondary"}
+                        style={{ width: `${Math.max(8, (parseCurrency(row.totalAmount) / payableMax) * 100)}%` }}
                       />
                     </div>
                   </div>
@@ -261,15 +285,15 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
                 <span className="metric-label">Queue rows</span>
                 <span className="badge">Tracker</span>
               </div>
-              <div className="metric-value">{upcomingPayments.length}</div>
+              <div className="metric-value">{payableRows.length}</div>
             </article>
             <article className="metric-card">
               <div className="metric-topline">
                 <span className="metric-label">Largest line</span>
                 <span className="badge">Exposure</span>
               </div>
-              <div className="metric-value">{topPayables[0]?.amount ?? "$0"}</div>
-              <div className="metric-subvalue">{topPayables[0]?.vendor ?? "No current payable rows."}</div>
+              <div className="metric-value">{topPayables[0]?.totalAmount ?? "$0"}</div>
+              <div className="metric-subvalue">{topPayables[0]?.invoiceNumber ?? "No current payable rows."}</div>
             </article>
           </section>
 
@@ -291,21 +315,34 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
                     <th>Race</th>
                     <th>Due</th>
                     <th>Amount</th>
+                    <th>Days</th>
                     <th>Status</th>
                     <th>Source note</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {upcomingPayments.map((row) => (
-                    <tr key={`${row.vendor}-${row.race}-${row.amount}`}>
-                      <td>{row.vendor}</td>
-                      <td>{row.race}</td>
+                  {payableRows.map((row) => (
+                    <tr
+                      className={row.daysOverdue > 60 ? "row-overdue" : row.daysOverdue > 0 ? "row-warn" : ""}
+                      key={`${row.invoiceNumber}-${row.raceName}-${row.totalAmount}`}
+                    >
+                      <td>{row.invoiceNumber}</td>
+                      <td>{row.raceName}</td>
                       <td>{row.dueDate}</td>
-                      <td>{row.amount}</td>
+                      <td>{row.totalAmount}</td>
+                      <td>
+                        <span className={`pill signal-pill ${row.daysOverdue > 60 ? "signal-risk" : row.daysOverdue > 0 ? "signal-warn" : "signal-good"}`}>
+                          {row.daysOverdue > 0
+                            ? `${row.daysOverdue}d late`
+                            : row.daysUntilDue > 0
+                              ? `in ${row.daysUntilDue}d`
+                              : "today"}
+                        </span>
+                      </td>
                       <td>
                         <span className="pill subtle-pill">{row.status.replace(/_/g, " ")}</span>
                       </td>
-                      <td>{summarizePaymentContext(row.category)}</td>
+                      <td>{summarizePaymentContext(row.description)}</td>
                     </tr>
                   ))}
                 </tbody>
