@@ -1,7 +1,7 @@
 # LSC Finance Dashboard — Living Financial Operating System
 
 ## Project Identity
-LSC Finance Dashboard is a living financial operating system for League Sports Co (LSC), built as an ontology-backed dashboard where changes propagate through shared canonical entities, derived metrics, and linked workflows. Not a static reporting UI.
+A living financial operating system for League Sports Co (LSC). Ontology-backed dashboard where changes propagate through shared canonical entities, derived metrics, and linked workflows. Not a static reporting UI.
 
 ### Business Scope
 - **LSC** — consolidated holding company view
@@ -9,282 +9,259 @@ LSC Finance Dashboard is a living financial operating system for League Sports C
 - **FSP** (Future of Sports) — future entity with placeholder support
 
 ## Stack
-- **Framework**: Next.js 15 (App Router), TypeScript strict mode
-- **Styling**: Tailwind CSS (globals.css)
+- **Framework**: Next.js 16.2.1 (App Router), React 19, TypeScript strict mode
+- **Styling**: Vanilla CSS with CSS custom properties (`globals.css`) — NOT Tailwind
 - **Database**: Neon Postgres via `pg` (node-postgres), raw SQL with role-based connection pooling
-- **Validation**: Zod (to be adopted), currently manual validation
-- **AI**: Google Gemini API (gemini-2.5-flash) for document intelligence
-- **Storage**: AWS S3 for document storage (with inline fallback)
-- **Auth**: Custom scrypt + HMAC-SHA256 session tokens
-- **Monorepo**: pnpm workspaces (`apps/web`, `packages/db`)
+- **Validation**: Manual validation (Zod planned but not yet adopted)
+- **AI**: Google Gemini API (`gemini-2.5-flash`) for document intelligence
+- **Storage**: AWS S3 for document storage (with inline base64 fallback)
+- **Auth**: Custom HMAC-SHA256 session tokens via Web Crypto API
+- **Monorepo**: pnpm workspaces (root `package.json` + `lsc-finance-dashboard/` inner workspace)
 - **Deployment**: Vercel
 
-## Directory Structure
+## Actual Directory Structure
+
+The repo has a nested structure — the git root is `lsc-finance-dashboard-1/`, and the main workspace lives inside `lsc-finance-dashboard/`:
+
 ```
-lsc-finance-dashboard/
-├── ontology/
-│   ├── schema.ts          # Drizzle schema (source of truth) [TO BUILD]
-│   ├── relations.ts       # Drizzle relations [TO BUILD]
-│   └── cascades.ts        # Cascade rules engine [TO BUILD]
-├── agents/
-│   ├── agent-graph.ts     # Agent topology, skills registry, message validation
-│   ├── orchestrator.ts    # Claude-powered intent router
-│   ├── finance-agent.ts   # Finance domain agent
-│   ├── import-agent.ts    # Data import/normalization agent
-│   ├── expense-agent.ts   # Expense workflow agent
-│   ├── invoice-agent.ts   # Invoice workflow agent
-│   ├── commercial-agent.ts # Commercial goals agent
-│   └── ai-analyzers/
-│       ├── cash-flow-analyzer.ts
-│       ├── receivables-analyzer.ts
-│       ├── margin-analyzer.ts
-│       ├── budget-analyzer.ts
-│       └── goal-tracker.ts
-├── skills/
-│   ├── finance/
-│   │   ├── company-metrics.ts
-│   │   ├── monthly-summary.ts
-│   │   ├── cash-flow.ts
-│   │   └── export-report.ts
-│   ├── expenses/
-│   │   ├── create-submission.ts
-│   │   ├── approve-submission.ts
-│   │   ├── manage-budget-rules.ts
-│   │   └── expense-queries.ts
-│   ├── invoices/
-│   │   ├── create-invoice.ts
-│   │   ├── approve-invoice.ts
-│   │   ├── process-payment.ts
-│   │   └── invoice-queries.ts
-│   ├── imports/
-│   │   ├── import-xlsx.ts
-│   │   ├── normalize-payables.ts
-│   │   ├── normalize-revenue.ts
-│   │   ├── normalize-expenses.ts
-│   │   └── validate-import.ts
-│   ├── documents/
-│   │   ├── upload-document.ts
-│   │   ├── analyze-document.ts
-│   │   └── document-queries.ts
-│   ├── commercial/
-│   │   ├── manage-goals.ts
-│   │   ├── track-sponsors.ts
-│   │   └── partner-performance.ts
-│   └── shared/
-│       ├── ontology-query.ts
-│       ├── cascade-update.ts
-│       └── audit-log.ts
-├── apps/
-│   └── web/                    # Next.js 15 app
-│       ├── app/
-│       │   ├── layout.tsx
-│       │   ├── page.tsx            # Overview (portfolio)
-│       │   ├── login/
-│       │   ├── tbr/
-│       │   │   ├── page.tsx        # TBR console
-│       │   │   ├── races/
-│       │   │   ├── my-expenses/
-│       │   │   ├── expense-management/
-│       │   │   ├── invoice-hub/
-│       │   │   └── team-management/
-│       │   ├── costs/
-│       │   ├── payments/
-│       │   ├── commercial-goals/
-│       │   ├── documents/
-│       │   ├── ai-analysis/
-│       │   ├── fsp/
-│       │   ├── agent-graph/
-│       │   └── workflow-graph/
-│       ├── components/
-│       ├── lib/
-│       │   ├── auth.ts
-│       │   ├── session.ts
-│       │   └── password.ts
-│       └── middleware.ts
-├── packages/
-│   └── db/
-│       └── src/
-│           ├── app-data.ts        # Query layer (2577 lines — NEEDS REFACTOR)
-│           ├── query.ts           # Connection pooling
-│           ├── connection.ts      # Role-based DB URLs
-│           ├── seed-data.ts       # Fallback placeholder data
-│           ├── agent-graph.ts     # Agent topology visualization
-│           ├── workflow-graph.ts  # Workflow stage definitions
-│           ├── document-storage.ts # S3 + inline storage
-│           └── schema.ts          # Table/view metadata
-├── scripts/                       # Import & setup scripts
-│   ├── apply-sql.mjs
-│   ├── bootstrap-admin-user.mjs
-│   ├── import-xlsx.mjs
-│   ├── import-csv.mjs
-│   ├── normalize-e1-payables.mjs
-│   ├── normalize-race-expenses.mjs
-│   ├── normalize-revenue.mjs
-│   └── seed-*.mjs
-├── sql/                           # Schema migrations (001-014)
-├── imports/                       # Source data files
-└── docs/                          # Specs & design docs
+lsc-finance-dashboard-1/          # Git root
+├── CLAUDE.md
+├── AGENTS.md
+├── SECURITY.md
+├── package.json                   # Root workspace config
+├── docs/                          # High-level docs (starter-checklist, codex setup)
+├── skills/                        # Codex skill definitions
+│   ├── lsc-finance-dashboard/
+│   └── lsc-section-categorization/
+└── lsc-finance-dashboard/         # Inner workspace
+    ├── package.json               # pnpm scripts (dev, build, db:*, import:*, seed:*)
+    ├── vercel.json                # Vercel deployment config
+    ├── tsconfig.base.json         # Shared TS config
+    ├── ontology/
+    │   ├── schema.ts              # Canonical type definitions + enums (all entities)
+    │   ├── relations.ts           # Entity relationship graph
+    │   ├── cascades.ts            # Cascade rules engine (trigger → actions)
+    │   └── index.ts
+    ├── agents/
+    │   ├── agent-graph.ts         # Agent topology, skill registry, routing validation
+    │   └── orchestrator.ts        # Intent classification + plan execution
+    ├── skills/
+    │   └── shared/
+    │       ├── audit-log.ts       # Audit log skill (stub — console-only for now)
+    │       └── cascade-update.ts
+    ├── apps/
+    │   └── web/                   # Next.js app
+    │       ├── next.config.ts     # CSP headers, transpilePackages, tracing root
+    │       ├── middleware.ts       # Session-based auth guard
+    │       ├── lib/
+    │       │   ├── auth.ts        # Session management, login, role checks
+    │       │   ├── session.ts     # HMAC-SHA256 token create/verify (Web Crypto)
+    │       │   └── password.ts    # Password hashing
+    │       └── app/
+    │           ├── layout.tsx     # Root layout with SessionShell
+    │           ├── session-shell.tsx  # Client-side sidebar + nav + breadcrumbs
+    │           ├── page.tsx       # Overview (portfolio dashboard)
+    │           ├── globals.css    # All styles (CSS custom properties, no Tailwind)
+    │           ├── login/         # Login page + actions
+    │           ├── logout/        # POST route for sign-out
+    │           ├── tbr/
+    │           │   ├── page.tsx           # TBR console
+    │           │   ├── races/             # Race list + [raceId] detail
+    │           │   ├── my-expenses/       # Personal expense view
+    │           │   ├── expense-management/ # Admin review + [submissionId] detail
+    │           │   ├── invoice-hub/       # Invoice intake + actions
+    │           │   └── team-management/   # User/team admin
+    │           ├── costs/[company]/       # Cost breakdown by company
+    │           ├── payments/[company]/    # Payment tracking by company
+    │           ├── commercial-goals/[company]/ # Commercial targets by company
+    │           ├── documents/[company]/   # Document intelligence by company
+    │           ├── ai-analysis/           # AI analysis dashboard
+    │           ├── fsp/                   # FSP placeholder
+    │           ├── agent-graph/           # Agent topology visualization
+    │           ├── workflow-graph/        # Workflow stage visualization
+    │           ├── api/analyze/           # POST route for Gemini doc analysis
+    │           ├── components/            # Shared UI components
+    │           │   ├── paginated-table.tsx
+    │           │   ├── race-bill-table.tsx
+    │           │   ├── race-budget-rule-builder.tsx
+    │           │   ├── race-expense-report-builder.tsx
+    │           │   ├── document-analyzer-panel.tsx
+    │           │   ├── document-analysis-summary.tsx
+    │           │   ├── company-selection-index.tsx
+    │           │   ├── company-workspace-index.tsx
+    │           │   ├── company-workspace-shell.tsx
+    │           │   └── modal-launcher.tsx
+    │           └── lib/
+    │               ├── shared-workspace.ts
+    │               └── workflow-labels.ts
+    ├── packages/
+    │   └── db/                    # @lsc/db package
+    │       └── src/
+    │           ├── index.ts       # Re-exports everything
+    │           ├── query.ts       # Connection pools (getPool, getAdminPool, queryRows, queryRowsAdmin)
+    │           ├── connection.ts  # Role-based DB URL derivation
+    │           ├── metadata.ts    # DB metadata + required env vars
+    │           ├── schema.ts      # Table/view metadata constants
+    │           ├── app-data.ts    # Re-exports queries (1 line — queries were refactored out)
+    │           ├── seed-data.ts   # Fallback placeholder data
+    │           ├── agent-graph.ts # Agent graph visualization data
+    │           ├── workflow-graph.ts # Workflow stage definitions
+    │           ├── document-storage.ts # S3 upload/preview + inline fallback
+    │           └── queries/       # Domain query modules (refactored from app-data.ts)
+    │               ├── index.ts
+    │               ├── shared.ts      # Formatters, helpers, types (313 lines)
+    │               ├── finance.ts     # Overview metrics, cash flow, entity snapshots (279 lines)
+    │               ├── costs.ts       # Cost breakdown queries (193 lines)
+    │               ├── expenses.ts    # Expense submissions, items, splits (649 lines)
+    │               ├── invoices.ts    # Invoice intake queries (114 lines)
+    │               ├── documents.ts   # Document analysis queries (363 lines)
+    │               ├── commercial.ts  # Commercial goals, sponsors (105 lines)
+    │               ├── races.ts       # Race events, seasons, budgets (362 lines)
+    │               ├── teams.ts       # Team/user management (120 lines)
+    │               └── system.ts      # System status, data backend (329 lines)
+    ├── scripts/                   # Node.js scripts (.mjs)
+    │   ├── pre-deploy-audit.mjs   # MANDATORY pre-deploy checks
+    │   ├── apply-sql.mjs          # Run SQL migrations
+    │   ├── bootstrap-admin-user.mjs
+    │   ├── import-xlsx.mjs / import-csv.mjs
+    │   ├── normalize-*.mjs        # Data normalization scripts
+    │   ├── seed-*.mjs             # Seed data scripts
+    │   └── deploy-preview.mjs
+    ├── sql/                       # Schema migrations (001-014)
+    ├── imports/                   # Source data manifests
+    └── docs/                      # Design specs & docs
 ```
+
+## Key Architecture Details
+
+### Database Query Layer (`@lsc/db`)
+- **Read pool**: `queryRows()` — uses `lsc_app_read` role or falls back to admin URL
+- **Write pool**: `queryRowsAdmin()` / `executeAdmin()` — uses `DATABASE_URL_ADMIN`
+- Raw SQL queries, no ORM — all queries in `packages/db/src/queries/`
+- Queries were refactored from monolithic `app-data.ts` into domain-specific modules
+- `app-data.ts` is now just `export * from "./queries"` (1 line)
+
+### Ontology Layer (`ontology/`)
+- `schema.ts`: TypeScript types mirroring SQL tables (not Drizzle — plain types + const enums)
+- `relations.ts`: Declarative entity relationship graph
+- `cascades.ts`: Trigger → Action rules engine (currently, SQL views are always-current so most actions are no-ops; audit-log and analyzer triggers are stubs)
+
+### Agent Architecture (`agents/`)
+- `agent-graph.ts`: Defines 11 agents (1 orchestrator, 6 specialists, 5 analyzers) with topology, skills registry, and routing validation
+- `orchestrator.ts`: Intent classification (keyword-based stub, Gemini integration planned) + topological plan execution with parallel steps
+- Analyzers are READ-ONLY with scoped context
+
+### Auth System
+- **NOT scrypt** — uses Web Crypto `HMAC-SHA256` for session tokens
+- Password hashing is in `lib/password.ts`
+- Session token format: `base64url(payload).base64url(hmac_signature)`
+- 7-day expiry, HTTP-only cookies
+- Middleware redirects unauthenticated users to `/login`
+- Roles: `super_admin`, `finance_admin`, `team_member`, `commercial_user`, `viewer`
+- Role-based nav filtering in `session-shell.tsx`
+
+### Styling
+- **Vanilla CSS** with CSS custom properties in `globals.css`
+- Design tokens: `--bg`, `--bg-deep`, `--surface`, `--ink`, `--ink-soft`, `--line`, `--brand`, `--accent`, `--good`, `--warn`, `--risk`
+- Sidebar: dark navy (`--bg-deep: #0f2438`)
+- Accent: warm copper (`--accent: #b56a3d`)
+- Layout: CSS Grid sidebar (310px) + content area
+- Components: no `apps/web/components/` — all components live in `apps/web/app/components/`
+
+### Document Intelligence
+- Gemini API integration in `app/documents/gemini.ts`
+- API route at `/api/analyze` for file upload + analysis
+- S3 storage with inline base64 fallback for previews
+- Workflow contexts: generic review, race expense submission, invoice intake, cost review
 
 ## Coding Conventions
 
 ### TypeScript
-- Strict mode always (`"strict": true` in tsconfig)
-- No `any` types — use `unknown` and narrow
-- Explicit return types on all exported functions
-- Use `satisfies` for config objects
+- Strict mode (`"strict": true`)
+- Target ES2022, module ESNext, bundler resolution
+- Path aliases: `@lsc/db` → `packages/db/src/index.ts`
+- `satisfies` used for config objects (e.g., `StoredDocumentMetadata`)
 
 ### Database
-- All queries go through `packages/db/src/query.ts` connection pools
+- All reads through `queryRows()`, all writes through `queryRowsAdmin()` / `executeAdmin()`
 - Role-based connections: admin (writes), app_read (reads), import (bulk loads)
-- Soft delete: never `DELETE`, always set `deletedAt = new Date()`
+- Soft delete: set `deleted_at`, never `DELETE`
 - All queries filter `WHERE deleted_at IS NULL` by default
-- All mutations must go through the cascade engine
+- SQL migrations numbered `001` through `014` in `sql/`
 
 ### Finance Architecture Layers
-1. **Raw input layer** — imported sheet rows, source documents
-2. **Canonical domain layer** — companies, sponsors, contracts, invoices, payments, expenses, race_events
-3. **Derived analytics layer** — SQL views (consolidated_company_metrics, payments_due, race_cost_summary)
-4. **Application layer** — APIs, pages, analysis services
+1. **Raw input** — imported sheet rows, source documents
+2. **Canonical domain** — companies, sponsors, contracts, invoices, payments, expenses, race_events
+3. **Derived analytics** — SQL views (consolidated_company_metrics, payments_due, tbr_race_cost_summary)
+4. **Application** — APIs, pages, analysis services
 
-Never collapse these layers. Every UI number must be traceable to a canonical table or derived SQL view.
+Never collapse these layers. Every UI number must trace to a canonical table or derived view.
 
-### Validation
-- All skill inputs/outputs validated with Zod schemas
-- Server action inputs parsed with `z.safeParse()` — return error on failure
-- No trust of client-provided IDs without DB lookup
+### Page Patterns
+- Company-scoped pages use `[company]` dynamic segments (costs, payments, documents, commercial-goals)
+- Index pages (costs, payments, etc.) render a company selection screen
+- Server components fetch data with `await` calls to `@lsc/db` functions
+- Server actions in co-located `actions.ts` files
+- Error/loading boundary files per route segment
 
 ### Commits
 - Conventional commits: `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`
 - One logical change per commit
 
-## Agent Architecture Rules
+## Environment Variables
 
-### Orchestrator
-- Single entry point for all AI operations
-- Uses Claude to classify intent → generate routing plan
-- Validates all routes against `AGENT_GRAPH` before execution
-- Merges results from multiple agents into unified response
+### Required
+- `DATABASE_URL` or `DATABASE_URL_ADMIN` — Neon Postgres connection
+- `AUTH_SESSION_SECRET` — HMAC signing key for sessions
+- `GEMINI_API_KEY` — Google Gemini API key
 
-### Sub-Agents (finance, import, expense, invoice, commercial)
-- Own their domain — no cross-domain direct mutations
-- All state changes go through skills, not direct DB writes
-- Emit cascade events after every mutation skill
-
-### AI Analyzers (cash-flow, receivables, margin, budget, goal-tracker)
-- **READ-ONLY** — never mutate database
-- Context strictly scoped to defined entity types
-- Output recommendations only — orchestrator decides if action taken
-- Powered by Gemini API with structured response schemas
-
-### Skills
-- Pure async functions: `(input: ZodSchema) => Promise<ZodSchema>`
-- No side effects beyond their declared scope
-- Always call `cascade-update` after mutations
-
-## Ontology Rules
-
-### Canonical Entities
-- companies, sponsors_or_customers, owners, race_events, cost_categories
-- contracts, source_documents, invoices, payments, expenses
-- revenue_records, commercial_targets, import_batches, raw_import_rows
-
-### Soft Delete
-All entities have `deleted_at: timestamp`. Deletion = set `deleted_at`, never remove rows.
-
-### Cascade Updates
-Every mutation triggers relevant cascades:
-- Payments → receivables aging recalculated
-- Invoices → payables due updated
-- Expenses → race P&L updated, budget signals refreshed
-- Revenue → consolidated metrics updated
-- Commercial targets → goal progress recalculated
-
-### Audit Log
-Every mutation writes to `audit_log` with before/after state.
-Format: `{ entityType, entityId, action, before, after, cascadeTriggered, performedBy }`
-
-### Data Source Lineage
-All imports must preserve:
-- source system, source sheet/folder, row/file identifier
-- import timestamp, import batch identifier
-- No imported row should lose its source identity
-
-## Finance Rules
-- `Cash`, `Revenue`, `Receivables`, `Expenses`, and `Margin` must never be mixed or inferred casually
-- Anything that can be computed should be derived, not manually entered
-- LSC, TBR, and FSP totals must always be clearly labeled
-- Never build pages that depend on ad hoc spreadsheet columns
-- Always normalize imported data into canonical entities first
-- If a metric is ambiguous, define it in the metric dictionary before coding
-
-## UI Design
-
-### Colors
-- Sidebar: dark navy (#1a1a2e)
-- Primary accent: emerald (#4CAF50)
-- Content background: warm white (#FAFAF5)
-- Cards: white with border (#E5E7EB)
-- Primary text: #111827
-- Secondary text: #6B7280
-
-### Layout
-- Left sidebar with navigation groups
-- Role-based menu filtering (super_admin, finance_admin, team_member, etc.)
-- Company selector pattern for multi-entity pages
-
-### Components
-- Cards: `rounded-lg border bg-white shadow-sm p-6`
-- Tables: clean header, alternating rows, pagination
-- Buttons: primary=green, secondary=white+border
-- Currency: USD ($) — displayed with proper formatting
-
-### Navigation Priority
-1. Overview
-2. TBR
-3. Costs
-4. Payments
-5. Commercial Goals
-6. AI Analysis
-
-## Auth & Security
-- Sessions: Custom HMAC-SHA256 tokens, 7-day expiry, HTTP-only cookies
-- Passwords: scrypt hashing with random salt
-- Roles: super_admin, finance_admin, team_member, commercial_user, viewer
-- Middleware: All routes except /login require valid session
-- DB roles: app_read (read-only), import_rw (writes during imports), admin (full)
+### Optional
+- `DATABASE_URL_APP_READ` — Dedicated read-only connection
+- `LSC_APP_READ_PASSWORD` / `LSC_APP_READ_ROLE` — Derive read URL from admin URL
+- `LSC_IMPORT_RW_PASSWORD` / `LSC_IMPORT_RW_ROLE` — Import role
+- `LSC_DATA_BACKEND` — `"database"` or `"seed"` (fallback placeholder data)
+- `S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — Document storage
+- `DOCUMENT_STORAGE_BACKEND` — `"s3"` or `"inline"` (default)
+- `GEMINI_MODEL` — Override model (default: `gemini-2.5-flash`)
 
 ## Pre-Deploy Audit (MANDATORY)
-
-**BEFORE every commit and deploy, run the pre-deploy audit:**
 
 ```bash
 cd lsc-finance-dashboard && node scripts/pre-deploy-audit.mjs
 ```
 
-This audit checks:
-1. All env vars are set and have no trailing newlines
-2. Database connection works and returns data
-3. All critical queries (seasons, races, entities, invoices) return results
-4. Gemini API key is valid and not revoked
-5. S3 storage is accessible
-6. All 22+ page routes exist with default exports
-7. All key components exist
-8. Build compiles without errors
-9. Vercel env vars match local
+Checks: env vars, DB connection, critical queries, Gemini key, S3, page routes, build compilation, Vercel env parity.
 
-**DO NOT deploy if any check fails.** Fix the failing check first.
+**Do not deploy if any check fails.**
 
 ### Deploy Process
 1. Make code changes
-2. Run `node scripts/pre-deploy-audit.mjs` — ALL checks must pass
+2. Run `node scripts/pre-deploy-audit.mjs` — all checks must pass
 3. `git add && git commit`
 4. `git push origin main`
 5. `cd lsc-finance-dashboard && npx vercel --prod --scope anujsingh012001-gmailcoms-projects --yes`
-6. Verify deployment status is "● Ready"
 
 ### Env Var Rules
 - ALWAYS use `printf` (never `echo`) when adding Vercel env vars
-- Wrong: `echo "database" | vercel env add VAR production`
-- Right: `printf "database" | vercel env add VAR production`
 - `echo` adds trailing newlines that silently break string comparisons
+
+## pnpm Scripts (from `lsc-finance-dashboard/package.json`)
+
+```bash
+pnpm dev                    # Start dev server
+pnpm build                  # Build for production
+pnpm typecheck              # TypeScript check
+pnpm db:apply               # Apply core SQL migrations
+pnpm db:apply:expense-workflow  # Apply expense management schema
+pnpm db:apply:invoice-workflow  # Apply invoice workflow schema
+pnpm db:apply:race-budgets  # Apply budget rules schema
+pnpm db:setup-roles         # Apply role/grant SQL
+pnpm auth:bootstrap-admin   # Create initial admin user
+pnpm import:xlsx / import:csv  # Import data
+pnpm normalize:e1-payables  # Normalize payables
+pnpm normalize:race-expenses # Normalize expenses
+pnpm normalize:revenue      # Normalize revenue
+pnpm seed:document-analysis # Seed document data
+pnpm seed:expense-management # Seed expense data
+pnpm seed:invoice-workflow  # Seed invoice data
+```
