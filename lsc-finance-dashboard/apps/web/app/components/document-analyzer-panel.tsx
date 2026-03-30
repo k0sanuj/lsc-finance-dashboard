@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { CameraCapture } from "./camera-capture";
 
 type ExtractedField = {
   key: string;
@@ -44,19 +45,24 @@ export function DocumentAnalyzerPanel({
   showSubmissionMode = false,
   variant = "card"
 }: DocumentAnalyzerPanelProps) {
-  const [phase, setPhase] = useState<"upload" | "analyzing" | "review">("upload");
+  const [phase, setPhase] = useState<"upload" | "camera" | "analyzing" | "review">("upload");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [editedFields, setEditedFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [cameraSupported, setCameraSupported] = useState(false);
 
-  const handleUpload = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  useEffect(() => {
+    setCameraSupported(
+      typeof navigator !== "undefined" &&
+      Boolean(navigator.mediaDevices?.getUserMedia)
+    );
+  }, []);
+
+  const submitForAnalysis = useCallback(async (formData: FormData) => {
     setPhase("analyzing");
     setError(null);
 
-    const form = e.currentTarget;
-    const formData = new FormData(form);
     formData.set("companyCode", companyCode);
     formData.set("workflowContext", workflowContext ?? "invoice-hub");
 
@@ -72,7 +78,6 @@ export function DocumentAnalyzerPanel({
 
       setResult(data as AnalysisResult);
 
-      // Pre-fill editable fields
       const initial: Record<string, string> = {};
       for (const f of data.fields) {
         initial[f.key] = f.value;
@@ -84,6 +89,18 @@ export function DocumentAnalyzerPanel({
       setPhase("upload");
     }
   }, [companyCode, workflowContext]);
+
+  const handleUpload = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    await submitForAnalysis(formData);
+  }, [submitForAnalysis]);
+
+  const handleCapturedFile = useCallback(async (file: File) => {
+    const formData = new FormData();
+    formData.set("document", file);
+    await submitForAnalysis(formData);
+  }, [submitForAnalysis]);
 
   const handleFieldChange = (key: string, value: string) => {
     setEditedFields((prev) => ({ ...prev, [key]: value }));
@@ -164,10 +181,34 @@ export function DocumentAnalyzerPanel({
               </label>
             )}
           </section>
-          <button className="action-button primary" type="submit">
-            Upload &amp; analyze with AI
-          </button>
+          <div className="upload-method-row">
+            <button className="action-button primary" type="submit">
+              Upload &amp; analyze with AI
+            </button>
+            {cameraSupported && (
+              <>
+                <span className="upload-method-divider">or</span>
+                <button
+                  className="action-button secondary"
+                  type="button"
+                  onClick={() => setPhase("camera")}
+                >
+                  Capture photo
+                </button>
+              </>
+            )}
+          </div>
         </form>
+      )}
+
+      {/* Phase: Camera */}
+      {phase === "camera" && (
+        <section className="intake-section">
+          <CameraCapture
+            onCapture={handleCapturedFile}
+            onCancel={() => setPhase("upload")}
+          />
+        </section>
       )}
 
       {/* Phase 2: Analyzing */}
