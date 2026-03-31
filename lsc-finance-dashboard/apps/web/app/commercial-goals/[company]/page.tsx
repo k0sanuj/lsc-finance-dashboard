@@ -3,13 +3,19 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   getCommercialGoals,
+  getContractsForChecklistForm,
+  getDeliverableChecklists,
   getDocumentAnalysisDetail,
   getDocumentAnalysisQueue,
   getDocumentExtractedFields,
   getDocumentPostingEvents,
-  getPartnerPerformance
+  getOwnersForChecklistForm,
+  getPartnerPerformance,
+  getSponsorDeliverableSummary
 } from "@lsc/db";
 import { CompanyWorkspaceShell } from "../../components/company-workspace-shell";
+import { DeliverableChecklistBuilder } from "../../components/deliverable-checklist-builder";
+import { DeliverableStatusUpdater } from "../../components/deliverable-status-updater";
 import { DocumentAnalysisSummary } from "../../components/document-analysis-summary";
 import { DocumentAnalyzerPanel } from "../../components/document-analyzer-panel";
 import { ModalLauncher } from "../../components/modal-launcher";
@@ -67,10 +73,16 @@ const workstreams = [
     badge: "Step 3"
   },
   {
+    key: "deliverables",
+    title: "Deliverables",
+    description: "Sponsor deliverable tracking and revenue recognition.",
+    badge: "Step 4"
+  },
+  {
     key: "source-docs",
     title: "Source documents",
     description: "Sponsorship and prize document intake.",
-    badge: "Step 4"
+    badge: "Step 5"
   }
 ] as const;
 
@@ -125,13 +137,17 @@ export default async function CommercialGoalsCompanyPage({
     );
   }
 
-  const [commercialGoals, partnerPerformance, queue, detail, fields, postingEvents] = await Promise.all([
+  const [commercialGoals, partnerPerformance, queue, detail, fields, postingEvents, checklists, sponsorDeliverables, contractOptions, ownerOptions] = await Promise.all([
     getCommercialGoals(),
     getPartnerPerformance(),
     getDocumentAnalysisQueue(),
     selectedAnalysisRunId ? getDocumentAnalysisDetail(selectedAnalysisRunId) : Promise.resolve(null),
     selectedAnalysisRunId ? getDocumentExtractedFields(selectedAnalysisRunId) : Promise.resolve([]),
-    selectedAnalysisRunId ? getDocumentPostingEvents(selectedAnalysisRunId) : Promise.resolve([])
+    selectedAnalysisRunId ? getDocumentPostingEvents(selectedAnalysisRunId) : Promise.resolve([]),
+    selectedView === "deliverables" ? getDeliverableChecklists(companyCode) : Promise.resolve([]),
+    selectedView === "deliverables" ? getSponsorDeliverableSummary(companyCode) : Promise.resolve([]),
+    selectedView === "deliverables" ? getContractsForChecklistForm(companyCode) : Promise.resolve([]),
+    selectedView === "deliverables" ? getOwnersForChecklistForm(companyCode) : Promise.resolve([])
   ]);
   const commercialQueue = (queue as QueueRow[]).filter((item) => {
     const workflow = String(item.workflowContext ?? "").toLowerCase();
@@ -375,6 +391,153 @@ export default async function CommercialGoalsCompanyPage({
                 </tbody>
               </table>
             </div>
+          </article>
+        </>
+      ) : null}
+
+      {selectedView === "deliverables" ? (
+        <>
+          <section className="stats-grid compact-stats">
+            <article className="metric-card accent-brand">
+              <div className="metric-topline">
+                <span className="metric-label">Checklists</span>
+              </div>
+              <div className="metric-value">{checklists.length}</div>
+            </article>
+            <article className="metric-card accent-good">
+              <div className="metric-topline">
+                <span className="metric-label">Recognized</span>
+              </div>
+              <div className="metric-value">
+                {checklists.length > 0
+                  ? checklists.reduce((sum, c) => sum + Number(c.recognizedRevenue.replace(/[^0-9.-]/g, "")), 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })
+                  : "$0"}
+              </div>
+              <span className="metric-subvalue">From completed deliverables</span>
+            </article>
+            <article className="metric-card accent-warn">
+              <div className="metric-topline">
+                <span className="metric-label">Deferred</span>
+              </div>
+              <div className="metric-value">
+                {checklists.length > 0
+                  ? checklists.reduce((sum, c) => sum + Number(c.deferredRevenue.replace(/[^0-9.-]/g, "")), 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })
+                  : "$0"}
+              </div>
+              <span className="metric-subvalue">Pending deliverables</span>
+            </article>
+            <article className="metric-card accent-accent">
+              <div className="metric-topline">
+                <span className="metric-label">Invoice eligible</span>
+              </div>
+              <div className="metric-value">
+                {checklists.filter((c) => c.invoiceEligible).length} / {checklists.length}
+              </div>
+              <span className="metric-subvalue">All deliverables complete</span>
+            </article>
+          </section>
+
+          {sponsorDeliverables.length > 0 ? (
+            <article className="card">
+              <div className="card-title-row">
+                <div>
+                  <span className="section-kicker">Sponsor overview</span>
+                  <h3>Deliverable completion by sponsor</h3>
+                </div>
+                <span className="pill">{sponsorDeliverables.length} sponsors</span>
+              </div>
+              <div className="table-wrapper clean-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Sponsor</th>
+                      <th>Contract</th>
+                      <th>Recognized</th>
+                      <th>Deferred</th>
+                      <th>Completion</th>
+                      <th>Invoice</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sponsorDeliverables.map((row) => (
+                      <tr key={row.sponsorName}>
+                        <td>{row.sponsorName}</td>
+                        <td>{row.totalContractValue}</td>
+                        <td>{row.totalRecognized}</td>
+                        <td>{row.totalDeferred}</td>
+                        <td>
+                          <div className="chart-track" style={{ width: 80, display: "inline-block" }}>
+                            <div
+                              className="chart-fill good"
+                              style={{ width: `${Math.max(4, row.overallCompletionPct)}%` }}
+                            />
+                          </div>
+                          <span style={{ marginLeft: 8, fontSize: "0.85rem" }}>{row.overallCompletionPct}%</span>
+                        </td>
+                        <td>
+                          <span className={`pill signal-pill ${row.allInvoiceable ? "signal-good" : "signal-risk"}`}>
+                            {row.allInvoiceable ? "Eligible" : "Blocked"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          ) : null}
+
+          {checklists.map((checklist) => (
+            <article className="card" key={checklist.checklistId}>
+              <div className="card-title-row">
+                <div>
+                  <span className="section-kicker">{checklist.sponsorName}</span>
+                  <h3>{checklist.checklistTitle}</h3>
+                  <p className="muted">
+                    {checklist.completedItems + checklist.waivedItems} of {checklist.totalItems} complete
+                    ({checklist.completionPercentage}%) — Recognized: {checklist.recognizedRevenue} / Deferred: {checklist.deferredRevenue}
+                  </p>
+                </div>
+                <span className={`pill signal-pill ${checklist.invoiceEligible ? "signal-good" : checklist.completionPercentage > 50 ? "signal-warn" : "signal-risk"}`}>
+                  {checklist.invoiceEligible ? "Invoice eligible" : `${checklist.completionPercentage}% done`}
+                </span>
+              </div>
+              <div className="chart-track">
+                <div
+                  className={`chart-fill ${checklist.invoiceEligible ? "good" : checklist.completionPercentage > 50 ? "" : "warn"}`}
+                  style={{ width: `${Math.max(2, checklist.completionPercentage)}%` }}
+                />
+              </div>
+            </article>
+          ))}
+
+          <article className="card compact-section-card">
+            <div className="card-title-row">
+              <div>
+                <span className="section-kicker">Create checklist</span>
+                <h3>Add sponsor deliverables</h3>
+              </div>
+              <ModalLauncher
+                description="Define deliverable items for a sponsor contract. Revenue recognition is gated by completion."
+                eyebrow="Deliverable setup"
+                title="Create deliverable checklist"
+                triggerLabel="New checklist"
+              >
+                <DeliverableChecklistBuilder
+                  contracts={contractOptions}
+                  owners={ownerOptions}
+                  returnPath={buildCompanyPath("/commercial-goals", companyCode, { view: "deliverables" })}
+                />
+              </ModalLauncher>
+            </div>
+            {contractOptions.length === 0 ? (
+              <p className="muted">No active contracts found. Create a contract first to set up deliverables.</p>
+            ) : (
+              <p className="muted">
+                {contractOptions.length} active contract{contractOptions.length !== 1 ? "s" : ""} available.
+                Each checklist defines what the sponsor is owed and gates when invoices can be sent.
+              </p>
+            )}
           </article>
         </>
       ) : null}
