@@ -147,44 +147,43 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
       {selectedView === "overview" ? (
         <>
           <section className="stats-grid compact-stats">
-            <article className="metric-card">
+            <article className="metric-card accent-brand">
               <div className="metric-topline">
                 <span className="metric-label">Total Outstanding</span>
-                <span className="badge">All buckets</span>
               </div>
               <div className="metric-value">
                 ${totalOutstanding.toLocaleString("en-US")}
               </div>
-              <div className="metric-subvalue">
+              <span className="metric-subvalue">
                 {agingSummary.reduce((sum, b) => sum + b.count, 0)} invoices
-              </div>
+              </span>
             </article>
-            <article className="metric-card">
+            <article className="metric-card accent-good">
               <div className="metric-topline">
                 <span className="metric-label">Current</span>
-                <span className={`pill signal-pill signal-good`}>Not yet due</span>
               </div>
               <div className="metric-value">
                 ${currentTotal.toLocaleString("en-US")}
               </div>
+              <span className="metric-subvalue">Not yet due</span>
             </article>
-            <article className="metric-card">
+            <article className="metric-card accent-warn">
               <div className="metric-topline">
                 <span className="metric-label">Overdue</span>
-                <span className={`pill signal-pill signal-warn`}>Needs attention</span>
               </div>
               <div className="metric-value">
                 ${overdueTotal.toLocaleString("en-US")}
               </div>
+              <span className="metric-subvalue">Needs attention</span>
             </article>
-            <article className="metric-card">
+            <article className="metric-card accent-risk">
               <div className="metric-topline">
                 <span className="metric-label">90+ Days</span>
-                <span className={`pill signal-pill signal-risk`}>Critical</span>
               </div>
               <div className="metric-value">
                 ${criticalTotal.toLocaleString("en-US")}
               </div>
+              <span className="metric-subvalue">Critical</span>
             </article>
           </section>
 

@@ -198,33 +198,29 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
       {selectedView === "overview" ? (
         <>
           <section className="stats-grid compact-stats">
-            <article className="metric-card">
+            <article className="metric-card accent-brand">
               <div className="metric-topline">
-                <span className="metric-label">{selectedEntity?.name ?? "TBR"}</span>
-                <span className="badge">Open payables</span>
+                <span className="metric-label">Open payables</span>
               </div>
               <div className="metric-value">{payableRows.length}</div>
+              <span className="metric-subvalue">{selectedEntity?.name ?? "TBR"}</span>
             </article>
-            <article className="metric-card">
+            <article className="metric-card accent-accent">
               <div className="metric-topline">
                 <span className="metric-label">Open amount</span>
-                <span className="badge">USD</span>
               </div>
               <div className="metric-value">${openAmount.toLocaleString("en-US")}</div>
             </article>
-            <article className="metric-card">
+            <article className="metric-card accent-risk">
               <div className="metric-topline">
                 <span className="metric-label">Overdue</span>
-                <span className={`pill signal-pill ${overdueCount > 0 ? "signal-risk" : "signal-good"}`}>
-                  {overdueCount > 0 ? "Action needed" : "All current"}
-                </span>
               </div>
               <div className="metric-value">{overdueCount}</div>
+              <span className="metric-subvalue">{overdueCount > 0 ? "Action needed" : "All current"}</span>
             </article>
-            <article className="metric-card">
+            <article className="metric-card accent-warn">
               <div className="metric-topline">
                 <span className="metric-label">Partially paid</span>
-                <span className="badge">Attention</span>
               </div>
               <div className="metric-value">{partiallyPaidCount}</div>
             </article>

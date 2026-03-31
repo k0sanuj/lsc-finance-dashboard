@@ -77,15 +77,25 @@ export default async function OverviewPage() {
       <section className="stats-grid compact-stats">
         {overviewMetrics
           .filter((metric) => metric.label !== "Upcoming Payments")
-          .map((metric) => (
-            <article className="metric-card" key={metric.label}>
-              <div className="metric-topline">
-                <span className="metric-label">{metric.scope}</span>
-                <span className="badge">{metric.label}</span>
-              </div>
-              <div className="metric-value">{metric.value}</div>
-            </article>
-          ))}
+          .map((metric) => {
+            const accent =
+              metric.label === "Total Revenue" || metric.label === "Margin"
+                ? "accent-good"
+                : metric.label === "Total Cost"
+                  ? "accent-risk"
+                  : metric.label === "Receivables"
+                    ? "accent-warn"
+                    : "accent-brand";
+            return (
+              <article className={`metric-card ${accent}`} key={metric.label}>
+                <div className="metric-topline">
+                  <span className="metric-label">{metric.label}</span>
+                </div>
+                <div className="metric-value">{metric.value}</div>
+                <span className="metric-subvalue">{metric.scope}</span>
+              </article>
+            );
+          })}
       </section>
 
       <section className="grid-two portfolio-panels">

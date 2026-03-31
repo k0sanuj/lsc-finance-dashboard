@@ -57,7 +57,7 @@ textarea {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 310px minmax(0, 1fr);
+  grid-template-columns: 270px minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -142,8 +142,9 @@ textarea {
 
 .nav-list a.active,
 .nav-sublist a.active {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(31, 93, 132, 0.4);
+  border-color: rgba(31, 93, 132, 0.55);
+  font-weight: 600;
 }
 
 .nav-item {
@@ -153,11 +154,11 @@ textarea {
 
 .nav-sublist {
   list-style: none;
-  margin: 0 0 0 12px;
-  padding: 0 0 0 14px;
+  margin: 0;
+  padding: 0;
   display: grid;
-  gap: 7px;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  gap: 5px;
+  border-left: none;
 }
 
 .nav-sublist a {
@@ -215,9 +216,10 @@ textarea {
 .nav-sublabel {
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-size: 0.68rem;
-  color: rgba(245, 239, 230, 0.45);
+  font-size: 0.6rem;
+  color: rgba(245, 239, 230, 0.3);
   padding-left: 14px;
+  margin-top: 10px;
 }
 
 .sidebar-note {
@@ -322,7 +324,7 @@ textarea {
 .graph-shell,
 .workflow-board {
   display: grid;
-  gap: 22px;
+  gap: 24px;
 }
 
 .page-header,
@@ -381,14 +383,22 @@ textarea {
 .process-card {
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
-  padding: 24px;
+  padding: 26px;
   background: var(--surface);
-  box-shadow: var(--shadow-card);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .metric-card {
-  padding: 18px;
+  padding: 22px 24px;
+  border-left: 4px solid var(--line);
+  transition: box-shadow 150ms ease;
 }
+
+.metric-card.accent-good { border-left-color: var(--good); }
+.metric-card.accent-brand { border-left-color: var(--brand-2); }
+.metric-card.accent-warn { border-left-color: var(--warn); }
+.metric-card.accent-risk { border-left-color: var(--risk); }
+.metric-card.accent-accent { border-left-color: var(--accent); }
 
 .portfolio-hero {
   display: flex;
@@ -461,11 +471,12 @@ textarea {
 }
 
 .metric-value {
-  font-size: 1.8rem;
+  font-size: 2.1rem;
   line-height: 1;
   margin: 8px 0 6px;
   font-weight: 700;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .metric-subvalue {
@@ -857,7 +868,7 @@ textarea {
 .table td,
 .table-wrapper th,
 .table-wrapper td {
-  padding: 13px 16px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--line);
   text-align: left;
   vertical-align: top;
@@ -866,12 +877,18 @@ textarea {
 
 .table th,
 .table-wrapper th {
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-soft);
   font-weight: 600;
   background: var(--surface-muted);
+  border-bottom: 2px solid var(--line);
+}
+
+.table tbody tr:nth-child(even),
+.table-wrapper tbody tr:nth-child(even) {
+  background: rgba(15, 53, 84, 0.015);
 }
 
 .table tbody tr:last-child td,
@@ -881,7 +898,7 @@ textarea {
 
 .table tbody tr:hover,
 .table-wrapper tbody tr:hover {
-  background: rgba(15, 53, 84, 0.03);
+  background: rgba(15, 53, 84, 0.05);
 }
 
 .trend-chart {
@@ -1572,7 +1589,7 @@ textarea {
   .sidebar {
     position: fixed;
     inset: 0;
-    width: 310px;
+    width: 270px;
     max-width: 85vw;
     z-index: 40;
     border-right: none;
@@ -1894,4 +1911,43 @@ textarea {
 
 .table-wrapper .row-warn td:first-child {
   border-left: 3px solid var(--warn);
+}
+
+/* Compact workspace header (replaces verbose shell) */
+.workspace-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 26px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.workspace-header-left {
+  display: grid;
+  gap: 4px;
+}
+
+.workspace-header-left h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.workspace-header-left p {
+  font-size: 0.9rem;
+}
+
+.workspace-header-right {
+  flex-shrink: 0;
+}
+
+@media (max-width: 1120px) {
+  .workspace-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
