@@ -16,13 +16,11 @@ type RecentBillRow = {
 export default async function MyExpensesPage() {
   await requireRole(["super_admin", "finance_admin", "team_member"]);
   const session = await requireSession();
-  const [submissions, queue] = (await Promise.all([
+  const [submissions, rawQueue] = await Promise.all([
     getMyExpenseSubmissions(session.id),
     getDocumentAnalysisQueue(session.id, "tbr-race:")
-  ])) as [
-    Awaited<ReturnType<typeof getMyExpenseSubmissions>>,
-    RecentBillRow[]
-  ];
+  ]);
+  const queue = rawQueue as RecentBillRow[];
 
   return (
     <div className="page-grid">

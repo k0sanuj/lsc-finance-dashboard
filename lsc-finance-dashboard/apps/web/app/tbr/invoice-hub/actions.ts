@@ -15,7 +15,7 @@ function parseAmount(value: string) {
   return Number.isFinite(amount) ? amount : 0;
 }
 
-function redirectToInvoiceHub(status: "success" | "error" | "info", message: string) {
+function redirectToInvoiceHub(status: "success" | "error" | "info", message: string): never {
   redirect(
     `/tbr/invoice-hub?status=${encodeURIComponent(status)}&message=${encodeURIComponent(message)}`
   );

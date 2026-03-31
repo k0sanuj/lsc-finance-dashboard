@@ -9,7 +9,7 @@ function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function redirectToTeamManagement(status: "success" | "error" | "info", message: string) {
+function redirectToTeamManagement(status: "success" | "error" | "info", message: string): never {
   redirect(
     `/tbr/team-management?status=${encodeURIComponent(status)}&message=${encodeURIComponent(message)}`
   );

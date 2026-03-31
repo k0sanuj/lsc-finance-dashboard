@@ -39,11 +39,11 @@ export async function createDeliverableChecklistAction(formData: FormData) {
   try {
     items = JSON.parse(String(formData.get("itemsJson") ?? "[]"));
   } catch {
-    redirect(`${returnPath}&status=error&message=${encodeURIComponent("Invalid items data.")}` as Route);
+    return redirect(`${returnPath}&status=error&message=${encodeURIComponent("Invalid items data.")}` as Route);
   }
 
   if (!contractId || !checklistTitle || items.length === 0) {
-    redirect(`${returnPath}&status=error&message=${encodeURIComponent("Contract, title, and at least one item are required.")}` as Route);
+    return redirect(`${returnPath}&status=error&message=${encodeURIComponent("Contract, title, and at least one item are required.")}` as Route);
   }
 
   // Look up company from contract
@@ -53,7 +53,7 @@ export async function createDeliverableChecklistAction(formData: FormData) {
   );
   const companyId = contractRows[0]?.company_id;
   if (!companyId) {
-    redirect(`${returnPath}&status=error&message=${encodeURIComponent("Contract not found.")}` as Route);
+    return redirect(`${returnPath}&status=error&message=${encodeURIComponent("Contract not found.")}` as Route);
   }
 
   // Insert checklist
@@ -70,7 +70,7 @@ export async function createDeliverableChecklistAction(formData: FormData) {
 
   const checklistId = checklistRows[0]?.id;
   if (!checklistId) {
-    redirect(`${returnPath}&status=error&message=${encodeURIComponent("Checklist could not be created.")}` as Route);
+    return redirect(`${returnPath}&status=error&message=${encodeURIComponent("Checklist could not be created.")}` as Route);
   }
 
   // Insert items
@@ -113,7 +113,7 @@ export async function updateDeliverableItemStatusAction(formData: FormData) {
 
   const validStatuses = ["pending", "in_progress", "completed", "waived"];
   if (!itemId || !validStatuses.includes(newStatus)) {
-    redirect(`${returnPath}&status=error&message=${encodeURIComponent("Invalid item or status.")}` as Route);
+    return redirect(`${returnPath}&status=error&message=${encodeURIComponent("Invalid item or status.")}` as Route);
   }
 
   if (newStatus === "completed") {
@@ -156,7 +156,7 @@ export async function addDeliverableItemAction(formData: FormData) {
   const returnPath = normalizeWhitespace(String(formData.get("returnPath") ?? "")) || "/commercial-goals/TBR?view=deliverables";
 
   if (!checklistId || !itemLabel) {
-    redirect(`${returnPath}&status=error&message=${encodeURIComponent("Checklist ID and item label are required.")}` as Route);
+    return redirect(`${returnPath}&status=error&message=${encodeURIComponent("Checklist ID and item label are required.")}` as Route);
   }
 
   // Get max sort order

@@ -54,10 +54,11 @@ export default async function TbrRaceDetailPage({ params, searchParams }: RaceDe
     );
   }
 
-  const [billQueue, mySubmissions] = (await Promise.all([
+  const [rawBillQueue, mySubmissions] = await Promise.all([
     getDocumentAnalysisQueue(session.id, workflowContextPrefix),
     getMyExpenseSubmissions(session.id, raceId)
-  ])) as [RaceBillRow[], Awaited<ReturnType<typeof getMyExpenseSubmissions>>];
+  ]);
+  const billQueue = rawBillQueue as RaceBillRow[];
 
   return (
     <div className="page-grid">

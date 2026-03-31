@@ -44,7 +44,7 @@ function redirectToExpenseWorkflow(
   status: "success" | "error" | "info",
   message: string,
   returnPath = "/tbr/expense-management"
-) {
+): never {
   redirect(
     `${returnPath}?status=${encodeURIComponent(status)}&message=${encodeURIComponent(message)}` as Route
   );
