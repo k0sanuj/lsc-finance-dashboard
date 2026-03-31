@@ -6,12 +6,14 @@ import {
   getReceivablesAgingSummary,
   getSponsorBreakdown,
   getTrancheSummaryByCompany,
-  getUpcomingTranches
+  getActionableTranches,
+  getCollectionTranches
 } from "@lsc/db";
-import type { TrancheScheduleSummaryRow, TrancheRow } from "@lsc/db";
+import type { TrancheScheduleSummaryRow, TrancheRow, CollectionTrancheRow } from "@lsc/db";
 import {
   activateTrancheAction,
-  generateTrancheInvoiceAction
+  generateTrancheInvoiceAction,
+  markTrancheCollectedAction
 } from "../actions";
 import { CompanyWorkspaceShell } from "../../components/company-workspace-shell";
 import { requireRole } from "../../../lib/auth";
@@ -120,12 +122,13 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
     );
   }
 
-  const [agingSummary, agingDetail, sponsors, trancheSummaries, upcomingTranches] = await Promise.all([
+  const [agingSummary, agingDetail, sponsors, trancheSummaries, actionableTranches, collectionTranches] = await Promise.all([
     getReceivablesAgingSummary(companyCode),
     selectedView === "detail" ? getReceivablesAgingDetail(companyCode) : Promise.resolve([]),
     getSponsorBreakdown(),
     selectedView === "schedule" ? getTrancheSummaryByCompany(companyCode) : Promise.resolve([] as TrancheScheduleSummaryRow[]),
-    selectedView === "schedule" ? getUpcomingTranches(companyCode) : Promise.resolve([] as TrancheRow[])
+    selectedView === "schedule" ? getActionableTranches(companyCode) : Promise.resolve([] as TrancheRow[]),
+    selectedView === "collection" ? getCollectionTranches(companyCode) : Promise.resolve([] as CollectionTrancheRow[])
   ]);
 
   const totalOutstanding = agingSummary.reduce((sum, bucket) => sum + bucket.rawTotal, 0);
@@ -373,10 +376,10 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
             </article>
             <article className="metric-card accent-good">
               <div className="metric-topline">
-                <span className="metric-label">Upcoming (90d)</span>
+                <span className="metric-label">Actionable</span>
               </div>
-              <div className="metric-value">{upcomingTranches.length}</div>
-              <span className="metric-subvalue">Scheduled or active</span>
+              <div className="metric-value">{actionableTranches.length}</div>
+              <span className="metric-subvalue">Scheduled, active, or invoiced</span>
             </article>
             <article className="metric-card accent-warn">
               <div className="metric-topline">
@@ -470,14 +473,14 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
             </div>
           </article>
 
-          {/* Upcoming tranches with actions */}
+          {/* Actionable tranches with lifecycle buttons */}
           <article className="card">
             <div className="card-title-row">
               <div>
-                <span className="section-kicker">Upcoming milestones</span>
-                <h3>Tranches due within 90 days</h3>
+                <span className="section-kicker">Actionable tranches</span>
+                <h3>Scheduled, active, and invoiced milestones</h3>
               </div>
-              <span className="badge">{upcomingTranches.length} tranches</span>
+              <span className="badge">{actionableTranches.length} tranches</span>
             </div>
             <div className="table-wrapper clean-table">
               <table>
@@ -495,8 +498,8 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
                   </tr>
                 </thead>
                 <tbody>
-                  {upcomingTranches.length > 0 ? (
-                    upcomingTranches.map((t) => {
+                  {actionableTranches.length > 0 ? (
+                    actionableTranches.map((t) => {
                       const returnPath = buildCompanyPath("/receivables", companyCode, { view: "schedule" });
                       return (
                         <tr
@@ -519,7 +522,7 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
                           <td>
                             <span className={`pill ${
                               t.trancheStatus === "active" ? "signal-pill signal-good" :
-                              t.trancheStatus === "invoiced" ? "signal-pill signal-muted" :
+                              t.trancheStatus === "invoiced" ? "signal-pill signal-warn" :
                               "subtle-pill"
                             }`}>
                               {t.trancheStatus}
@@ -545,6 +548,15 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
                                   </button>
                                 </form>
                               ) : null}
+                              {t.trancheStatus === "invoiced" ? (
+                                <form action={markTrancheCollectedAction}>
+                                  <input name="trancheId" type="hidden" value={t.id} />
+                                  <input name="returnPath" type="hidden" value={returnPath} />
+                                  <button className="action-button primary" type="submit">
+                                    Mark collected
+                                  </button>
+                                </form>
+                              ) : null}
                               {t.trancheStatus === "scheduled" && t.deliverableGateBlocked ? (
                                 <span className="muted">Gate blocked</span>
                               ) : null}
@@ -556,7 +568,7 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
                   ) : (
                     <tr>
                       <td className="muted" colSpan={9}>
-                        No upcoming tranches in the next 90 days.
+                        No actionable tranches found.
                       </td>
                     </tr>
                   )}
@@ -568,41 +580,164 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
       ) : null}
 
       {selectedView === "collection" ? (
-        <section className="grid-two">
-          <article className="card compact-section-card">
+        <>
+          <section className="stats-grid compact-stats">
+            <article className="metric-card accent-brand">
+              <div className="metric-topline">
+                <span className="metric-label">Awaiting collection</span>
+              </div>
+              <div className="metric-value">{collectionTranches.length}</div>
+              <span className="metric-subvalue">Invoiced tranches</span>
+            </article>
+            <article className="metric-card accent-warn">
+              <div className="metric-topline">
+                <span className="metric-label">Overdue</span>
+              </div>
+              <div className="metric-value">
+                {collectionTranches.filter((t) => t.daysOverdue > 0).length}
+              </div>
+              <span className="metric-subvalue">Past due date</span>
+            </article>
+            <article className="metric-card accent-risk">
+              <div className="metric-topline">
+                <span className="metric-label">60+ days overdue</span>
+              </div>
+              <div className="metric-value">
+                {collectionTranches.filter((t) => t.daysOverdue >= 60).length}
+              </div>
+              <span className="metric-subvalue">Escalation zone</span>
+            </article>
+            <article className="metric-card">
+              <div className="metric-topline">
+                <span className="metric-label">Outstanding value</span>
+              </div>
+              <div className="metric-value">
+                {collectionTranches.length > 0
+                  ? collectionTranches.reduce((sum, t) => {
+                      const n = Number(t.trancheAmount.replace(/[^0-9.-]/g, ""));
+                      return sum + (Number.isFinite(n) ? n : 0);
+                    }, 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })
+                  : "$0"}
+              </div>
+              <span className="metric-subvalue">Invoiced, not collected</span>
+            </article>
+          </section>
+
+          <article className="card">
             <div className="card-title-row">
               <div>
-                <span className="section-kicker">Collection workflow</span>
-                <h3>Coming soon</h3>
+                <span className="section-kicker">Collection tracking</span>
+                <h3>Invoiced tranches awaiting payment</h3>
               </div>
-              <span className="badge">Planned</span>
+              <span className="pill">{companyCode}</span>
             </div>
-            <p className="muted">
-              Auto-reminders at 7d, 3d, 1d before due. Escalation at 60 days. Deliverable-gated
-              invoice sending. This workspace will be activated once tranche payment support is built.
-            </p>
-            <div className="support-grid">
-              <Link
-                className="workflow-tile"
-                href={buildCompanyPath("/receivables", "TBR", { view: "overview" }) as Route}
-              >
-                <span className="process-step-index">Review</span>
-                <strong>Return to aging overview</strong>
-              </Link>
-              <Link
-                className="workflow-tile"
-                href={buildCompanyPath("/receivables", "TBR", { view: "detail" }) as Route}
-              >
-                <span className="process-step-index">Detail</span>
-                <strong>View invoice detail</strong>
-              </Link>
-              <Link className="workflow-tile" href="/commercial-goals/TBR">
-                <span className="process-step-index">Commercial</span>
-                <strong>Open commercial goals</strong>
-              </Link>
+            <div className="table-wrapper clean-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Sponsor</th>
+                    <th>Contract</th>
+                    <th>Tranche</th>
+                    <th>Amount</th>
+                    <th>Invoice</th>
+                    <th>Invoiced</th>
+                    <th>Due</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {collectionTranches.length > 0 ? (
+                    collectionTranches.map((t) => {
+                      const returnPath = buildCompanyPath("/receivables", companyCode, { view: "collection" });
+                      return (
+                        <tr
+                          className={
+                            t.daysOverdue >= 60
+                              ? "row-overdue"
+                              : t.daysOverdue > 0
+                                ? "row-warn"
+                                : ""
+                          }
+                          key={t.id}
+                        >
+                          <td>{t.sponsorName}</td>
+                          <td>{t.contractName}</td>
+                          <td>{t.trancheLabel}</td>
+                          <td>{t.trancheAmount}</td>
+                          <td>{t.invoiceNumber || "—"}</td>
+                          <td>{t.invoicedAt}</td>
+                          <td>{t.dueDate}</td>
+                          <td>
+                            {t.daysOverdue >= 60 ? (
+                              <span className="pill signal-pill signal-risk">
+                                {t.daysOverdue}d overdue
+                              </span>
+                            ) : t.daysOverdue > 0 ? (
+                              <span className="pill signal-pill signal-warn">
+                                {t.daysOverdue}d overdue
+                              </span>
+                            ) : (
+                              <span className="pill signal-pill signal-good">
+                                Due in {t.daysUntilDue}d
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <form action={markTrancheCollectedAction}>
+                              <input name="trancheId" type="hidden" value={t.id} />
+                              <input name="returnPath" type="hidden" value={returnPath} />
+                              <button className="action-button primary" type="submit">
+                                Mark collected
+                              </button>
+                            </form>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td className="muted" colSpan={9}>
+                        No invoiced tranches awaiting collection.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </article>
-        </section>
+
+          <section className="grid-two">
+            <article className="card compact-section-card">
+              <div className="card-title-row">
+                <div>
+                  <span className="section-kicker">Quick links</span>
+                  <h3>Related workspaces</h3>
+                </div>
+              </div>
+              <div className="support-grid">
+                <Link
+                  className="workflow-tile"
+                  href={buildCompanyPath("/receivables", companyCode, { view: "schedule" }) as Route}
+                >
+                  <span className="process-step-index">Schedule</span>
+                  <strong>Tranche schedule</strong>
+                </Link>
+                <Link
+                  className="workflow-tile"
+                  href={buildCompanyPath("/receivables", companyCode, { view: "overview" }) as Route}
+                >
+                  <span className="process-step-index">Aging</span>
+                  <strong>Aging overview</strong>
+                </Link>
+                <Link className="workflow-tile" href="/commercial-goals/TBR">
+                  <span className="process-step-index">Commercial</span>
+                  <strong>Commercial goals</strong>
+                </Link>
+              </div>
+            </article>
+          </section>
+        </>
       ) : null}
     </div>
   );

@@ -233,6 +233,126 @@ export async function getUpcomingTranches(
   return rows.map(mapTranche);
 }
 
+export async function getActionableTranches(
+  companyCode: string
+): Promise<TrancheRow[]> {
+  if (getBackend() !== "database") return [];
+
+  const rows = await queryRows<TrancheSource>(
+    `select
+       ct.id,
+       ct.contract_id,
+       con.contract_name,
+       sc.name as sponsor_name,
+       ct.tranche_number,
+       ct.tranche_label,
+       ct.tranche_percentage,
+       ct.tranche_amount,
+       ct.trigger_type,
+       ${EFFECTIVE_DATE_SQL} as effective_trigger_date,
+       re.name as race_name,
+       coalesce(
+         (ct.deliverable_checklist_id is not null
+          and exists(
+            select 1 from deliverable_checklist_summary dcs
+            where dcs.checklist_id = ct.deliverable_checklist_id
+              and dcs.invoice_eligible = false
+          )),
+         false
+       ) as deliverable_gate_blocked,
+       ct.tranche_status,
+       ct.linked_invoice_id
+     from contract_tranches ct
+     join contracts con on con.id = ct.contract_id
+     join companies c on c.id = ct.company_id
+     join sponsors_or_customers sc on sc.id = ct.sponsor_or_customer_id
+     left join race_events re on re.id = ct.trigger_race_event_id
+     where c.code = $1::company_code
+       and ct.tranche_status in ('scheduled', 'active', 'invoiced')
+     order by
+       case ct.tranche_status
+         when 'active' then 1
+         when 'invoiced' then 2
+         when 'scheduled' then 3
+       end,
+       (${EFFECTIVE_DATE_SQL}) nulls last`,
+    [companyCode]
+  );
+
+  return rows.map(mapTranche);
+}
+
+export type CollectionTrancheRow = {
+  id: string;
+  contractName: string;
+  sponsorName: string;
+  trancheLabel: string;
+  trancheAmount: string;
+  invoiceNumber: string;
+  invoicedAt: string;
+  dueDate: string;
+  daysOverdue: number;
+  daysUntilDue: number;
+  linkedInvoiceId: string;
+};
+
+export async function getCollectionTranches(
+  companyCode: string
+): Promise<CollectionTrancheRow[]> {
+  if (getBackend() !== "database") return [];
+
+  const rows = await queryRows<{
+    id: string;
+    contract_name: string;
+    sponsor_name: string;
+    tranche_label: string;
+    tranche_amount: string;
+    invoice_number: string;
+    invoiced_at: string;
+    due_date: string;
+    days_overdue: string;
+    days_until_due: string;
+    linked_invoice_id: string;
+  }>(
+    `select
+       ct.id,
+       con.contract_name,
+       sc.name as sponsor_name,
+       ct.tranche_label,
+       ct.tranche_amount,
+       coalesce(inv.invoice_number, '') as invoice_number,
+       ct.invoiced_at,
+       coalesce(inv.due_date, (ct.invoiced_at::date + 30)) as due_date,
+       greatest(0, current_date - coalesce(inv.due_date, (ct.invoiced_at::date + 30)))::integer as days_overdue,
+       greatest(0, coalesce(inv.due_date, (ct.invoiced_at::date + 30)) - current_date)::integer as days_until_due,
+       ct.linked_invoice_id
+     from contract_tranches ct
+     join contracts con on con.id = ct.contract_id
+     join companies c on c.id = ct.company_id
+     join sponsors_or_customers sc on sc.id = ct.sponsor_or_customer_id
+     left join invoices inv on inv.id = ct.linked_invoice_id
+     where c.code = $1::company_code
+       and ct.tranche_status = 'invoiced'
+     order by
+       coalesce(inv.due_date, (ct.invoiced_at::date + 30)) asc`,
+    [companyCode]
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    contractName: row.contract_name,
+    sponsorName: row.sponsor_name,
+    trancheLabel: row.tranche_label,
+    trancheAmount: formatCurrency(row.tranche_amount),
+    invoiceNumber: row.invoice_number,
+    invoicedAt: formatDateLabel(row.invoiced_at),
+    dueDate: formatDateLabel(row.due_date),
+    daysOverdue: Number(row.days_overdue),
+    daysUntilDue: Number(row.days_until_due),
+    linkedInvoiceId: row.linked_invoice_id
+  }));
+}
+
 export async function getTrancheScheduleCalendar(
   companyCode: string
 ): Promise<TrancheCalendarEntry[]> {

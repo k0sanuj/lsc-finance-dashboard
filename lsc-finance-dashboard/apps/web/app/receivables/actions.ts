@@ -209,3 +209,34 @@ export async function generateTrancheInvoiceAction(formData: FormData) {
   revalidatePath("/payments");
   redirect(`${returnPath}&status=success&message=${encodeURIComponent(`Invoice generated for ${tranche.tranche_label}.`)}` as Route);
 }
+
+export async function markTrancheCollectedAction(formData: FormData) {
+  await requireRole(["super_admin", "finance_admin"]);
+
+  const trancheId = normalizeWhitespace(String(formData.get("trancheId") ?? ""));
+  const returnPath = normalizeWhitespace(String(formData.get("returnPath") ?? "")) || "/receivables/TBR?view=schedule";
+
+  if (!trancheId) {
+    return redirect(`${returnPath}&status=error&message=${encodeURIComponent("Missing tranche ID.")}` as Route);
+  }
+
+  const trancheRows = await queryRowsAdmin<{ tranche_status: string }>(
+    `select tranche_status from contract_tranches where id = $1`,
+    [trancheId]
+  );
+
+  if (!trancheRows[0] || trancheRows[0].tranche_status !== "invoiced") {
+    return redirect(`${returnPath}&status=error&message=${encodeURIComponent("Tranche must be invoiced before marking as collected.")}` as Route);
+  }
+
+  await executeAdmin(
+    `update contract_tranches
+     set tranche_status = 'collected', collected_at = now(), updated_at = now()
+     where id = $1 and tranche_status = 'invoiced'`,
+    [trancheId]
+  );
+
+  revalidatePath("/receivables");
+  revalidatePath("/payments");
+  redirect(`${returnPath}&status=success&message=${encodeURIComponent("Tranche marked as collected.")}` as Route);
+}
