@@ -4,8 +4,15 @@ import { notFound } from "next/navigation";
 import {
   getReceivablesAgingDetail,
   getReceivablesAgingSummary,
-  getSponsorBreakdown
+  getSponsorBreakdown,
+  getTrancheSummaryByCompany,
+  getUpcomingTranches
 } from "@lsc/db";
+import type { TrancheScheduleSummaryRow, TrancheRow } from "@lsc/db";
+import {
+  activateTrancheAction,
+  generateTrancheInvoiceAction
+} from "../actions";
 import { CompanyWorkspaceShell } from "../../components/company-workspace-shell";
 import { requireRole } from "../../../lib/auth";
 import {
@@ -38,10 +45,16 @@ const workstreams = [
     badge: "Step 2"
   },
   {
+    key: "schedule",
+    title: "Tranche schedule",
+    description: "Contract payment milestones, deliverable gates, and invoicing.",
+    badge: "Step 3"
+  },
+  {
     key: "collection",
     title: "Collection path",
     description: "Future: reminders, escalation, deliverable gates.",
-    badge: "Step 3"
+    badge: "Step 4"
   }
 ] as const;
 
@@ -107,10 +120,12 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
     );
   }
 
-  const [agingSummary, agingDetail, sponsors] = await Promise.all([
+  const [agingSummary, agingDetail, sponsors, trancheSummaries, upcomingTranches] = await Promise.all([
     getReceivablesAgingSummary(companyCode),
     selectedView === "detail" ? getReceivablesAgingDetail(companyCode) : Promise.resolve([]),
-    getSponsorBreakdown()
+    getSponsorBreakdown(),
+    selectedView === "schedule" ? getTrancheSummaryByCompany(companyCode) : Promise.resolve([] as TrancheScheduleSummaryRow[]),
+    selectedView === "schedule" ? getUpcomingTranches(companyCode) : Promise.resolve([] as TrancheRow[])
   ]);
 
   const totalOutstanding = agingSummary.reduce((sum, bucket) => sum + bucket.rawTotal, 0);
@@ -337,6 +352,211 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
                     <tr>
                       <td className="muted" colSpan={8}>
                         No outstanding receivables found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </>
+      ) : null}
+
+      {selectedView === "schedule" ? (
+        <>
+          <section className="stats-grid compact-stats">
+            <article className="metric-card accent-brand">
+              <div className="metric-topline">
+                <span className="metric-label">Contracts with tranches</span>
+              </div>
+              <div className="metric-value">{trancheSummaries.length}</div>
+            </article>
+            <article className="metric-card accent-good">
+              <div className="metric-topline">
+                <span className="metric-label">Upcoming (90d)</span>
+              </div>
+              <div className="metric-value">{upcomingTranches.length}</div>
+              <span className="metric-subvalue">Scheduled or active</span>
+            </article>
+            <article className="metric-card accent-warn">
+              <div className="metric-topline">
+                <span className="metric-label">Blocked</span>
+              </div>
+              <div className="metric-value">
+                {trancheSummaries.filter((s) => s.hasBlockedTranche).length}
+              </div>
+              <span className="metric-subvalue">Deliverable gate</span>
+            </article>
+            <article className="metric-card">
+              <div className="metric-topline">
+                <span className="metric-label">Invoiced value</span>
+              </div>
+              <div className="metric-value">
+                {trancheSummaries.length > 0
+                  ? trancheSummaries.reduce((sum, s) => {
+                      const n = Number(s.invoicedValue.replace(/[^0-9.-]/g, ""));
+                      return sum + (Number.isFinite(n) ? n : 0);
+                    }, 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })
+                  : "$0"}
+              </div>
+              <span className="metric-subvalue">Across all contracts</span>
+            </article>
+          </section>
+
+          {/* Per-contract tranche summaries */}
+          <article className="card">
+            <div className="card-title-row">
+              <div>
+                <span className="section-kicker">Contract tranche overview</span>
+                <h3>Payment schedule by contract</h3>
+              </div>
+              <span className="pill">{companyCode}</span>
+            </div>
+            <div className="table-wrapper clean-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Sponsor</th>
+                    <th>Contract</th>
+                    <th>Value</th>
+                    <th>Tranches</th>
+                    <th>Invoiced</th>
+                    <th>Collected</th>
+                    <th>Next milestone</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trancheSummaries.length > 0 ? (
+                    trancheSummaries.map((row) => (
+                      <tr key={row.contractId}>
+                        <td>{row.sponsorName}</td>
+                        <td>{row.contractName}</td>
+                        <td>{row.fullContractValue}</td>
+                        <td>{row.totalTranches}</td>
+                        <td>{row.invoicedValue}</td>
+                        <td>{row.collectedValue}</td>
+                        <td>
+                          <div>
+                            <strong>{row.nextTrancheLabel}</strong>
+                            <br />
+                            <span className="muted">{row.nextTrancheDate}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="inline-actions">
+                            {row.hasBlockedTranche ? (
+                              <span className="pill signal-pill signal-warn">Blocked</span>
+                            ) : row.invoicedCount === row.totalTranches ? (
+                              <span className="pill signal-pill signal-good">All invoiced</span>
+                            ) : (
+                              <span className="pill subtle-pill">
+                                {row.activeCount} active · {row.invoicedCount} invoiced
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="muted" colSpan={8}>
+                        No tranche schedules found. Create tranches from the contract view.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          {/* Upcoming tranches with actions */}
+          <article className="card">
+            <div className="card-title-row">
+              <div>
+                <span className="section-kicker">Upcoming milestones</span>
+                <h3>Tranches due within 90 days</h3>
+              </div>
+              <span className="badge">{upcomingTranches.length} tranches</span>
+            </div>
+            <div className="table-wrapper clean-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Sponsor</th>
+                    <th>Contract</th>
+                    <th>Tranche</th>
+                    <th>Amount</th>
+                    <th>Trigger</th>
+                    <th>Date</th>
+                    <th>Gate</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {upcomingTranches.length > 0 ? (
+                    upcomingTranches.map((t) => {
+                      const returnPath = buildCompanyPath("/receivables", companyCode, { view: "schedule" });
+                      return (
+                        <tr
+                          className={t.deliverableGateBlocked ? "row-warn" : ""}
+                          key={t.id}
+                        >
+                          <td>{t.sponsorName}</td>
+                          <td>{t.contractName}</td>
+                          <td>{t.trancheLabel}</td>
+                          <td>{t.trancheAmount}</td>
+                          <td>{t.triggerType}</td>
+                          <td>{t.triggerDate}</td>
+                          <td>
+                            {t.deliverableGateBlocked ? (
+                              <span className="pill signal-pill signal-risk">Blocked</span>
+                            ) : (
+                              <span className="pill signal-pill signal-good">Clear</span>
+                            )}
+                          </td>
+                          <td>
+                            <span className={`pill ${
+                              t.trancheStatus === "active" ? "signal-pill signal-good" :
+                              t.trancheStatus === "invoiced" ? "signal-pill signal-muted" :
+                              "subtle-pill"
+                            }`}>
+                              {t.trancheStatus}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="inline-actions">
+                              {t.trancheStatus === "scheduled" && !t.deliverableGateBlocked ? (
+                                <form action={activateTrancheAction}>
+                                  <input name="trancheId" type="hidden" value={t.id} />
+                                  <input name="returnPath" type="hidden" value={returnPath} />
+                                  <button className="action-button secondary" type="submit">
+                                    Activate
+                                  </button>
+                                </form>
+                              ) : null}
+                              {t.trancheStatus === "active" ? (
+                                <form action={generateTrancheInvoiceAction}>
+                                  <input name="trancheId" type="hidden" value={t.id} />
+                                  <input name="returnPath" type="hidden" value={returnPath} />
+                                  <button className="action-button primary" type="submit">
+                                    Generate invoice
+                                  </button>
+                                </form>
+                              ) : null}
+                              {t.trancheStatus === "scheduled" && t.deliverableGateBlocked ? (
+                                <span className="muted">Gate blocked</span>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td className="muted" colSpan={9}>
+                        No upcoming tranches in the next 90 days.
                       </td>
                     </tr>
                   )}
