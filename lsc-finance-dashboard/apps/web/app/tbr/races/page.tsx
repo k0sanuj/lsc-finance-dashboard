@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getTbrRaceCards, getTbrSeasonSummaries, queryRows } from "@lsc/db";
+import { getNextUpcomingTbrRace, getTbrRaceCards, getTbrSeasonSummaries } from "@lsc/db";
 import { requireRole } from "../../../lib/auth";
 
 type TbrRacesPageProps = {
@@ -8,31 +8,13 @@ type TbrRacesPageProps = {
   }>;
 };
 
-/**
- * Find the season that contains the next upcoming race (event_start_date >= today).
- * Falls back to the latest season if no upcoming races exist.
- */
 async function getDefaultSeasonYear(seasons: { seasonYear: number }[]): Promise<number> {
   if (seasons.length === 0) return 2025;
 
-  try {
-    const rows = await queryRows<{ season_year: number }>(
-      `select re.season_year
-       from race_events re
-       join companies c on c.id = re.company_id
-       where c.code = 'TBR'::company_code
-         and re.season_year is not null
-         and re.event_start_date >= current_date
-       order by re.event_start_date asc
-       limit 1`
-    );
-
-    if (rows.length > 0) {
-      const match = seasons.find((s) => s.seasonYear === rows[0].season_year);
-      if (match) return match.seasonYear;
-    }
-  } catch {
-    // fall through to latest season
+  const nextRace = await getNextUpcomingTbrRace();
+  if (nextRace) {
+    const match = seasons.find((s) => s.seasonYear === nextRace.seasonYear);
+    if (match) return match.seasonYear;
   }
 
   return seasons.at(-1)?.seasonYear ?? seasons[0]?.seasonYear ?? 2025;
@@ -54,18 +36,16 @@ export default async function TbrRacesPage({ searchParams }: TbrRacesPageProps) 
 
   return (
     <div className="page-grid">
-      <section className="hero portfolio-hero tbr-hero">
-        <div className="hero-copy">
-          <span className="eyebrow">TBR races</span>
-          <h2>Pick a season and open a race to submit bills.</h2>
+      <section className="workspace-header">
+        <div className="workspace-header-left">
+          <span className="section-kicker">TBR races</span>
+          <h3>Pick a season and open a race to submit bills</h3>
         </div>
-        <div className="hero-actions">
-          <Link className="solid-link" href="/tbr">
-            Back to TBR
-          </Link>
-          <Link className="ghost-link" href="/tbr/my-expenses">
-            My expenses
-          </Link>
+        <div className="workspace-header-right">
+          <div className="segment-row">
+            <Link className="segment-chip" href="/tbr">Back to TBR</Link>
+            <Link className="segment-chip" href="/tbr/my-expenses">My expenses</Link>
+          </div>
         </div>
       </section>
 

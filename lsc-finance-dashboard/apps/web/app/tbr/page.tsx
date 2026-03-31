@@ -22,18 +22,16 @@ export default async function TbrPage() {
   if (!isAdmin) {
     return (
       <div className="page-grid">
-        <section className="hero portfolio-hero tbr-hero">
-          <div className="hero-copy">
-            <span className="eyebrow">TBR user console</span>
-            <h2>Submit expenses and track your race reimbursements.</h2>
+        <section className="workspace-header">
+          <div className="workspace-header-left">
+            <span className="section-kicker">TBR user console</span>
+            <h3>Submit expenses and track race reimbursements</h3>
           </div>
-          <div className="hero-actions">
-            <Link className="solid-link" href="/tbr/my-expenses">
-              My expenses
-            </Link>
-            <Link className="ghost-link" href="/tbr/races">
-              Open races
-            </Link>
+          <div className="workspace-header-right">
+            <div className="segment-row">
+              <Link className="segment-chip" href="/tbr/my-expenses">My expenses</Link>
+              <Link className="segment-chip" href="/tbr/races">Races</Link>
+            </div>
           </div>
         </section>
 
@@ -72,7 +70,7 @@ export default async function TbrPage() {
               <Link className="season-card compact-season-card" href={`/tbr/races?season=${season.seasonYear}`} key={season.seasonYear}>
                 <div className="season-card-top">
                   <span className="season-tag">{season.seasonLabel}</span>
-                  <span className="badge">{season.status}</span>
+                  <span className="pill subtle-pill">{season.status}</span>
                 </div>
                 <div className="season-metrics">
                   <div>
@@ -91,26 +89,24 @@ export default async function TbrPage() {
 
   return (
     <div className="page-grid">
-      <section className="hero portfolio-hero tbr-hero">
-          <div className="hero-copy">
-            <span className="eyebrow">TBR admin console</span>
-            <h2>TBR finance and operations dashboard.</h2>
+      <section className="workspace-header">
+        <div className="workspace-header-left">
+          <span className="section-kicker">TBR admin console</span>
+          <h3>Finance and operations dashboard</h3>
+        </div>
+        <div className="workspace-header-right">
+          <div className="segment-row">
+            <Link className="segment-chip" href="/tbr/expense-management">Expense review</Link>
+            <Link className="segment-chip" href="/tbr/invoice-hub">Invoice hub</Link>
+            <Link className="segment-chip" href="/tbr/races">Races</Link>
           </div>
-        <div className="hero-actions">
-          <Link className="solid-link" href="/tbr/expense-management">
-            Review console
-          </Link>
-          <Link className="ghost-link" href="/tbr/invoice-hub">
-            Invoice hub
-          </Link>
         </div>
       </section>
 
       <section className="stats-grid compact-stats">
-        <article className="metric-card">
+        <article className="metric-card accent-good">
           <div className="metric-topline">
-            <span className="metric-label">TBR overview</span>
-            <span className="badge">Recognized revenue</span>
+            <span className="metric-label">Recognized revenue</span>
           </div>
           <div className="metric-value">
             {new Intl.NumberFormat("en-US", {
@@ -120,24 +116,23 @@ export default async function TbrPage() {
             }).format(recognizedRevenue)}
           </div>
         </article>
-        <article className="metric-card">
+        <article className="metric-card accent-risk">
           <div className="metric-topline">
-            <span className="metric-label">{latestSeason?.seasonLabel ?? "Current season"}</span>
-            <span className="badge">Approved cost</span>
+            <span className="metric-label">Approved cost</span>
           </div>
           <div className="metric-value">{latestSeason?.cost ?? "$0"}</div>
+          <span className="metric-subvalue">{latestSeason?.seasonLabel ?? "Current season"}</span>
         </article>
-        <article className="metric-card">
+        <article className="metric-card accent-warn">
           <div className="metric-topline">
-            <span className="metric-label">{latestSeason?.seasonLabel ?? "Current season"}</span>
-            <span className="badge">Open payables</span>
+            <span className="metric-label">Open payables</span>
           </div>
           <div className="metric-value">{latestSeason?.openPayables ?? "$0"}</div>
+          <span className="metric-subvalue">{latestSeason?.seasonLabel ?? "Current season"}</span>
         </article>
-        <article className="metric-card">
+        <article className="metric-card accent-brand">
           <div className="metric-topline">
-            <span className="metric-label">Operating scope</span>
-            <span className="badge">Seasons</span>
+            <span className="metric-label">Seasons</span>
           </div>
           <div className="metric-value">{seasons.length}</div>
         </article>
@@ -187,7 +182,7 @@ export default async function TbrPage() {
             <Link className="season-card" href={`/tbr/races?season=${season.seasonYear}`} key={season.seasonYear}>
               <div className="season-card-top">
                 <span className="season-tag">{season.seasonLabel}</span>
-                <span className="badge">{season.status}</span>
+                <span className="pill subtle-pill">{season.status}</span>
               </div>
               <div className="season-metrics">
                 <div>

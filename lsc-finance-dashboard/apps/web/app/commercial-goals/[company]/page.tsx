@@ -214,34 +214,30 @@ export default async function CommercialGoalsCompanyPage({
       {selectedView === "snapshot" ? (
         <>
           <section className="stats-grid compact-stats">
-            <article className="metric-card">
+            <article className="metric-card accent-brand">
               <div className="metric-topline">
                 <span className="metric-label">Annual target</span>
-                <span className="badge">TBR</span>
               </div>
               <div className="metric-value">${totalTarget.toLocaleString("en-US")}</div>
             </article>
-            <article className="metric-card">
+            <article className="metric-card accent-good">
               <div className="metric-topline">
                 <span className="metric-label">Closed value</span>
-                <span className="badge">Actual</span>
               </div>
               <div className="metric-value">${totalActual.toLocaleString("en-US")}</div>
             </article>
-            <article className="metric-card">
+            <article className="metric-card accent-warn">
               <div className="metric-topline">
                 <span className="metric-label">Remaining gap</span>
-                <span className="badge">To close</span>
               </div>
               <div className="metric-value">${totalGap.toLocaleString("en-US")}</div>
             </article>
-            <article className="metric-card">
+            <article className="metric-card accent-accent">
               <div className="metric-topline">
                 <span className="metric-label">Lead owner</span>
-                <span className="badge">Accountability</span>
               </div>
               <div className="metric-value">{strongestOwner?.owner ?? "TBD"}</div>
-              <div className="metric-subvalue">{strongestOwner?.closedRevenue ?? "$0"} currently leads the board.</div>
+              <span className="metric-subvalue">{strongestOwner?.closedRevenue ?? "$0"} leads the board</span>
             </article>
           </section>
 
@@ -290,20 +286,18 @@ export default async function CommercialGoalsCompanyPage({
       {selectedView === "targets" ? (
         <>
           <section className="stats-grid compact-stats">
-            <article className="metric-card">
+            <article className="metric-card accent-brand">
               <div className="metric-topline">
                 <span className="metric-label">Tracked months</span>
-                <span className="badge">Target path</span>
               </div>
               <div className="metric-value">{commercialGoals.length}</div>
             </article>
-            <article className="metric-card">
+            <article className="metric-card accent-good">
               <div className="metric-topline">
                 <span className="metric-label">Best month</span>
-                <span className="badge">Actual</span>
               </div>
               <div className="metric-value">{strongestMonth?.month ?? "TBD"}</div>
-              <div className="metric-subvalue">{strongestMonth?.actual ?? "$0"} currently leads the pace.</div>
+              <span className="metric-subvalue">{strongestMonth?.actual ?? "$0"} leads the pace</span>
             </article>
           </section>
 
@@ -344,20 +338,18 @@ export default async function CommercialGoalsCompanyPage({
       {selectedView === "owners" ? (
         <>
           <section className="stats-grid compact-stats">
-            <article className="metric-card">
+            <article className="metric-card accent-brand">
               <div className="metric-topline">
                 <span className="metric-label">Tracked owners</span>
-                <span className="badge">Accountability</span>
               </div>
               <div className="metric-value">{partnerPerformance.length}</div>
             </article>
-            <article className="metric-card">
+            <article className="metric-card accent-good">
               <div className="metric-topline">
                 <span className="metric-label">Leader</span>
-                <span className="badge">Closed value</span>
               </div>
               <div className="metric-value">{strongestOwner?.owner ?? "TBD"}</div>
-              <div className="metric-subvalue">{strongestOwner?.closedRevenue ?? "$0"} currently leads.</div>
+              <span className="metric-subvalue">{strongestOwner?.closedRevenue ?? "$0"} leads</span>
             </article>
           </section>
 

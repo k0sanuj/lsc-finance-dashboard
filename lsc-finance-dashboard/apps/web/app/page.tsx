@@ -25,18 +25,18 @@ export default async function OverviewPage() {
 
   return (
     <div className="page-grid">
-      <section className="hero portfolio-hero">
-        <div className="hero-copy">
-          <span className="eyebrow">Portfolio overview</span>
-          <h2>LSC consolidated portfolio — TBR operating, FSP structured for expansion.</h2>
+      <section className="workspace-header">
+        <div className="workspace-header-left">
+          <span className="section-kicker">Portfolio overview</span>
+          <h3>LSC consolidated portfolio</h3>
+          <p className="muted">TBR operating, FSP structured for expansion.</p>
         </div>
-        <div className="hero-actions">
-          <Link className="solid-link" href="/tbr">
-            Open TBR
-          </Link>
-          <Link className="ghost-link" href="/fsp">
-            Open FSP
-          </Link>
+        <div className="workspace-header-right">
+          <div className="segment-row">
+            <Link className="segment-chip active" href="/">Overview</Link>
+            <Link className="segment-chip" href="/tbr">TBR</Link>
+            <Link className="segment-chip" href="/fsp">FSP</Link>
+          </div>
         </div>
       </section>
 

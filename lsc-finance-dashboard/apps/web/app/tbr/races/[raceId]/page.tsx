@@ -61,24 +61,17 @@ export default async function TbrRaceDetailPage({ params, searchParams }: RaceDe
 
   return (
     <div className="page-grid">
-      <section className="hero portfolio-hero tbr-hero">
-        <div className="hero-copy">
-          <span className="eyebrow">TBR race workflow</span>
-          <h2>
-            {race.countryFlag} {race.name}
-          </h2>
-          <p>
-            This race page is only for your own bill and receipt submissions. Upload expense
-            evidence in context, then track the minimal extracted output here.
-          </p>
+      <section className="workspace-header">
+        <div className="workspace-header-left">
+          <span className="section-kicker">TBR race workflow</span>
+          <h3>{race.countryFlag} {race.name}</h3>
+          <p className="muted">Upload expense evidence, then track extracted output here.</p>
         </div>
-        <div className="hero-actions">
-          <Link className="solid-link" href="/tbr/races">
-            Back to races
-          </Link>
-          <Link className="ghost-link" href="/tbr/my-expenses">
-            My expenses
-          </Link>
+        <div className="workspace-header-right">
+          <div className="segment-row">
+            <Link className="segment-chip" href="/tbr/races">Back to races</Link>
+            <Link className="segment-chip" href="/tbr/my-expenses">My expenses</Link>
+          </div>
         </div>
       </section>
 

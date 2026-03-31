@@ -26,18 +26,16 @@ export default async function MyExpensesPage() {
 
   return (
     <div className="page-grid">
-      <section className="hero portfolio-hero tbr-hero">
-        <div className="hero-copy">
-          <span className="eyebrow">My expenses</span>
-          <h2>Your expense submissions and analyzed receipts.</h2>
+      <section className="workspace-header">
+        <div className="workspace-header-left">
+          <span className="section-kicker">My expenses</span>
+          <h3>Expense submissions and analyzed receipts</h3>
         </div>
-        <div className="hero-actions">
-          <Link className="solid-link" href="/tbr/races">
-            Open races
-          </Link>
-          <Link className="ghost-link" href="/tbr">
-            Back to TBR
-          </Link>
+        <div className="workspace-header-right">
+          <div className="segment-row">
+            <Link className="segment-chip" href="/tbr/races">Races</Link>
+            <Link className="segment-chip" href="/tbr">Back to TBR</Link>
+          </div>
         </div>
       </section>
 

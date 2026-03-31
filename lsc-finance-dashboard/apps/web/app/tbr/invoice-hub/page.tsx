@@ -109,14 +109,16 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
 
   return (
     <div className="page-grid">
-      {/* Header */}
-      <section className="hero">
-        <span className="eyebrow">TBR Invoice Hub</span>
-        <h2>Upload, scan, and approve payable invoices.</h2>
-        <div className="hero-actions">
-          <Link className="ghost-link" href="/payments/TBR" as={"/payments/TBR" as Route}>
-            Payments tracker
-          </Link>
+      <section className="workspace-header">
+        <div className="workspace-header-left">
+          <span className="section-kicker">TBR invoice hub</span>
+          <h3>Upload, scan, and approve payable invoices</h3>
+        </div>
+        <div className="workspace-header-right">
+          <div className="segment-row">
+            <Link className="segment-chip" href="/payments/TBR">Payments</Link>
+            <Link className="segment-chip" href="/tbr">Back to TBR</Link>
+          </div>
         </div>
       </section>
 
@@ -127,18 +129,20 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
         </section>
       ) : null}
 
-      {/* Metrics */}
       <section className="stats-grid compact-stats">
-        {workflowSummary.map((item) => (
-          <article className="metric-card" key={item.label}>
+        {workflowSummary.map((item, i) => {
+          const accent = i === 0 ? "accent-warn" : i === 1 ? "accent-good" : "accent-brand";
+          return (
+          <article className={`metric-card ${accent}`} key={item.label}>
             <div className="metric-topline">
               <span className="metric-label">{item.label}</span>
             </div>
             <div className="metric-value">{item.value}</div>
-            <div className="metric-subvalue">{item.detail}</div>
+            <span className="metric-subvalue">{item.detail}</span>
           </article>
-        ))}
-        <article className="metric-card">
+          );
+        })}
+        <article className="metric-card accent-risk">
           <div className="metric-topline">
             <span className="metric-label">Pending review</span>
           </div>

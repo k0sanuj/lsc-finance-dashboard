@@ -54,30 +54,18 @@ export default async function FspPage() {
 
   return (
     <div className="page-grid">
-      <section className="hero portfolio-hero">
-        <div className="hero-copy">
-          <span className="eyebrow">Future of Sports</span>
-          <h2>Choose the FSP workspace you want to open.</h2>
+      <section className="workspace-header">
+        <div className="workspace-header-left">
+          <span className="section-kicker">Future of Sports</span>
+          <h3>FSP workspace</h3>
+          <p className="muted">Planning mode — no live data yet. {fsp?.status ?? "Schema ready"}.</p>
         </div>
-        <div className="hero-actions">
-          <Link className="solid-link" href="/commercial-goals/FSP">
-            Open commercial planning
-          </Link>
-          <Link className="ghost-link" href="/">
-            Back to overview
-          </Link>
-        </div>
-      </section>
-
-      <section className="stats-grid compact-stats">
-        <article className="metric-card" style={{ gridColumn: "1 / -1" }}>
-          <div className="metric-topline">
-            <span className="metric-label">FSP</span>
-            <span className="badge">Status: {fsp?.status ?? "Schema ready"}</span>
+        <div className="workspace-header-right">
+          <div className="segment-row">
+            <Link className="segment-chip" href="/commercial-goals/FSP">Commercial</Link>
+            <Link className="segment-chip" href="/">Back to overview</Link>
           </div>
-          <div className="metric-value">Planning mode</div>
-          <div className="metric-subvalue">FSP is in planning mode — no live data yet.</div>
-        </article>
+        </div>
       </section>
 
       <section className="tool-grid workflow-grid">

@@ -76,10 +76,10 @@ export default async function AiAnalysisPage({ searchParams }: AiAnalysisPagePro
 
   return (
     <div className="page-grid">
-      <section className="hero portfolio-hero">
-        <div className="hero-copy">
-          <span className="eyebrow">Narrative layer</span>
-          <h2>Pick an analysis lens, then read the brief.</h2>
+      <section className="workspace-header">
+        <div className="workspace-header-left">
+          <span className="section-kicker">AI analysis</span>
+          <h3>Pick an analysis lens, then read the brief</h3>
         </div>
       </section>
 
@@ -99,7 +99,7 @@ export default async function AiAnalysisPage({ searchParams }: AiAnalysisPagePro
       <section className="card-grid">
         {visibleInsights.map((item) => (
           <article className="insight-card" key={item.title}>
-            <span className="badge">{item.type}</span>
+            <span className="pill subtle-pill">{item.type}</span>
             <h3>{item.title}</h3>
             <p>{item.summary}</p>
           </article>
