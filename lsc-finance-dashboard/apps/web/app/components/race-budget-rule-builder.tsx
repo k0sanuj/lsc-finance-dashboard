@@ -155,19 +155,19 @@ export function RaceBudgetRuleBuilder({ raceEventId, raceLabel, categories, retu
                   <tr key={draft.id}>
                     <td>
                       <input
+                        className="table-input"
                         value={draft.ruleLabel}
                         onChange={(e) => updateDraft(draft.id, { ruleLabel: e.target.value })}
                         placeholder="Food / day"
-                        style={{ width: "100%", minWidth: 120, border: "1px solid var(--line)", borderRadius: 8, padding: "6px 8px", fontSize: "0.9rem" }}
                       />
                     </td>
                     <td>
                       <select
+                        className="table-select"
                         value={draft.categoryId}
                         onChange={(e) => updateDraft(draft.id, { categoryId: e.target.value })}
-                        style={{ border: "1px solid var(--line)", borderRadius: 8, padding: "6px 8px", fontSize: "0.85rem" }}
                       >
-                        <option value="">—</option>
+                        <option value="">--</option>
                         {categories.map((c) => (
                           <option key={c.id} value={c.id}>{c.label}</option>
                         ))}
@@ -175,9 +175,9 @@ export function RaceBudgetRuleBuilder({ raceEventId, raceLabel, categories, retu
                     </td>
                     <td>
                       <select
+                        className="table-select"
                         value={draft.ruleKind}
                         onChange={(e) => updateDraft(draft.id, { ruleKind: e.target.value as BudgetRuleDraft["ruleKind"] })}
-                        style={{ border: "1px solid var(--line)", borderRadius: 8, padding: "6px 8px", fontSize: "0.85rem" }}
                       >
                         <option value="per_diem">Per diem</option>
                         <option value="budget_cap">Cap</option>
@@ -186,9 +186,9 @@ export function RaceBudgetRuleBuilder({ raceEventId, raceLabel, categories, retu
                     </td>
                     <td>
                       <select
+                        className="table-select"
                         value={draft.unitLabel}
                         onChange={(e) => updateDraft(draft.id, { unitLabel: e.target.value as BudgetRuleDraft["unitLabel"] })}
-                        style={{ border: "1px solid var(--line)", borderRadius: 8, padding: "6px 8px", fontSize: "0.85rem" }}
                       >
                         <option value="per_day">/day</option>
                         <option value="per_person">/person</option>
@@ -197,25 +197,29 @@ export function RaceBudgetRuleBuilder({ raceEventId, raceLabel, categories, retu
                       </select>
                     </td>
                     <td>
-                      <input
-                        inputMode="decimal"
-                        value={draft.approvedAmountUsd}
-                        onChange={(e) => updateDraft(draft.id, { approvedAmountUsd: e.target.value })}
-                        placeholder="250"
-                        style={{ width: 80, border: "1px solid var(--line)", borderRadius: 8, padding: "6px 8px", fontSize: "0.9rem", textAlign: "right" as const }}
-                      />
+                      <div className="currency-input">
+                        <span className="currency-symbol">$</span>
+                        <input
+                          inputMode="decimal"
+                          value={draft.approvedAmountUsd}
+                          onChange={(e) => updateDraft(draft.id, { approvedAmountUsd: e.target.value })}
+                          placeholder="250.00"
+                        />
+                      </div>
                     </td>
                     <td>
-                      <input
-                        inputMode="decimal"
-                        value={draft.closeThresholdPercent}
-                        onChange={(e) => updateDraft(draft.id, { closeThresholdPercent: e.target.value })}
-                        placeholder="90"
-                        style={{ width: 50, border: "1px solid var(--line)", borderRadius: 8, padding: "6px 8px", fontSize: "0.9rem", textAlign: "right" as const }}
-                      />%
+                      <div className="threshold-input">
+                        <input
+                          inputMode="decimal"
+                          value={draft.closeThresholdPercent}
+                          onChange={(e) => updateDraft(draft.id, { closeThresholdPercent: e.target.value })}
+                          placeholder="90"
+                        />
+                        <span className="unit-suffix">%</span>
+                      </div>
                     </td>
                     <td>
-                      <button className="danger-link" onClick={() => removeDraft(draft.id)} type="button" style={{ fontSize: "0.8rem" }}>
+                      <button className="remove-button" onClick={() => removeDraft(draft.id)} type="button" aria-label="Remove rule">
                         ✕
                       </button>
                     </td>

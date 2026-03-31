@@ -1951,3 +1951,124 @@ textarea {
     align-items: flex-start;
   }
 }
+
+/* Inline table form inputs */
+.table-input {
+  width: 100%;
+  min-width: 100px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+}
+
+.table-input:focus-visible {
+  outline: none;
+  border-color: var(--brand-2);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--brand-2);
+}
+
+.table-select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+}
+
+.table-select:focus-visible {
+  outline: none;
+  border-color: var(--brand-2);
+}
+
+.currency-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px 0 0;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.currency-input .currency-symbol {
+  padding: 8px 0 8px 10px;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-weight: 600;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.currency-input input {
+  border: none;
+  background: transparent;
+  padding: 8px 0;
+  font-size: 0.9rem;
+  text-align: right;
+  width: 80px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.currency-input input:focus {
+  outline: none;
+}
+
+.currency-input:focus-within {
+  border-color: var(--brand-2);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--brand-2);
+}
+
+.threshold-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.threshold-input input {
+  width: 50px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 8px;
+  font-size: 0.9rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+}
+
+.threshold-input input:focus-visible {
+  outline: none;
+  border-color: var(--brand-2);
+}
+
+.threshold-input .unit-suffix {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.remove-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.remove-button:hover {
+  background: var(--risk-soft);
+  color: var(--risk);
+  border-color: rgba(220, 38, 38, 0.15);
+}
