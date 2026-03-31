@@ -110,9 +110,14 @@ export default async function ExpenseManagementPage({
 
   return (
     <div className="page-grid">
-      <section className="hero">
-        <span className="eyebrow">TBR approval dashboard</span>
-        <h2>Review expense submissions against approved race budgets.</h2>
+      <section className="workspace-header">
+        <div className="workspace-header-left">
+          <span className="section-kicker">TBR approval dashboard</span>
+          <h3>Expense review and budget management</h3>
+        </div>
+        <div className="workspace-header-right">
+          <Link className="ghost-link" href="/tbr">Back to TBR</Link>
+        </div>
       </section>
 
       {message ? (
@@ -122,17 +127,19 @@ export default async function ExpenseManagementPage({
         </section>
       ) : null}
 
-      <section className="stats-grid">
-        {summary.map((item) => (
-          <article className="metric-card" key={item.label}>
-            <div className="metric-topline">
-              <span className="metric-label">Review cycle</span>
-              <span className="badge">{item.label}</span>
-            </div>
-            <div className="metric-value">{item.value}</div>
-            <div className="metric-subvalue">{item.detail}</div>
-          </article>
-        ))}
+      <section className="stats-grid compact-stats">
+        {summary.map((item, i) => {
+          const accent = i === 0 ? "accent-warn" : i === 1 ? "accent-brand" : "accent-good";
+          return (
+            <article className={`metric-card ${accent}`} key={item.label}>
+              <div className="metric-topline">
+                <span className="metric-label">{item.label}</span>
+              </div>
+              <div className="metric-value">{item.value}</div>
+              <span className="metric-subvalue">{item.detail}</span>
+            </article>
+          );
+        })}
       </section>
 
       <section className="card compact-section-card">
@@ -200,54 +207,44 @@ export default async function ExpenseManagementPage({
         </form>
       </section>
 
-      <section className="grid-two">
-        <article className="card compact-section-card">
-          <div className="card-title-row">
-            <div>
-              <h3>Race budgets and per-diems</h3>
-            </div>
-            <span className="pill">{selectedRaceId ? selectedRaceLabel : "Choose race first"}</span>
-          </div>
-          {selectedRaceId ? (
-            <>
-              <div className="mini-metric-grid">
-                <div className="mini-metric">
-                  <span>Total rules</span>
-                  <strong>{raceBudgetRules.length}</strong>
-                </div>
-                <div className="mini-metric">
-                  <span>Per diems</span>
-                  <strong>{raceBudgetRules.filter((rule) => rule.ruleKind === "per diem").length}</strong>
-                </div>
-                <div className="mini-metric">
-                  <span>Budget caps</span>
-                  <strong>{raceBudgetRules.filter((rule) => rule.ruleKind === "budget cap").length}</strong>
-                </div>
-                <div className="mini-metric">
-                  <span>Approved charges</span>
-                  <strong>{raceBudgetRules.filter((rule) => rule.ruleKind === "approved charge").length}</strong>
-                </div>
+      {selectedRaceId ? (
+        <>
+          <section className="stats-grid compact-stats">
+            <article className="metric-card accent-brand">
+              <div className="metric-topline">
+                <span className="metric-label">Total rules</span>
               </div>
-              <RaceBudgetRuleBuilder
-                categories={formOptions.categories}
-                raceEventId={selectedRaceId}
-                raceLabel={selectedRaceLabel}
-                returnPath={returnPath}
-              />
-            </>
-          ) : (
-            <p className="muted">Select a race to manage its budget rules.</p>
-          )}
-        </article>
+              <div className="metric-value">{raceBudgetRules.length}</div>
+              <span className="metric-subvalue">{selectedRaceLabel}</span>
+            </article>
+            <article className="metric-card accent-accent">
+              <div className="metric-topline">
+                <span className="metric-label">Per diems</span>
+              </div>
+              <div className="metric-value">{raceBudgetRules.filter((rule) => rule.ruleKind === "per diem").length}</div>
+            </article>
+            <article className="metric-card accent-warn">
+              <div className="metric-topline">
+                <span className="metric-label">Budget caps</span>
+              </div>
+              <div className="metric-value">{raceBudgetRules.filter((rule) => rule.ruleKind === "budget cap").length}</div>
+            </article>
+            <article className="metric-card accent-good">
+              <div className="metric-topline">
+                <span className="metric-label">Approved charges</span>
+              </div>
+              <div className="metric-value">{raceBudgetRules.filter((rule) => rule.ruleKind === "approved charge").length}</div>
+            </article>
+          </section>
 
-        <article className="card compact-section-card">
-          <div className="card-title-row">
-            <div>
-              <h3>Current budget table</h3>
+          <article className="card">
+            <div className="card-title-row">
+              <div>
+                <span className="section-kicker">Budget rules</span>
+                <h3>Current budget table for {selectedRaceLabel}</h3>
+              </div>
+              <span className="pill">{raceBudgetRules.length} rules</span>
             </div>
-            <span className="pill">{raceBudgetRules.length} rules</span>
-          </div>
-          {selectedRaceId ? (
             <div className="table-wrapper clean-table">
               <table>
                 <thead>
@@ -256,9 +253,8 @@ export default async function ExpenseManagementPage({
                     <th>Type</th>
                     <th>Unit</th>
                     <th>Label</th>
-                    <th>Approved amount</th>
-                    <th>Close threshold</th>
-                    <th>Notes</th>
+                    <th>Approved (USD)</th>
+                    <th>Threshold</th>
                     <th>Action</th>
                   </tr>
                 </thead>
@@ -267,12 +263,11 @@ export default async function ExpenseManagementPage({
                     raceBudgetRules.map((rule) => (
                       <tr key={rule.id}>
                         <td>{rule.category}</td>
-                        <td>{rule.ruleKind}</td>
+                        <td><span className="pill subtle-pill">{rule.ruleKind}</span></td>
                         <td>{rule.unitLabel}</td>
                         <td>{rule.ruleLabel}</td>
                         <td>{rule.approvedAmountUsd}</td>
                         <td>{rule.closeThreshold}</td>
-                        <td>{rule.notes}</td>
                         <td>
                           <form action={deleteRaceBudgetRuleAction}>
                             <input name="ruleId" type="hidden" value={rule.id} />
@@ -286,19 +281,36 @@ export default async function ExpenseManagementPage({
                     ))
                   ) : (
                     <tr>
-                      <td className="muted" colSpan={8}>
-                        No approved budgets have been saved for this race yet.
+                      <td className="muted" colSpan={7}>
+                        No approved budgets for this race yet. Add rules below.
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <p className="muted">Select a race to view its budget rules.</p>
-          )}
+          </article>
+
+          <article className="card">
+            <div className="card-title-row">
+              <div>
+                <span className="section-kicker">Add rules</span>
+                <h3>Budget rule builder</h3>
+              </div>
+            </div>
+            <RaceBudgetRuleBuilder
+              categories={formOptions.categories}
+              raceEventId={selectedRaceId}
+              raceLabel={selectedRaceLabel}
+              returnPath={returnPath}
+            />
+          </article>
+        </>
+      ) : (
+        <article className="card">
+          <p className="muted">Select a race in the filters above to manage budget rules and view the approval queue.</p>
         </article>
-      </section>
+      )}
 
       <section className="card compact-section-card">
         <div className="card-title-row">
