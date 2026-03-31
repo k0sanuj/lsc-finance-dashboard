@@ -58,6 +58,10 @@ function getTbrNav(): CompanyNav {
           { href: "/payments/TBR" as Route, label: "Payments", roles: ALL_ADMIN },
           { href: "/receivables/TBR" as Route, label: "Receivables", roles: ALL_ADMIN },
           { href: "/documents/TBR" as Route, label: "Documents", roles: ALL_ADMIN },
+          { href: "/vendors" as Route, label: "Vendors", roles: [...ALL_ADMIN, "viewer"] },
+          { href: "/subscriptions" as Route, label: "Subscriptions", roles: [...ALL_ADMIN, "viewer"] },
+          { href: "/cap-table" as Route, label: "Cap Table", roles: ALL_ADMIN },
+          { href: "/litigation" as Route, label: "Litigation & Compliance", roles: ALL_ADMIN },
         ],
       },
       {
@@ -82,6 +86,23 @@ function getFspNav(): CompanyNav {
         links: [
           { href: "/commercial-goals/FSP" as Route, label: "Commercial Goals", roles: ALL_ROLES },
           { href: "/documents/FSP" as Route, label: "Documents", roles: ALL_ADMIN },
+          { href: "/fsp/sp-multiplier" as Route, label: "SP Multiplier", roles: ALL_ADMIN },
+        ],
+      },
+    ],
+  };
+}
+
+function getXtzNav(): CompanyNav {
+  return {
+    href: "/gig-workers" as Route,
+    label: "XTZ India",
+    roles: ALL_ADMIN,
+    sections: [
+      {
+        label: "Operations",
+        links: [
+          { href: "/gig-workers" as Route, label: "Gig Workers", roles: ALL_ADMIN },
         ],
       },
     ],
@@ -119,6 +140,12 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/costs")) return "Costs";
   if (pathname.startsWith("/payments")) return "Payments";
   if (pathname.startsWith("/receivables")) return "Receivables";
+  if (pathname.startsWith("/subscriptions")) return "Subscriptions";
+  if (pathname.startsWith("/vendors")) return "Vendors";
+  if (pathname.startsWith("/cap-table")) return "Cap Table";
+  if (pathname.startsWith("/litigation")) return "Litigation & Compliance";
+  if (pathname.startsWith("/gig-workers")) return "Gig Workers";
+  if (pathname.startsWith("/fsp/sp-multiplier")) return "SP Multiplier";
   if (pathname.startsWith("/documents")) return "Documents";
   if (pathname.startsWith("/ai-analysis")) return "AI Analysis";
   if (pathname.startsWith("/agent-graph")) return "Agent Graph";
@@ -153,6 +180,18 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Documents" });
   } else if (pathname.startsWith("/commercial-goals/")) {
     crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Commercial Goals" });
+  } else if (pathname.startsWith("/subscriptions")) {
+    crumbs.push({ label: "Finance", href: "/" }, { label: "Subscriptions" });
+  } else if (pathname.startsWith("/vendors")) {
+    crumbs.push({ label: "Finance", href: "/" }, { label: "Vendors" });
+  } else if (pathname.startsWith("/cap-table")) {
+    crumbs.push({ label: "Finance", href: "/" }, { label: "Cap Table" });
+  } else if (pathname.startsWith("/litigation")) {
+    crumbs.push({ label: "Finance", href: "/" }, { label: "Litigation & Compliance" });
+  } else if (pathname.startsWith("/gig-workers")) {
+    crumbs.push({ label: "XTZ India" }, { label: "Gig Workers" });
+  } else if (pathname.startsWith("/fsp/sp-multiplier")) {
+    crumbs.push({ label: "FSP", href: "/fsp" }, { label: "SP Multiplier" });
   } else if (pathname.startsWith("/ai-analysis")) {
     crumbs.push({ label: "TBR", href: "/tbr" }, { label: "AI Analysis" });
   }
@@ -175,10 +214,12 @@ export function SessionShell({ children, user }: SessionShellProps) {
 
   // Auto-expand company based on current path
   useEffect(() => {
-    if (pathname.startsWith("/tbr") || pathname.startsWith("/costs") || pathname.startsWith("/payments") || pathname.startsWith("/receivables") || pathname.startsWith("/documents") || pathname.startsWith("/commercial-goals") || pathname.startsWith("/ai-analysis")) {
+    if (pathname.startsWith("/tbr") || pathname.startsWith("/costs") || pathname.startsWith("/payments") || pathname.startsWith("/receivables") || pathname.startsWith("/documents") || pathname.startsWith("/subscriptions") || pathname.startsWith("/vendors") || pathname.startsWith("/cap-table") || pathname.startsWith("/litigation") || pathname.startsWith("/commercial-goals") || pathname.startsWith("/ai-analysis")) {
       setExpandedCompany("TBR");
     } else if (pathname.startsWith("/fsp")) {
       setExpandedCompany("FSP");
+    } else if (pathname.startsWith("/gig-workers")) {
+      setExpandedCompany("XTZ India");
     }
   }, [pathname]);
 
@@ -204,7 +245,7 @@ export function SessionShell({ children, user }: SessionShellProps) {
   // Build company navs based on role
   const companies: CompanyNav[] = role === "team_member"
     ? [getTeamMemberNav()]
-    : [getTbrNav(), getFspNav()];
+    : [getTbrNav(), getFspNav(), getXtzNav()];
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
