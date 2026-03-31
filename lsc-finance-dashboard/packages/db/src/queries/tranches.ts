@@ -400,6 +400,59 @@ export async function getTrancheScheduleCalendar(
   });
 }
 
+export type TrancheAgingSummary = {
+  totalScheduled: number;
+  totalInvoiced: number;
+  totalCollected: number;
+  totalOutstanding: number;
+  scheduledCount: number;
+  activeCount: number;
+  invoicedCount: number;
+  collectedCount: number;
+};
+
+export async function getTrancheAgingSummary(
+  companyCode: string
+): Promise<TrancheAgingSummary> {
+  if (getBackend() !== "database") {
+    return {
+      totalScheduled: 0, totalInvoiced: 0, totalCollected: 0, totalOutstanding: 0,
+      scheduledCount: 0, activeCount: 0, invoicedCount: 0, collectedCount: 0
+    };
+  }
+
+  const rows = await queryRows<{
+    tranche_status: string;
+    status_count: string;
+    status_total: string;
+  }>(
+    `select
+       ct.tranche_status,
+       count(*)::text as status_count,
+       coalesce(sum(ct.tranche_amount), 0)::numeric(14,2)::text as status_total
+     from contract_tranches ct
+     join companies c on c.id = ct.company_id
+     where c.code = $1::company_code
+     group by ct.tranche_status`,
+    [companyCode]
+  );
+
+  const byStatus = new Map(rows.map((r) => [r.tranche_status, r]));
+  const val = (status: string) => Number(byStatus.get(status)?.status_total ?? 0);
+  const cnt = (status: string) => Number(byStatus.get(status)?.status_count ?? 0);
+
+  return {
+    totalScheduled: val("scheduled") + val("active"),
+    totalInvoiced: val("invoiced"),
+    totalCollected: val("collected"),
+    totalOutstanding: val("active") + val("invoiced"),
+    scheduledCount: cnt("scheduled"),
+    activeCount: cnt("active"),
+    invoicedCount: cnt("invoiced"),
+    collectedCount: cnt("collected")
+  };
+}
+
 export async function getRaceEventsForTrancheForm(
   companyCode: string
 ): Promise<RaceEventOption[]> {

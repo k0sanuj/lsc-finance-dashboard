@@ -23,7 +23,9 @@
     "seed:expense-management": "node scripts/seed-expense-management.mjs",
     "db:apply:invoice-workflow": "node scripts/apply-sql.mjs sql/009_invoice_workflow.sql",
     "seed:invoice-workflow": "node scripts/seed-invoice-workflow.mjs",
-    "db:apply:race-budgets": "node scripts/apply-sql.mjs sql/013_race_budget_rules.sql sql/014_race_budget_rule_units.sql"
+    "db:apply:race-budgets": "node scripts/apply-sql.mjs sql/013_race_budget_rules.sql sql/014_race_budget_rule_units.sql",
+    "db:apply:tranches": "node scripts/apply-sql.mjs sql/017_contract_tranches.sql",
+    "seed:contract-tranches": "node scripts/seed-contract-tranches.mjs"
   },
   "devDependencies": {
     "@types/pg": "^8.18.0",

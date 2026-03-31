@@ -1904,6 +1904,52 @@ textarea {
   background: linear-gradient(90deg, var(--good), #2eb86e);
 }
 
+.gap-bottom {
+  margin-bottom: 1rem;
+}
+
+/* Calendar month group */
+.calendar-month-group {
+  margin-bottom: 1.25rem;
+}
+
+.calendar-month-group:last-child {
+  margin-bottom: 0;
+}
+
+.calendar-month-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0.5rem;
+}
+
+.calendar-entry {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line-light, #f0f0f0);
+}
+
+.calendar-entry:last-child {
+  border-bottom: none;
+}
+
+.calendar-entry-label {
+  font-weight: 500;
+}
+
+.calendar-entry-sponsor {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
 /* Overdue row highlighting */
 .table-wrapper .row-overdue td:first-child {
   border-left: 3px solid var(--risk);

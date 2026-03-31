@@ -7,9 +7,12 @@ import {
   getSponsorBreakdown,
   getTrancheSummaryByCompany,
   getActionableTranches,
-  getCollectionTranches
+  getCollectionTranches,
+  getTrancheScheduleCalendar,
+  getTrancheAgingSummary,
+  getContractTranches
 } from "@lsc/db";
-import type { TrancheScheduleSummaryRow, TrancheRow, CollectionTrancheRow } from "@lsc/db";
+import type { TrancheScheduleSummaryRow, TrancheRow, CollectionTrancheRow, TrancheCalendarEntry, TrancheAgingSummary } from "@lsc/db";
 import {
   activateTrancheAction,
   generateTrancheInvoiceAction,
@@ -30,6 +33,7 @@ type ReceivablesCompanyPageProps = {
     view?: string;
     status?: string;
     message?: string;
+    contractId?: string;
   }>;
 };
 
@@ -37,7 +41,7 @@ const workstreams = [
   {
     key: "overview",
     title: "Aging overview",
-    description: "Outstanding receivables by aging bucket.",
+    description: "Outstanding receivables by aging bucket with tranche pipeline.",
     badge: "Step 1"
   },
   {
@@ -53,10 +57,16 @@ const workstreams = [
     badge: "Step 3"
   },
   {
+    key: "calendar",
+    title: "Tranche calendar",
+    description: "Month-by-month timeline of upcoming payment milestones.",
+    badge: "Step 4"
+  },
+  {
     key: "collection",
     title: "Collection path",
-    description: "Future: reminders, escalation, deliverable gates.",
-    badge: "Step 4"
+    description: "Track invoiced tranches, overdue aging, and mark collected.",
+    badge: "Step 5"
   }
 ] as const;
 
@@ -91,9 +101,10 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
   const pageParams = searchParams ? await searchParams : undefined;
   const selectedView = workstreams.some((item) => item.key === pageParams?.view)
     ? (pageParams?.view as (typeof workstreams)[number]["key"])
-    : "overview";
+    : pageParams?.view === "contract" ? "contract" as const : "overview";
   const status = pageParams?.status ?? null;
   const message = pageParams?.message ?? null;
+  const contractIdParam = pageParams?.contractId ?? null;
 
   if (companyCode === "FSP") {
     return (
@@ -122,13 +133,20 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
     );
   }
 
-  const [agingSummary, agingDetail, sponsors, trancheSummaries, actionableTranches, collectionTranches] = await Promise.all([
+  const [
+    agingSummary, agingDetail, sponsors,
+    trancheSummaries, actionableTranches, collectionTranches,
+    calendarEntries, trancheAging, contractTranches
+  ] = await Promise.all([
     getReceivablesAgingSummary(companyCode),
     selectedView === "detail" ? getReceivablesAgingDetail(companyCode) : Promise.resolve([]),
     getSponsorBreakdown(),
     selectedView === "schedule" ? getTrancheSummaryByCompany(companyCode) : Promise.resolve([] as TrancheScheduleSummaryRow[]),
     selectedView === "schedule" ? getActionableTranches(companyCode) : Promise.resolve([] as TrancheRow[]),
-    selectedView === "collection" ? getCollectionTranches(companyCode) : Promise.resolve([] as CollectionTrancheRow[])
+    selectedView === "collection" ? getCollectionTranches(companyCode) : Promise.resolve([] as CollectionTrancheRow[]),
+    selectedView === "calendar" ? getTrancheScheduleCalendar(companyCode) : Promise.resolve([] as TrancheCalendarEntry[]),
+    selectedView === "overview" ? getTrancheAgingSummary(companyCode) : Promise.resolve({ totalScheduled: 0, totalInvoiced: 0, totalCollected: 0, totalOutstanding: 0, scheduledCount: 0, activeCount: 0, invoicedCount: 0, collectedCount: 0 } as TrancheAgingSummary),
+    selectedView === "contract" && contractIdParam ? getContractTranches(contractIdParam) : Promise.resolve([] as TrancheRow[])
   ]);
 
   const totalOutstanding = agingSummary.reduce((sum, bucket) => sum + bucket.rawTotal, 0);
@@ -274,6 +292,69 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
               </div>
             </article>
           </section>
+
+          {/* Tranche pipeline summary on overview */}
+          {trancheAging.scheduledCount + trancheAging.activeCount + trancheAging.invoicedCount + trancheAging.collectedCount > 0 ? (
+            <article className="card">
+              <div className="card-title-row">
+                <div>
+                  <span className="section-kicker">Tranche pipeline</span>
+                  <h3>Contract milestone receivables</h3>
+                </div>
+                <Link
+                  className="ghost-link"
+                  href={buildCompanyPath("/receivables", companyCode, { view: "schedule" }) as Route}
+                >
+                  View schedule
+                </Link>
+              </div>
+              <div className="stats-grid compact-stats gap-bottom">
+                <div className="metric-card compact">
+                  <span className="metric-label">Scheduled</span>
+                  <span className="metric-value">${trancheAging.totalScheduled.toLocaleString("en-US")}</span>
+                  <span className="metric-subvalue">{trancheAging.scheduledCount + trancheAging.activeCount} tranches</span>
+                </div>
+                <div className="metric-card compact">
+                  <span className="metric-label">Invoiced</span>
+                  <span className="metric-value">${trancheAging.totalInvoiced.toLocaleString("en-US")}</span>
+                  <span className="metric-subvalue">{trancheAging.invoicedCount} awaiting payment</span>
+                </div>
+                <div className="metric-card compact">
+                  <span className="metric-label">Collected</span>
+                  <span className="metric-value">${trancheAging.totalCollected.toLocaleString("en-US")}</span>
+                  <span className="metric-subvalue">{trancheAging.collectedCount} complete</span>
+                </div>
+                <div className="metric-card compact">
+                  <span className="metric-label">Outstanding</span>
+                  <span className="metric-value">${trancheAging.totalOutstanding.toLocaleString("en-US")}</span>
+                  <span className="metric-subvalue">Active + invoiced</span>
+                </div>
+              </div>
+              <div className="chart-list">
+                {[
+                  { label: "Collected", value: trancheAging.totalCollected, tone: "good" },
+                  { label: "Invoiced", value: trancheAging.totalInvoiced, tone: "warn" },
+                  { label: "Scheduled", value: trancheAging.totalScheduled, tone: "secondary" }
+                ].map((seg) => {
+                  const pipelineMax = Math.max(1, trancheAging.totalScheduled + trancheAging.totalInvoiced + trancheAging.totalCollected);
+                  return (
+                    <div className="chart-row" key={seg.label}>
+                      <div className="chart-meta">
+                        <strong>{seg.label}</strong>
+                        <span>${seg.value.toLocaleString("en-US")}</span>
+                      </div>
+                      <div className="chart-track">
+                        <div
+                          className={`chart-fill ${seg.tone}`}
+                          style={{ width: `${Math.max(4, (seg.value / pipelineMax) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+          ) : null}
         </>
       ) : null}
 
@@ -434,7 +515,14 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
                     trancheSummaries.map((row) => (
                       <tr key={row.contractId}>
                         <td>{row.sponsorName}</td>
-                        <td>{row.contractName}</td>
+                        <td>
+                          <Link
+                            className="ghost-link"
+                            href={buildCompanyPath("/receivables", companyCode, { view: "contract", contractId: row.contractId }) as Route}
+                          >
+                            {row.contractName}
+                          </Link>
+                        </td>
                         <td>{row.fullContractValue}</td>
                         <td>{row.totalTranches}</td>
                         <td>{row.invoicedValue}</td>
@@ -578,6 +666,289 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
           </article>
         </>
       ) : null}
+
+      {selectedView === "calendar" ? (() => {
+        const monthGroups = new Map<string, TrancheCalendarEntry[]>();
+        for (const entry of calendarEntries) {
+          const key = entry.monthLabel;
+          if (!monthGroups.has(key)) monthGroups.set(key, []);
+          monthGroups.get(key)!.push(entry);
+        }
+
+        const totalCalendarValue = calendarEntries.reduce((sum, e) => {
+          const n = Number(e.trancheAmount.replace(/[^0-9.-]/g, ""));
+          return sum + (Number.isFinite(n) ? n : 0);
+        }, 0);
+        const scheduledCalendarValue = calendarEntries
+          .filter((e) => e.trancheStatus === "scheduled" || e.trancheStatus === "active")
+          .reduce((sum, e) => {
+            const n = Number(e.trancheAmount.replace(/[^0-9.-]/g, ""));
+            return sum + (Number.isFinite(n) ? n : 0);
+          }, 0);
+
+        return (
+          <>
+            <section className="stats-grid compact-stats">
+              <article className="metric-card accent-brand">
+                <div className="metric-topline">
+                  <span className="metric-label">Total milestones</span>
+                </div>
+                <div className="metric-value">{calendarEntries.length}</div>
+                <span className="metric-subvalue">Across {monthGroups.size} months</span>
+              </article>
+              <article className="metric-card accent-good">
+                <div className="metric-topline">
+                  <span className="metric-label">Pipeline value</span>
+                </div>
+                <div className="metric-value">
+                  {totalCalendarValue.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}
+                </div>
+                <span className="metric-subvalue">All tranches</span>
+              </article>
+              <article className="metric-card accent-warn">
+                <div className="metric-topline">
+                  <span className="metric-label">Upcoming</span>
+                </div>
+                <div className="metric-value">
+                  {scheduledCalendarValue.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}
+                </div>
+                <span className="metric-subvalue">Scheduled + active</span>
+              </article>
+              <article className="metric-card">
+                <div className="metric-topline">
+                  <span className="metric-label">Months spanned</span>
+                </div>
+                <div className="metric-value">{monthGroups.size}</div>
+              </article>
+            </section>
+
+            <article className="card">
+              <div className="card-title-row">
+                <div>
+                  <span className="section-kicker">Tranche calendar</span>
+                  <h3>Payment milestones by month</h3>
+                </div>
+                <Link
+                  className="ghost-link"
+                  href={buildCompanyPath("/receivables", companyCode, { view: "schedule" }) as Route}
+                >
+                  Back to schedule
+                </Link>
+              </div>
+
+              {calendarEntries.length > 0 ? (
+                <div>
+                  {Array.from(monthGroups.entries()).map(([month, entries]) => (
+                    <div className="calendar-month-group" key={month}>
+                      <div className="calendar-month-label">{month}</div>
+                      <div className="table-wrapper clean-table">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Sponsor</th>
+                              <th>Contract</th>
+                              <th>Tranche</th>
+                              <th>Amount</th>
+                              <th>Date</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {entries.map((entry) => (
+                              <tr key={entry.id}>
+                                <td>{entry.sponsorName}</td>
+                                <td>{entry.contractName}</td>
+                                <td>{entry.trancheLabel}</td>
+                                <td>{entry.trancheAmount}</td>
+                                <td>{entry.effectiveDate ? new Date(entry.effectiveDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "TBD"}</td>
+                                <td>
+                                  <span className={`pill ${
+                                    entry.trancheStatus === "collected" ? "signal-pill signal-good" :
+                                    entry.trancheStatus === "invoiced" ? "signal-pill signal-warn" :
+                                    entry.trancheStatus === "active" ? "signal-pill signal-good" :
+                                    "subtle-pill"
+                                  }`}>
+                                    {entry.trancheStatus}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">No tranche milestones found.</p>
+              )}
+            </article>
+          </>
+        );
+      })() : null}
+
+      {selectedView === "contract" && contractIdParam ? (() => {
+        const contractName = contractTranches[0]?.contractName ?? "Contract";
+        const sponsorName = contractTranches[0]?.sponsorName ?? "";
+        const totalValue = contractTranches.reduce((sum, t) => {
+          const n = Number(t.trancheAmount.replace(/[^0-9.-]/g, ""));
+          return sum + (Number.isFinite(n) ? n : 0);
+        }, 0);
+        const collectedValue = contractTranches
+          .filter((t) => t.trancheStatus === "collected")
+          .reduce((sum, t) => {
+            const n = Number(t.trancheAmount.replace(/[^0-9.-]/g, ""));
+            return sum + (Number.isFinite(n) ? n : 0);
+          }, 0);
+
+        return (
+          <>
+            <section className="stats-grid compact-stats">
+              <article className="metric-card accent-brand">
+                <div className="metric-topline">
+                  <span className="metric-label">Total tranches</span>
+                </div>
+                <div className="metric-value">{contractTranches.length}</div>
+                <span className="metric-subvalue">{contractName}</span>
+              </article>
+              <article className="metric-card accent-good">
+                <div className="metric-topline">
+                  <span className="metric-label">Contract value</span>
+                </div>
+                <div className="metric-value">
+                  {totalValue.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}
+                </div>
+                <span className="metric-subvalue">{sponsorName}</span>
+              </article>
+              <article className="metric-card">
+                <div className="metric-topline">
+                  <span className="metric-label">Collected</span>
+                </div>
+                <div className="metric-value">
+                  {collectedValue.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}
+                </div>
+                <span className="metric-subvalue">
+                  {totalValue > 0 ? `${Math.round((collectedValue / totalValue) * 100)}%` : "0%"} of total
+                </span>
+              </article>
+            </section>
+
+            <article className="card">
+              <div className="card-title-row">
+                <div>
+                  <span className="section-kicker">{sponsorName}</span>
+                  <h3>{contractName} — tranche detail</h3>
+                </div>
+                <Link
+                  className="ghost-link"
+                  href={buildCompanyPath("/receivables", companyCode, { view: "schedule" }) as Route}
+                >
+                  Back to schedule
+                </Link>
+              </div>
+              <div className="table-wrapper clean-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Tranche</th>
+                      <th>%</th>
+                      <th>Amount</th>
+                      <th>Trigger</th>
+                      <th>Date</th>
+                      <th>Race</th>
+                      <th>Gate</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {contractTranches.length > 0 ? (
+                      contractTranches.map((t) => {
+                        const returnPath = buildCompanyPath("/receivables", companyCode, { view: "contract", contractId: contractIdParam });
+                        return (
+                          <tr
+                            className={t.deliverableGateBlocked ? "row-warn" : ""}
+                            key={t.id}
+                          >
+                            <td>{t.trancheNumber}</td>
+                            <td>{t.trancheLabel}</td>
+                            <td>{t.tranchePercentage}%</td>
+                            <td>{t.trancheAmount}</td>
+                            <td>{t.triggerType}</td>
+                            <td>{t.triggerDate}</td>
+                            <td>{t.raceName || "—"}</td>
+                            <td>
+                              {t.deliverableGateBlocked ? (
+                                <span className="pill signal-pill signal-risk">Blocked</span>
+                              ) : (
+                                <span className="pill signal-pill signal-good">Clear</span>
+                              )}
+                            </td>
+                            <td>
+                              <span className={`pill ${
+                                t.trancheStatus === "collected" ? "signal-pill signal-good" :
+                                t.trancheStatus === "active" ? "signal-pill signal-good" :
+                                t.trancheStatus === "invoiced" ? "signal-pill signal-warn" :
+                                "subtle-pill"
+                              }`}>
+                                {t.trancheStatus}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="inline-actions">
+                                {t.trancheStatus === "scheduled" && !t.deliverableGateBlocked ? (
+                                  <form action={activateTrancheAction}>
+                                    <input name="trancheId" type="hidden" value={t.id} />
+                                    <input name="returnPath" type="hidden" value={returnPath} />
+                                    <button className="action-button secondary" type="submit">
+                                      Activate
+                                    </button>
+                                  </form>
+                                ) : null}
+                                {t.trancheStatus === "active" ? (
+                                  <form action={generateTrancheInvoiceAction}>
+                                    <input name="trancheId" type="hidden" value={t.id} />
+                                    <input name="returnPath" type="hidden" value={returnPath} />
+                                    <button className="action-button primary" type="submit">
+                                      Generate invoice
+                                    </button>
+                                  </form>
+                                ) : null}
+                                {t.trancheStatus === "invoiced" ? (
+                                  <form action={markTrancheCollectedAction}>
+                                    <input name="trancheId" type="hidden" value={t.id} />
+                                    <input name="returnPath" type="hidden" value={returnPath} />
+                                    <button className="action-button primary" type="submit">
+                                      Mark collected
+                                    </button>
+                                  </form>
+                                ) : null}
+                                {t.trancheStatus === "collected" ? (
+                                  <span className="muted">Complete</span>
+                                ) : null}
+                                {t.trancheStatus === "scheduled" && t.deliverableGateBlocked ? (
+                                  <span className="muted">Gate blocked</span>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td className="muted" colSpan={10}>
+                          No tranches found for this contract.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </>
+        );
+      })() : null}
 
       {selectedView === "collection" ? (
         <>
