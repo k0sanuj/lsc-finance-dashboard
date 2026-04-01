@@ -1,6 +1,7 @@
 import {
   getCapTableEntries,
   getCapTableSummary,
+  getCapTableEvents,
   getInvestors
 } from "@lsc/db";
 import { requireRole } from "../../lib/auth";
@@ -17,10 +18,11 @@ function chartFillClass(shareClass: string, index: number): string {
 export default async function CapTablePage() {
   await requireRole(["super_admin", "finance_admin"]);
 
-  const [entries, summary, investors] = await Promise.all([
+  const [entries, summary, investors, events] = await Promise.all([
     getCapTableEntries("LSC"),
     getCapTableSummary("LSC"),
-    getInvestors("LSC")
+    getInvestors("LSC"),
+    getCapTableEvents("LSC")
   ]);
 
   const barMax = Math.max(1, ...summary.shareClassBreakdown.map((sc) => sc.shares));
@@ -210,6 +212,70 @@ export default async function CapTablePage() {
           </div>
         </section>
       ) : null}
+
+      {/* Equity events timeline */}
+      <section className="card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">Equity events</span>
+            <h3>Timeline of grants, exercises, and transfers</h3>
+          </div>
+          <span className="badge">{events.length} events</span>
+        </div>
+        <div className="table-wrapper clean-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Event</th>
+                <th>Shares</th>
+                <th>Price/Share</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Round</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.length > 0 ? (
+                events.map((evt) => (
+                  <tr key={evt.id}>
+                    <td>{evt.eventDate}</td>
+                    <td>
+                      <span className={`pill ${
+                        evt.eventType === "grant" ? "signal-pill signal-good" :
+                        evt.eventType === "exercise" ? "signal-pill signal-warn" :
+                        evt.eventType === "round" ? "signal-pill signal-good" :
+                        "subtle-pill"
+                      }`}>
+                        {evt.eventType}
+                      </span>
+                    </td>
+                    <td>{formatNumber(evt.sharesAffected)}</td>
+                    <td>{evt.pricePerShare || "—"}</td>
+                    <td>{evt.fromHolder || "—"}</td>
+                    <td>{evt.toHolder || "—"}</td>
+                    <td>
+                      {evt.roundName ? (
+                        <span className="badge">{evt.roundName}</span>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td className="muted">{evt.notes || "—"}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="muted" colSpan={8}>
+                    No equity events recorded yet. Events are created when share grants are processed from the Legal platform.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }

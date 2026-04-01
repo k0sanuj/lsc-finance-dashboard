@@ -16,3 +16,7 @@ export * from "./subscriptions";
 export * from "./gig-workers";
 export * from "./cap-table";
 export * from "./litigation";
+export * from "./tax";
+export * from "./arena-ads";
+export * from "./messaging";
+export * from "./audit";

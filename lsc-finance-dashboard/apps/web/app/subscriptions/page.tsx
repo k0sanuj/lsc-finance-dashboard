@@ -5,6 +5,7 @@ import {
   getSubscriptionSummary
 } from "@lsc/db";
 import { requireRole } from "../../lib/auth";
+import { generateSubscriptionAlertsAction, dismissAlertAction } from "./actions";
 
 function statusAccent(status: string): string {
   switch (status) {
@@ -27,8 +28,15 @@ function alertTypeAccent(alertType: string): string {
   return "accent-brand";
 }
 
-export default async function SubscriptionsPage() {
+type SubscriptionsPageProps = {
+  searchParams?: Promise<{ status?: string; message?: string }>;
+};
+
+export default async function SubscriptionsPage({ searchParams }: SubscriptionsPageProps) {
   await requireRole(["super_admin", "finance_admin", "viewer"]);
+  const pageParams = searchParams ? await searchParams : undefined;
+  const status = pageParams?.status ?? null;
+  const message = pageParams?.message ?? null;
   const [subs, summary, alerts] = await Promise.all([
     getSubscriptions(),
     getSubscriptionSummary(),
@@ -49,7 +57,21 @@ export default async function SubscriptionsPage() {
             Track all recurring subscriptions, SaaS tools, and software costs across LSC entities.
           </p>
         </div>
+        <div>
+          <form action={generateSubscriptionAlertsAction}>
+            <button className="action-button primary" type="submit">
+              Generate alerts
+            </button>
+          </form>
+        </div>
       </section>
+
+      {message ? (
+        <section className={`notice ${status ?? "info"}`}>
+          <strong>{status === "error" ? "Error" : "Update"}</strong>
+          <span>{message}</span>
+        </section>
+      ) : null}
 
       <section className="stats-grid compact-stats">
         <article className="metric-card accent-brand">
@@ -224,6 +246,7 @@ export default async function SubscriptionsPage() {
                   <th>Alert Type</th>
                   <th>Message</th>
                   <th>Triggered</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -231,12 +254,25 @@ export default async function SubscriptionsPage() {
                   <tr key={alert.id}>
                     <td><strong>{alert.subscriptionName}</strong></td>
                     <td>
-                      <span className={`metric-card ${alertTypeAccent(alert.alertType)}`} style={{ display: "inline", padding: "2px 8px", borderRadius: 6, fontSize: "0.82rem" }}>
+                      <span className={`pill ${
+                        alert.alertType.includes("7d") ? "signal-pill signal-risk" :
+                        alert.alertType.includes("15d") ? "signal-pill signal-warn" :
+                        alert.alertType.includes("unused") ? "signal-pill signal-warn" :
+                        "signal-pill signal-good"
+                      }`}>
                         {alert.alertType}
                       </span>
                     </td>
                     <td>{alert.message}</td>
                     <td>{alert.triggeredAt}</td>
+                    <td>
+                      <form action={dismissAlertAction}>
+                        <input name="alertId" type="hidden" value={alert.id} />
+                        <button className="action-button secondary" type="submit">
+                          Dismiss
+                        </button>
+                      </form>
+                    </td>
                   </tr>
                 ))}
               </tbody>

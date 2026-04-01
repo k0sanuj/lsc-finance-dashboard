@@ -62,6 +62,8 @@ function getTbrNav(): CompanyNav {
           { href: "/subscriptions" as Route, label: "Subscriptions", roles: [...ALL_ADMIN, "viewer"] },
           { href: "/cap-table" as Route, label: "Cap Table", roles: ALL_ADMIN },
           { href: "/litigation" as Route, label: "Litigation & Compliance", roles: ALL_ADMIN },
+          { href: "/arena-ads" as Route, label: "Arena & Ads", roles: ALL_ADMIN },
+          { href: "/tax-filings" as Route, label: "Tax & Filing", roles: ALL_ADMIN },
         ],
       },
       {
@@ -146,6 +148,10 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/litigation")) return "Litigation & Compliance";
   if (pathname.startsWith("/gig-workers")) return "Gig Workers";
   if (pathname.startsWith("/fsp/sp-multiplier")) return "SP Multiplier";
+  if (pathname.startsWith("/tax-filings")) return "Tax & Filing";
+  if (pathname.startsWith("/arena-ads")) return "Arena & Ads";
+  if (pathname.startsWith("/messaging")) return "Cross-Dashboard Messages";
+  if (pathname.startsWith("/audit-reports")) return "Audit Reports";
   if (pathname.startsWith("/documents")) return "Documents";
   if (pathname.startsWith("/ai-analysis")) return "AI Analysis";
   if (pathname.startsWith("/agent-graph")) return "Agent Graph";
@@ -192,6 +198,14 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "XTZ India" }, { label: "Gig Workers" });
   } else if (pathname.startsWith("/fsp/sp-multiplier")) {
     crumbs.push({ label: "FSP", href: "/fsp" }, { label: "SP Multiplier" });
+  } else if (pathname.startsWith("/tax-filings")) {
+    crumbs.push({ label: "Finance", href: "/" }, { label: "Tax & Filing" });
+  } else if (pathname.startsWith("/arena-ads")) {
+    crumbs.push({ label: "Finance", href: "/" }, { label: "Arena & Ads" });
+  } else if (pathname.startsWith("/messaging")) {
+    crumbs.push({ label: "System" }, { label: "Cross-Dashboard Messages" });
+  } else if (pathname.startsWith("/audit-reports")) {
+    crumbs.push({ label: "System" }, { label: "Audit Reports" });
   } else if (pathname.startsWith("/ai-analysis")) {
     crumbs.push({ label: "TBR", href: "/tbr" }, { label: "AI Analysis" });
   }
@@ -214,7 +228,7 @@ export function SessionShell({ children, user }: SessionShellProps) {
 
   // Auto-expand company based on current path
   useEffect(() => {
-    if (pathname.startsWith("/tbr") || pathname.startsWith("/costs") || pathname.startsWith("/payments") || pathname.startsWith("/receivables") || pathname.startsWith("/documents") || pathname.startsWith("/subscriptions") || pathname.startsWith("/vendors") || pathname.startsWith("/cap-table") || pathname.startsWith("/litigation") || pathname.startsWith("/commercial-goals") || pathname.startsWith("/ai-analysis")) {
+    if (pathname.startsWith("/tbr") || pathname.startsWith("/costs") || pathname.startsWith("/payments") || pathname.startsWith("/receivables") || pathname.startsWith("/documents") || pathname.startsWith("/subscriptions") || pathname.startsWith("/vendors") || pathname.startsWith("/cap-table") || pathname.startsWith("/litigation") || pathname.startsWith("/arena-ads") || pathname.startsWith("/tax-filings") || pathname.startsWith("/commercial-goals") || pathname.startsWith("/ai-analysis")) {
       setExpandedCompany("TBR");
     } else if (pathname.startsWith("/fsp")) {
       setExpandedCompany("FSP");
@@ -367,6 +381,16 @@ export function SessionShell({ children, user }: SessionShellProps) {
                 <li className="nav-item">
                   <Link className={isActive("/workflow-graph") ? "active" : ""} href="/workflow-graph">
                     Workflow Graph
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <Link className={isActive("/messaging") ? "active" : ""} href={"/messaging" as Route}>
+                    Cross-Dashboard Messages
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <Link className={isActive("/audit-reports") ? "active" : ""} href={"/audit-reports" as Route}>
+                    Audit Reports
                   </Link>
                 </li>
               </ul>
