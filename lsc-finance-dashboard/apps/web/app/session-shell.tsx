@@ -225,6 +225,7 @@ function getInitials(fullName?: string) {
 export function SessionShell({ children, user }: SessionShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [expandedCompany, setExpandedCompany] = useState<string | null>(null);
 
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
@@ -281,7 +282,7 @@ export function SessionShell({ children, user }: SessionShellProps) {
   const breadcrumbs = getBreadcrumbs(pathname);
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
       <button
         className="sidebar-toggle"
         onClick={() => setSidebarOpen((v) => !v)}
@@ -297,10 +298,22 @@ export function SessionShell({ children, user }: SessionShellProps) {
         role="presentation"
       />
 
-      <aside className={`sidebar ${sidebarOpen ? "open" : ""}`} aria-label="Main navigation">
+      <aside className={`sidebar ${sidebarOpen ? "open" : ""} ${sidebarCollapsed ? "collapsed" : ""}`} aria-label="Main navigation">
         <div className="brand-block">
-          <span className="brand-kicker">League Sports Co</span>
-          <h1>Finance OS</h1>
+          <div className="brand-row">
+            <div>
+              <span className="brand-kicker">League Sports Co</span>
+              <h1>Finance OS</h1>
+            </div>
+            <button
+              className="sidebar-collapse-btn"
+              onClick={() => setSidebarCollapsed((v) => !v)}
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              type="button"
+            >
+              {sidebarCollapsed ? "\u00BB" : "\u00AB"}
+            </button>
+          </div>
         </div>
 
         <nav>
@@ -329,13 +342,14 @@ export function SessionShell({ children, user }: SessionShellProps) {
             return (
               <div className="nav-group" key={company.label}>
                 <button
-                  className={`nav-company-toggle ${active ? "active" : ""}`}
+                  className={`nav-company-toggle ${active ? "active" : ""} ${expanded ? "expanded" : ""}`}
                   onClick={() => toggleCompany(company.label)}
                   type="button"
                   aria-expanded={expanded}
                 >
-                  <span className="nav-label">{company.label}</span>
-                  <span className="nav-chevron">{expanded ? "▾" : "▸"}</span>
+                  <span className="nav-company-indicator">{expanded ? "\u25BC" : "\u25B6"}</span>
+                  <span className="nav-company-name">{company.label}</span>
+                  {active && !expanded ? <span className="nav-active-dot" /> : null}
                 </button>
 
                 {expanded && (
