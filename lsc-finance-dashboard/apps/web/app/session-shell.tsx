@@ -152,6 +152,7 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/arena-ads")) return "Arena & Ads";
   if (pathname.startsWith("/messaging")) return "Cross-Dashboard Messages";
   if (pathname.startsWith("/audit-reports")) return "Audit Reports";
+  if (pathname.startsWith("/project-checklist")) return "Project Checklist";
   if (pathname.startsWith("/documents")) return "Documents";
   if (pathname.startsWith("/ai-analysis")) return "AI Analysis";
   if (pathname.startsWith("/agent-graph")) return "Agent Graph";
@@ -206,6 +207,8 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "System" }, { label: "Cross-Dashboard Messages" });
   } else if (pathname.startsWith("/audit-reports")) {
     crumbs.push({ label: "System" }, { label: "Audit Reports" });
+  } else if (pathname.startsWith("/project-checklist")) {
+    crumbs.push({ label: "Project Checklist" });
   } else if (pathname.startsWith("/ai-analysis")) {
     crumbs.push({ label: "TBR", href: "/tbr" }, { label: "AI Analysis" });
   }
@@ -308,6 +311,11 @@ export function SessionShell({ children, user }: SessionShellProps) {
               <li className="nav-item">
                 <Link className={pathname === "/" ? "active" : ""} href="/">
                   Overview
+                </Link>
+              </li>
+              <li className="nav-item">
+                <Link className={isActive("/project-checklist") ? "active" : ""} href={"/project-checklist" as Route}>
+                  Project Checklist
                 </Link>
               </li>
             </ul>
