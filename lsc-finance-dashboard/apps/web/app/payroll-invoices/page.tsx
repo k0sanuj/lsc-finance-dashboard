@@ -97,23 +97,33 @@ export default async function PayrollInvoicesPage({ searchParams }: PayrollInvoi
         <form action={generatePayrollInvoiceAction} className="stack-form">
           <input type="hidden" name="fromCompanyCode" value="XTZ" />
           <input type="hidden" name="toCompanyCode" value="XTE" />
-          <div className="grid-two">
+          <div className="form-grid">
             <label className="field">
               <span>Payroll month</span>
               <input name="payrollMonth" type="month" required />
             </label>
             <label className="field">
-              <span>Payment method</span>
-              <input name="paymentMethod" type="text" placeholder="e.g. Bank transfer, Wire" />
+              <span>Invoice currency</span>
+              <select name="invoiceCurrency" defaultValue="USD">
+                <option value="USD">USD (XTZ India → XTE invoices in USD)</option>
+                <option value="AED">AED</option>
+                <option value="INR">INR (same currency, no conversion)</option>
+              </select>
             </label>
+            <label className="field">
+              <span>Payment method</span>
+              <input name="paymentMethod" type="text" placeholder="e.g. Wire transfer" />
+            </label>
+            <label className="field">
+              <span>Notes</span>
+              <input name="notes" type="text" placeholder="Optional invoice notes" />
+            </label>
+            <div className="form-actions">
+              <button className="action-button primary" type="submit">
+                Generate invoice (with live FX rate)
+              </button>
+            </div>
           </div>
-          <label className="field">
-            <span>Notes</span>
-            <input name="notes" type="text" placeholder="Optional notes for this invoice" />
-          </label>
-          <button className="action-button primary" type="submit">
-            Generate invoice
-          </button>
         </form>
       </section>
 

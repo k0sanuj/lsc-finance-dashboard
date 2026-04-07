@@ -9,10 +9,12 @@ export type EmployeeRow = {
   email: string;
   designation: string;
   department: string;
+  region: string;
   employmentType: string;
   status: string;
   startDate: string;
   baseSalary: string;
+  rawBaseSalary: number;
   salaryCurrency: string;
   companyCode: string;
 };
@@ -80,6 +82,7 @@ export async function getEmployees(companyCode?: string): Promise<EmployeeRow[]>
     email: string | null;
     designation: string;
     department: string | null;
+    region: string | null;
     employment_type: string;
     status: string;
     start_date: string | null;
@@ -87,7 +90,7 @@ export async function getEmployees(companyCode?: string): Promise<EmployeeRow[]>
     salary_currency: string;
     company_code: string;
   }>(
-    `select e.id, e.full_name, e.email, e.designation, e.department,
+    `select e.id, e.full_name, e.email, e.designation, e.department, e.region,
             e.employment_type, e.status, e.start_date::text,
             e.base_salary, e.salary_currency, c.code::text as company_code
      from employees e
@@ -103,10 +106,12 @@ export async function getEmployees(companyCode?: string): Promise<EmployeeRow[]>
     email: r.email ?? "",
     designation: r.designation,
     department: r.department ?? "",
+    region: r.region ?? "",
     employmentType: r.employment_type.replace(/_/g, " "),
     status: r.status.replace(/_/g, " "),
     startDate: formatDateLabel(r.start_date),
     baseSalary: formatCurrency(r.base_salary),
+    rawBaseSalary: Number(r.base_salary),
     salaryCurrency: r.salary_currency,
     companyCode: r.company_code
   }));

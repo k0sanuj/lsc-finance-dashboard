@@ -1,8 +1,21 @@
 import { requireRole } from "../../lib/auth";
-import { getEmployees } from "@lsc/db";
-import { addEmployeeAction, updateEmployeeStatusAction } from "./actions";
+import { getEmployees, getFxRatesForDisplay } from "@lsc/db";
+import {
+  addEmployeeAction,
+  updateEmployeeStatusAction,
+  updateSalaryAction,
+  updateEmployeeAction
+} from "./actions";
 
-const COMPANIES = ["XTZ", "XTE", "TBR", "FSP"];
+const COMPANIES = ["XTZ", "XTE", "TBR", "FSP"] as const;
+
+const COMPANY_CURRENCY: Record<string, string> = {
+  XTZ: "INR",
+  XTE: "USD",
+  TBR: "AED",
+  FSP: "USD",
+  LSC: "USD"
+};
 
 type EmployeesPageProps = {
   searchParams?: Promise<{
@@ -18,27 +31,26 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
   const status = params?.status ?? null;
   const message = params?.message ?? null;
   const company = params?.company ?? "XTZ";
+  const defaultCurrency = COMPANY_CURRENCY[company] ?? "USD";
 
-  const employees = await getEmployees(company);
+  const [employees, fxRates] = await Promise.all([
+    getEmployees(company),
+    getFxRatesForDisplay()
+  ]);
 
   const totalCount = employees.length;
   const activeCount = employees.filter((e) => e.status === "active").length;
   const onLeaveCount = employees.filter((e) => e.status === "on leave").length;
   const terminatedCount = employees.filter((e) => e.status === "terminated").length;
+  const totalPayroll = employees
+    .filter((e) => e.status === "active")
+    .reduce((sum, e) => sum + e.rawBaseSalary, 0);
 
   function statusPillClass(s: string): string {
-    switch (s) {
-      case "active":
-        return "signal-pill signal-good";
-      case "on leave":
-        return "signal-pill signal-warn";
-      case "terminated":
-        return "signal-pill signal-risk";
-      case "notice period":
-        return "signal-pill signal-warn";
-      default:
-        return "pill";
-    }
+    if (s === "active") return "signal-pill signal-good";
+    if (s === "on leave" || s === "notice period") return "signal-pill signal-warn";
+    if (s === "terminated") return "signal-pill signal-risk";
+    return "pill";
   }
 
   return (
@@ -46,12 +58,12 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
       <section className="workspace-header">
         <div className="workspace-header-left">
           <span className="section-kicker">People &amp; payroll</span>
-          <h2>Employee Management</h2>
+          <h3>Employee Management</h3>
         </div>
       </section>
 
       {/* Company filter */}
-      <nav style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+      <nav className="inline-actions">
         {COMPANIES.map((code) => (
           <a
             key={code}
@@ -64,38 +76,55 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
       </nav>
 
       {/* Stats */}
-      <div className="stats-grid compact-stats">
-        <div className="metric-card accent-brand">
-          <div className="metric-topline">
-            <span className="metric-label">Total employees</span>
-          </div>
-          <span className="metric-value">{totalCount}</span>
+      <section className="stats-grid compact-stats">
+        <article className="metric-card accent-brand">
+          <div className="metric-topline"><span className="metric-label">Total</span></div>
+          <div className="metric-value">{totalCount}</div>
           <span className="metric-subvalue">{company}</span>
-        </div>
-        <div className="metric-card accent-good">
-          <div className="metric-topline">
-            <span className="metric-label">Active</span>
+        </article>
+        <article className="metric-card accent-good">
+          <div className="metric-topline"><span className="metric-label">Active</span></div>
+          <div className="metric-value">{activeCount}</div>
+        </article>
+        <article className="metric-card accent-warn">
+          <div className="metric-topline"><span className="metric-label">On leave</span></div>
+          <div className="metric-value">{onLeaveCount}</div>
+        </article>
+        <article className="metric-card accent-risk">
+          <div className="metric-topline"><span className="metric-label">Terminated</span></div>
+          <div className="metric-value">{terminatedCount}</div>
+        </article>
+        <article className="metric-card">
+          <div className="metric-topline"><span className="metric-label">Monthly payroll</span></div>
+          <div className="metric-value">
+            {totalPayroll.toLocaleString("en-US", { style: "currency", currency: defaultCurrency, maximumFractionDigits: 0 })}
           </div>
-          <span className="metric-value">{activeCount}</span>
-        </div>
-        <div className="metric-card accent-warn">
-          <div className="metric-topline">
-            <span className="metric-label">On leave</span>
+          <span className="metric-subvalue">{defaultCurrency} · active only</span>
+        </article>
+      </section>
+
+      {/* Live FX rates */}
+      <article className="card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">Live exchange rates</span>
+            <h3>Currency conversion</h3>
           </div>
-          <span className="metric-value">{onLeaveCount}</span>
+          <span className="badge">Auto-refreshed</span>
         </div>
-        <div className="metric-card accent-risk">
-          <div className="metric-topline">
-            <span className="metric-label">Terminated</span>
-          </div>
-          <span className="metric-value">{terminatedCount}</span>
+        <div className="inline-actions">
+          {fxRates.map((fx) => (
+            <span className="pill subtle-pill" key={`${fx.baseCurrency}${fx.targetCurrency}`}>
+              1 {fx.baseCurrency} = {fx.rate.toFixed(fx.rate > 10 ? 2 : 4)} {fx.targetCurrency}
+            </span>
+          ))}
         </div>
-      </div>
+      </article>
 
       {/* Status/message notice */}
       {message ? (
         <section className={`notice ${status ?? "info"}`}>
-          <strong>{status === "error" ? "Action failed" : "Update"}</strong>
+          <strong>{status === "error" ? "Error" : "Done"}</strong>
           <span>{message}</span>
         </section>
       ) : null}
@@ -108,16 +137,9 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
             <h3>Add employee</h3>
           </div>
         </div>
-        <form action={addEmployeeAction} className="stack-form">
+        <form action={addEmployeeAction}>
           <input type="hidden" name="companyCode" value={company} />
-          <div
-            className="form-grid"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "1rem",
-            }}
-          >
+          <div className="form-grid">
             <div className="field">
               <label>Full Name</label>
               <input name="fullName" type="text" required />
@@ -135,6 +157,18 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
               <input name="department" type="text" />
             </div>
             <div className="field">
+              <label>Region</label>
+              <select name="region" defaultValue="">
+                <option value="">Select region</option>
+                <option value="India">India</option>
+                <option value="UAE">UAE</option>
+                <option value="Kenya">Kenya</option>
+                <option value="UK">UK</option>
+                <option value="US">US</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div className="field">
               <label>Employment Type</label>
               <select name="employmentType" defaultValue="full_time" required>
                 <option value="full_time">Full time</option>
@@ -144,22 +178,22 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
               </select>
             </div>
             <div className="field">
-              <label>Base Salary</label>
+              <label>Base Salary (monthly)</label>
               <input name="baseSalary" type="number" min="0" step="0.01" required />
             </div>
             <div className="field">
               <label>Currency</label>
-              <select name="salaryCurrency" defaultValue="INR" required>
-                <option value="INR">INR</option>
-                <option value="USD">USD</option>
-                <option value="AED">AED</option>
-                <option value="KES">KES</option>
+              <select name="salaryCurrency" defaultValue={defaultCurrency} required>
+                <option value="INR">INR (Indian Rupee)</option>
+                <option value="USD">USD (US Dollar)</option>
+                <option value="AED">AED (UAE Dirham)</option>
+                <option value="KES">KES (Kenyan Shilling)</option>
               </select>
             </div>
+            <div className="form-actions">
+              <button className="action-button primary" type="submit">Add employee</button>
+            </div>
           </div>
-          <button className="action-button primary" type="submit" style={{ marginTop: "1rem" }}>
-            Add employee
-          </button>
         </form>
       </article>
 
@@ -168,7 +202,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
         <div className="card-title-row">
           <div>
             <span className="section-kicker">Directory</span>
-            <h3>Employees &mdash; {company}</h3>
+            <h3>Employees — {company}</h3>
           </div>
           <span className="badge">{totalCount} records</span>
         </div>
@@ -179,49 +213,66 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
                 <th>Name</th>
                 <th>Email</th>
                 <th>Designation</th>
-                <th>Department</th>
+                <th>Dept</th>
+                <th>Region</th>
                 <th>Type</th>
                 <th>Salary</th>
-                <th>Currency</th>
-                <th>Start Date</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th>Update salary</th>
+                <th>Change status</th>
               </tr>
             </thead>
             <tbody>
               {employees.length > 0 ? (
                 employees.map((emp) => (
                   <tr key={emp.id}>
-                    <td>
-                      <strong>{emp.fullName}</strong>
-                    </td>
-                    <td className="muted">{emp.email}</td>
+                    <td><strong>{emp.fullName}</strong></td>
+                    <td className="muted">{emp.email || "—"}</td>
                     <td>{emp.designation}</td>
-                    <td>{emp.department}</td>
+                    <td>{emp.department || "—"}</td>
+                    <td>{emp.region ? <span className="pill subtle-pill">{emp.region}</span> : <span className="muted">—</span>}</td>
+                    <td><span className="pill subtle-pill">{emp.employmentType}</span></td>
                     <td>
-                      <span className="pill subtle-pill">{emp.employmentType}</span>
+                      <strong>{emp.baseSalary}</strong>
+                      <br />
+                      <span className="muted">{emp.salaryCurrency}/mo</span>
                     </td>
-                    <td>{emp.baseSalary}</td>
-                    <td>{emp.salaryCurrency}</td>
-                    <td>{emp.startDate}</td>
                     <td>
                       <span className={statusPillClass(emp.status)}>{emp.status}</span>
                     </td>
                     <td>
+                      <form action={updateSalaryAction} className="inline-actions">
+                        <input type="hidden" name="employeeId" value={emp.id} />
+                        <input type="hidden" name="company" value={company} />
+                        <input
+                          name="baseSalary"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder={String(emp.rawBaseSalary)}
+                          required
+                        />
+                        <select name="salaryCurrency" defaultValue={emp.salaryCurrency} aria-label="Salary currency">
+                          <option value="INR">INR</option>
+                          <option value="USD">USD</option>
+                          <option value="AED">AED</option>
+                          <option value="KES">KES</option>
+                        </select>
+                        <button className="action-button secondary" type="submit">Set</button>
+                      </form>
+                    </td>
+                    <td>
                       <form action={updateEmployeeStatusAction} className="inline-actions">
                         <input type="hidden" name="employeeId" value={emp.id} />
-                        <select name="newStatus" defaultValue="">
-                          <option value="" disabled>
-                            Change...
-                          </option>
+                        <input type="hidden" name="company" value={company} />
+                        <select name="newStatus" defaultValue="" aria-label="Employee status">
+                          <option value="" disabled>Change...</option>
                           <option value="active">Active</option>
                           <option value="on_leave">On leave</option>
-                          <option value="notice_period">Notice period</option>
+                          <option value="notice_period">Notice</option>
                           <option value="terminated">Terminated</option>
                         </select>
-                        <button className="action-button secondary" type="submit">
-                          Update
-                        </button>
+                        <button className="action-button secondary" type="submit">Set</button>
                       </form>
                     </td>
                   </tr>
@@ -229,7 +280,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
               ) : (
                 <tr>
                   <td className="muted" colSpan={10}>
-                    No employees found for {company}.
+                    No employees found for {company}. Add one above.
                   </td>
                 </tr>
               )}

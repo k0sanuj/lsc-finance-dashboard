@@ -28,9 +28,10 @@ export async function addEmployeeAction(formData: FormData) {
   const email = normalizeWhitespace(String(formData.get("email") ?? ""));
   const designation = normalizeWhitespace(String(formData.get("designation") ?? ""));
   const department = normalizeWhitespace(String(formData.get("department") ?? ""));
-  const employmentType = normalizeWhitespace(String(formData.get("employmentType") ?? ""));
+  const region = normalizeWhitespace(String(formData.get("region") ?? ""));
+  const employmentType = normalizeWhitespace(String(formData.get("employmentType") ?? "full_time"));
   const baseSalary = normalizeWhitespace(String(formData.get("baseSalary") ?? "0"));
-  const salaryCurrency = normalizeWhitespace(String(formData.get("salaryCurrency") ?? "USD"));
+  const salaryCurrency = normalizeWhitespace(String(formData.get("salaryCurrency") ?? "INR"));
 
   if (!fullName || !companyCode) {
     redirectToEmployees("error", "Full name and company are required.", companyCode);
@@ -47,13 +48,66 @@ export async function addEmployeeAction(formData: FormData) {
   }
 
   await executeAdmin(
-    `insert into employees (company_id, full_name, email, designation, department, employment_type, base_salary, salary_currency, status)
-     values ($1, $2, $3, $4, $5, $6::employment_type, $7::numeric, $8, 'active')`,
-    [companyId, fullName, email || null, designation, department || null, employmentType, baseSalary, salaryCurrency]
+    `insert into employees (company_id, full_name, email, designation, department, region, employment_type, base_salary, salary_currency, status, start_date)
+     values ($1, $2, $3, $4, $5, $6, $7::employment_type, $8::numeric, $9, 'active', current_date)`,
+    [companyId, fullName, email || null, designation, department || null, region || null, employmentType, baseSalary, salaryCurrency]
   );
 
   revalidatePath("/employees");
   redirectToEmployees("success", `Employee "${fullName}" added.`, companyCode);
+}
+
+export async function updateEmployeeAction(formData: FormData) {
+  await requireRole(["super_admin", "finance_admin"]);
+
+  const employeeId = normalizeWhitespace(String(formData.get("employeeId") ?? ""));
+  const company = normalizeWhitespace(String(formData.get("company") ?? ""));
+
+  if (!employeeId) {
+    redirectToEmployees("error", "Employee ID required.", company);
+  }
+
+  // Build dynamic update fields
+  const updates: string[] = [];
+  const values: (string | null)[] = [employeeId];
+  let paramIndex = 2;
+
+  const fields: [string, string, string | null][] = [
+    ["designation", "designation", formData.get("designation") as string | null],
+    ["department", "department", formData.get("department") as string | null],
+    ["region", "region", formData.get("region") as string | null],
+    ["base_salary", "baseSalary", formData.get("baseSalary") as string | null],
+    ["salary_currency", "salaryCurrency", formData.get("salaryCurrency") as string | null],
+  ];
+
+  for (const [col, , val] of fields) {
+    if (val !== null && val !== undefined) {
+      const cleaned = normalizeWhitespace(val);
+      if (cleaned) {
+        if (col === "base_salary") {
+          updates.push(`${col} = $${paramIndex}::numeric`);
+        } else {
+          updates.push(`${col} = $${paramIndex}`);
+        }
+        values.push(cleaned);
+        paramIndex++;
+      }
+    }
+  }
+
+  if (updates.length === 0) {
+    redirectToEmployees("error", "No fields to update.", company);
+  }
+
+  updates.push("updated_at = now()");
+
+  await executeAdmin(
+    `update employees set ${updates.join(", ")} where id = $1`,
+    values
+  );
+
+  revalidatePath("/employees");
+  redirectToEmployees("success", "Employee updated.", company);
 }
 
 export async function updateEmployeeStatusAction(formData: FormData) {
@@ -61,9 +115,10 @@ export async function updateEmployeeStatusAction(formData: FormData) {
 
   const employeeId = normalizeWhitespace(String(formData.get("employeeId") ?? ""));
   const newStatus = normalizeWhitespace(String(formData.get("newStatus") ?? ""));
+  const company = normalizeWhitespace(String(formData.get("company") ?? ""));
 
   if (!employeeId || !newStatus) {
-    redirectToEmployees("error", "Employee and status are required.");
+    redirectToEmployees("error", "Employee and status are required.", company);
   }
 
   await executeAdmin(
@@ -72,5 +127,30 @@ export async function updateEmployeeStatusAction(formData: FormData) {
   );
 
   revalidatePath("/employees");
-  redirectToEmployees("success", `Employee status updated to "${newStatus.replace(/_/g, " ")}".`);
+  redirectToEmployees("success", `Status updated to "${newStatus.replace(/_/g, " ")}".`, company);
+}
+
+export async function updateSalaryAction(formData: FormData) {
+  await requireRole(["super_admin", "finance_admin"]);
+
+  const employeeId = normalizeWhitespace(String(formData.get("employeeId") ?? ""));
+  const baseSalary = normalizeWhitespace(String(formData.get("baseSalary") ?? ""));
+  const salaryCurrency = normalizeWhitespace(String(formData.get("salaryCurrency") ?? ""));
+  const company = normalizeWhitespace(String(formData.get("company") ?? ""));
+
+  if (!employeeId || !baseSalary) {
+    redirectToEmployees("error", "Employee and salary required.", company);
+  }
+
+  const setCurrency = salaryCurrency ? ", salary_currency = $3" : "";
+  const params: string[] = [employeeId, baseSalary];
+  if (salaryCurrency) params.push(salaryCurrency);
+
+  await executeAdmin(
+    `update employees set base_salary = $2::numeric${setCurrency}, updated_at = now() where id = $1`,
+    params
+  );
+
+  revalidatePath("/employees");
+  redirectToEmployees("success", "Salary updated.", company);
 }
