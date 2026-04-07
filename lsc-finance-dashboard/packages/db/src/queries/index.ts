@@ -22,4 +22,5 @@ export * from "./messaging";
 export * from "./audit";
 export * from "./employees";
 export * from "./fx-rates";
+export * from "./fsp-modules";
 export * from "./checklist";

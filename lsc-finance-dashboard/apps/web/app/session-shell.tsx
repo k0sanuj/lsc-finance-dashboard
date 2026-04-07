@@ -98,6 +98,13 @@ function getFspNav(): CompanyNav {
         label: "Sports",
         links: [
           { href: "/fsp/sports" as Route, label: "All Sports", roles: ALL_ADMIN },
+          { href: "/fsp/consolidated" as Route, label: "Consolidated P&L", roles: ALL_ADMIN },
+          { href: "/fsp/sports/squash" as Route, label: "Squash (WPS)", roles: ALL_ADMIN },
+          { href: "/fsp/sports/bowling" as Route, label: "Bowling (WBL)", roles: ALL_ADMIN },
+          { href: "/fsp/sports/basketball" as Route, label: "Basketball", roles: ALL_ADMIN },
+          { href: "/fsp/sports/beer_pong" as Route, label: "Beer Pong", roles: ALL_ADMIN },
+          { href: "/fsp/sports/padel" as Route, label: "Padel", roles: ALL_ADMIN },
+          { href: "/fsp/sports/foundation" as Route, label: "Foundation", roles: ALL_ADMIN },
         ],
       },
       {
@@ -175,6 +182,8 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/litigation")) return "Litigation & Compliance";
   if (pathname.startsWith("/xtz-expenses")) return "XTZ Expenses";
   if (pathname.startsWith("/gig-workers")) return "Gig Workers";
+  if (pathname.startsWith("/fsp/consolidated")) return "FSP Consolidated P&L";
+  if (pathname.startsWith("/fsp/sports/")) return "Sport Module";
   if (pathname.startsWith("/fsp/sp-multiplier")) return "SP Multiplier";
   if (pathname.startsWith("/tax-filings")) return "Tax & Filing";
   if (pathname.startsWith("/arena-ads")) return "Arena & Ads";
@@ -231,6 +240,10 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "XTZ India" }, { label: "Expenses" });
   } else if (pathname.startsWith("/gig-workers")) {
     crumbs.push({ label: "XTZ India" }, { label: "Gig Workers" });
+  } else if (pathname.startsWith("/fsp/consolidated")) {
+    crumbs.push({ label: "FSP", href: "/fsp" }, { label: "Consolidated P&L" });
+  } else if (pathname.startsWith("/fsp/sports/")) {
+    crumbs.push({ label: "FSP", href: "/fsp" }, { label: "Sports", href: "/fsp/sports" }, { label: "Module" });
   } else if (pathname.startsWith("/fsp/sports")) {
     crumbs.push({ label: "FSP", href: "/fsp" }, { label: "Sports" });
   } else if (pathname.startsWith("/fsp/sp-multiplier")) {
