@@ -2,8 +2,8 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState, useCallback, useEffect } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useState, useCallback, useEffect, Suspense } from "react";
 import type { AppUserRole } from "../lib/auth";
 
 type NavLink = {
@@ -34,6 +34,9 @@ type SessionShellProps = {
 
 const ALL_ADMIN: AppUserRole[] = ["super_admin", "finance_admin"];
 const ALL_ROLES: AppUserRole[] = ["super_admin", "finance_admin", "commercial_user", "viewer"];
+
+/** Routes that appear in multiple company navs — use ?company= to disambiguate */
+const SHARED_PEOPLE_ROUTES = ["/employees", "/salary-payable", "/payroll-invoices"];
 
 function getTbrNav(): CompanyNav {
   return {
@@ -69,8 +72,8 @@ function getTbrNav(): CompanyNav {
       {
         label: "People",
         links: [
-          { href: "/employees" as Route, label: "Employees", roles: ALL_ADMIN },
-          { href: "/salary-payable" as Route, label: "Salary Payable", roles: ALL_ADMIN },
+          { href: "/employees?company=TBR" as Route, label: "Employees", roles: ALL_ADMIN },
+          { href: "/salary-payable?company=TBR" as Route, label: "Salary Payable", roles: ALL_ADMIN },
           { href: "/payroll-invoices" as Route, label: "Payroll Invoices", roles: ALL_ADMIN },
         ],
       },
@@ -261,24 +264,35 @@ function getInitials(fullName?: string) {
   return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
 }
 
-export function SessionShell({ children, user }: SessionShellProps) {
+function SessionShellInner({ children, user }: SessionShellProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [expandedCompany, setExpandedCompany] = useState<string | null>(null);
 
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
-  // Auto-expand company based on current path
+  // Auto-expand company based on current path + search params
   useEffect(() => {
-    if (pathname.startsWith("/tbr") || pathname.startsWith("/costs") || pathname.startsWith("/payments") || pathname.startsWith("/receivables") || pathname.startsWith("/documents") || pathname.startsWith("/subscriptions") || pathname.startsWith("/vendors") || pathname.startsWith("/cap-table") || pathname.startsWith("/litigation") || pathname.startsWith("/arena-ads") || pathname.startsWith("/tax-filings") || pathname.startsWith("/employees") || pathname.startsWith("/salary-payable") || pathname.startsWith("/payroll-invoices") || pathname.startsWith("/commercial-goals") || pathname.startsWith("/ai-analysis")) {
-      setExpandedCompany("TBR");
-    } else if (pathname.startsWith("/fsp")) {
-      setExpandedCompany("FSP");
+    const companyParam = searchParams.get("company");
+    const isSharedPeopleRoute = SHARED_PEOPLE_ROUTES.some((r) => pathname.startsWith(r));
+
+    if (isSharedPeopleRoute) {
+      // Use the company query param to decide which section to expand
+      if (companyParam === "XTZ" || companyParam === "XTE") {
+        setExpandedCompany("XTZ India");
+      } else {
+        setExpandedCompany("TBR");
+      }
     } else if (pathname.startsWith("/gig-workers") || pathname.startsWith("/xtz-expenses")) {
       setExpandedCompany("XTZ India");
+    } else if (pathname.startsWith("/fsp")) {
+      setExpandedCompany("FSP");
+    } else if (pathname.startsWith("/tbr") || pathname.startsWith("/costs") || pathname.startsWith("/payments") || pathname.startsWith("/receivables") || pathname.startsWith("/documents") || pathname.startsWith("/subscriptions") || pathname.startsWith("/vendors") || pathname.startsWith("/cap-table") || pathname.startsWith("/litigation") || pathname.startsWith("/arena-ads") || pathname.startsWith("/tax-filings") || pathname.startsWith("/commercial-goals") || pathname.startsWith("/ai-analysis")) {
+      setExpandedCompany("TBR");
     }
-  }, [pathname]);
+  }, [pathname, searchParams]);
 
   // Close sidebar on navigation (mobile)
   useEffect(() => {
@@ -306,7 +320,26 @@ export function SessionShell({ children, user }: SessionShellProps) {
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
-    return pathname === href || pathname.startsWith(`${href}/`);
+
+    const [hrefPath, hrefQuery] = href.split("?");
+
+    // Path must match
+    if (pathname !== hrefPath && !pathname.startsWith(`${hrefPath}/`)) return false;
+
+    if (hrefQuery) {
+      // Href has query params — all must be present in current URL
+      const hrefParams = new URLSearchParams(hrefQuery);
+      for (const [key, val] of hrefParams) {
+        if (searchParams.get(key) !== val) return false;
+      }
+    } else {
+      // Href has NO query params — if this is a shared route and the URL
+      // has a company param, don't match (the company-specific link should match instead)
+      const isShared = SHARED_PEOPLE_ROUTES.some((r) => hrefPath.startsWith(r));
+      if (isShared && searchParams.has("company")) return false;
+    }
+
+    return true;
   };
 
   const isCompanyActive = (company: CompanyNav) => {
@@ -501,5 +534,13 @@ export function SessionShell({ children, user }: SessionShellProps) {
         {children}
       </main>
     </div>
+  );
+}
+
+export function SessionShell(props: SessionShellProps) {
+  return (
+    <Suspense fallback={null}>
+      <SessionShellInner {...props} />
+    </Suspense>
   );
 }
