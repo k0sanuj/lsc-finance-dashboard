@@ -20,4 +20,5 @@ export * from "./tax";
 export * from "./arena-ads";
 export * from "./messaging";
 export * from "./audit";
+export * from "./employees";
 export * from "./checklist";

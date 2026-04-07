@@ -67,6 +67,14 @@ function getTbrNav(): CompanyNav {
         ],
       },
       {
+        label: "People",
+        links: [
+          { href: "/employees" as Route, label: "Employees", roles: ALL_ADMIN },
+          { href: "/salary-payable" as Route, label: "Salary Payable", roles: ALL_ADMIN },
+          { href: "/payroll-invoices" as Route, label: "Payroll Invoices", roles: ALL_ADMIN },
+        ],
+      },
+      {
         label: "Strategy",
         links: [
           { href: "/commercial-goals/TBR" as Route, label: "Commercial Goals", roles: ALL_ROLES },
@@ -84,7 +92,13 @@ function getFspNav(): CompanyNav {
     roles: ALL_ROLES,
     sections: [
       {
-        label: "Planning",
+        label: "Sports",
+        links: [
+          { href: "/fsp/sports" as Route, label: "All Sports", roles: ALL_ADMIN },
+        ],
+      },
+      {
+        label: "Finance",
         links: [
           { href: "/commercial-goals/FSP" as Route, label: "Commercial Goals", roles: ALL_ROLES },
           { href: "/documents/FSP" as Route, label: "Documents", roles: ALL_ADMIN },
@@ -102,8 +116,11 @@ function getXtzNav(): CompanyNav {
     roles: ALL_ADMIN,
     sections: [
       {
-        label: "Operations",
+        label: "People",
         links: [
+          { href: "/employees?company=XTZ" as Route, label: "Employees", roles: ALL_ADMIN },
+          { href: "/salary-payable?company=XTZ" as Route, label: "Salary Payable", roles: ALL_ADMIN },
+          { href: "/payroll-invoices" as Route, label: "Payroll Invoices", roles: ALL_ADMIN },
           { href: "/gig-workers" as Route, label: "Gig Workers", roles: ALL_ADMIN },
         ],
       },
@@ -150,6 +167,10 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/fsp/sp-multiplier")) return "SP Multiplier";
   if (pathname.startsWith("/tax-filings")) return "Tax & Filing";
   if (pathname.startsWith("/arena-ads")) return "Arena & Ads";
+  if (pathname.startsWith("/employees")) return "Employees";
+  if (pathname.startsWith("/salary-payable")) return "Salary Payable";
+  if (pathname.startsWith("/payroll-invoices")) return "Payroll Invoices";
+  if (pathname.startsWith("/fsp/sports")) return "FSP Sports";
   if (pathname.startsWith("/messaging")) return "Cross-Dashboard Messages";
   if (pathname.startsWith("/audit-reports")) return "Audit Reports";
   if (pathname.startsWith("/project-checklist")) return "Project Checklist";
@@ -197,8 +218,16 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "Finance", href: "/" }, { label: "Litigation & Compliance" });
   } else if (pathname.startsWith("/gig-workers")) {
     crumbs.push({ label: "XTZ India" }, { label: "Gig Workers" });
+  } else if (pathname.startsWith("/fsp/sports")) {
+    crumbs.push({ label: "FSP", href: "/fsp" }, { label: "Sports" });
   } else if (pathname.startsWith("/fsp/sp-multiplier")) {
     crumbs.push({ label: "FSP", href: "/fsp" }, { label: "SP Multiplier" });
+  } else if (pathname.startsWith("/employees")) {
+    crumbs.push({ label: "People" }, { label: "Employees" });
+  } else if (pathname.startsWith("/salary-payable")) {
+    crumbs.push({ label: "People" }, { label: "Salary Payable" });
+  } else if (pathname.startsWith("/payroll-invoices")) {
+    crumbs.push({ label: "People" }, { label: "Payroll Invoices" });
   } else if (pathname.startsWith("/tax-filings")) {
     crumbs.push({ label: "Finance", href: "/" }, { label: "Tax & Filing" });
   } else if (pathname.startsWith("/arena-ads")) {
@@ -232,7 +261,7 @@ export function SessionShell({ children, user }: SessionShellProps) {
 
   // Auto-expand company based on current path
   useEffect(() => {
-    if (pathname.startsWith("/tbr") || pathname.startsWith("/costs") || pathname.startsWith("/payments") || pathname.startsWith("/receivables") || pathname.startsWith("/documents") || pathname.startsWith("/subscriptions") || pathname.startsWith("/vendors") || pathname.startsWith("/cap-table") || pathname.startsWith("/litigation") || pathname.startsWith("/arena-ads") || pathname.startsWith("/tax-filings") || pathname.startsWith("/commercial-goals") || pathname.startsWith("/ai-analysis")) {
+    if (pathname.startsWith("/tbr") || pathname.startsWith("/costs") || pathname.startsWith("/payments") || pathname.startsWith("/receivables") || pathname.startsWith("/documents") || pathname.startsWith("/subscriptions") || pathname.startsWith("/vendors") || pathname.startsWith("/cap-table") || pathname.startsWith("/litigation") || pathname.startsWith("/arena-ads") || pathname.startsWith("/tax-filings") || pathname.startsWith("/employees") || pathname.startsWith("/salary-payable") || pathname.startsWith("/payroll-invoices") || pathname.startsWith("/commercial-goals") || pathname.startsWith("/ai-analysis")) {
       setExpandedCompany("TBR");
     } else if (pathname.startsWith("/fsp")) {
       setExpandedCompany("FSP");
