@@ -3,6 +3,15 @@
 ## Project Identity
 A living financial operating system for League Sports Co (LSC). Ontology-backed dashboard where changes propagate through shared canonical entities, derived metrics, and linked workflows. Not a static reporting UI.
 
+## MANDATORY: UI Standards (read docs/UI_STANDARDS.md)
+- Every page is a **workspace** — users MUST be able to add, edit, and manage data directly
+- Every table MUST have a corresponding input form on the same page
+- Metric cards show ONE value per card — never concatenate multi-year data as strings
+- Empty states are actionable (setup prompts) — never show $0 tables or "coming soon" text
+- Hide modules/sports with no data in consolidated views
+- Never ship a tab without full implementation
+- Year-over-year data uses 3-column layouts, not string concatenation
+
 ### Business Scope
 - **LSC** — consolidated holding company view
 - **TBR** (Team Blue Rising) — active operating entity

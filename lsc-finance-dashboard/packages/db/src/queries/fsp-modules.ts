@@ -255,6 +255,55 @@ export async function getSportEventConfig(sportId: string): Promise<EventConfigR
   };
 }
 
+export async function getSportOpexItems(sportId: string): Promise<OpexItemRow[]> {
+  if (getBackend() !== "database") return [];
+
+  const rows = await queryRows<{
+    id: string; opex_category: string; sub_category: string;
+    year_1_budget: string; year_2_budget: string; year_3_budget: string;
+    year_1_actual: string; year_2_actual: string; year_3_actual: string;
+  }>(
+    `select id, opex_category, sub_category,
+            year_1_budget, year_2_budget, year_3_budget,
+            year_1_actual, year_2_actual, year_3_actual
+     from fsp_opex_items where sport_id = $1 order by opex_category, sub_category`,
+    [sportId]
+  );
+
+  return rows.map((r) => ({
+    id: r.id, opexCategory: r.opex_category, subCategory: r.sub_category,
+    y1Budget: Number(r.year_1_budget), y2Budget: Number(r.year_2_budget), y3Budget: Number(r.year_3_budget),
+    y1Actual: Number(r.year_1_actual), y2Actual: Number(r.year_2_actual), y3Actual: Number(r.year_3_actual)
+  }));
+}
+
+export type EventProductionRow = {
+  id: string;
+  costCategory: string;
+  subCategory: string;
+  unitCost: number;
+  quantity: number;
+  lineTotal: number;
+};
+
+export async function getSportEventProduction(sportId: string): Promise<EventProductionRow[]> {
+  if (getBackend() !== "database") return [];
+
+  const rows = await queryRows<{
+    id: string; cost_category: string; sub_category: string;
+    unit_cost: string; quantity: string; line_total: string;
+  }>(
+    `select id, cost_category, sub_category, unit_cost, quantity::text, line_total
+     from fsp_event_production where sport_id = $1 order by cost_category, sub_category`,
+    [sportId]
+  );
+
+  return rows.map((r) => ({
+    id: r.id, costCategory: r.cost_category, subCategory: r.sub_category,
+    unitCost: Number(r.unit_cost), quantity: Number(r.quantity), lineTotal: Number(r.line_total)
+  }));
+}
+
 export async function getSportIdByCode(sportCode: string): Promise<string | null> {
   if (getBackend() !== "database") return null;
 
