@@ -124,6 +124,13 @@ function getXtzNav(): CompanyNav {
           { href: "/gig-workers" as Route, label: "Gig Workers", roles: ALL_ADMIN },
         ],
       },
+      {
+        label: "Expenses",
+        links: [
+          { href: "/xtz-expenses?view=submit" as Route, label: "Submit Expense", roles: [...ALL_ADMIN, "team_member"] },
+          { href: "/xtz-expenses?view=review" as Route, label: "Expense Review", roles: ALL_ADMIN },
+        ],
+      },
     ],
   };
 }
@@ -163,6 +170,7 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/vendors")) return "Vendors";
   if (pathname.startsWith("/cap-table")) return "Cap Table";
   if (pathname.startsWith("/litigation")) return "Litigation & Compliance";
+  if (pathname.startsWith("/xtz-expenses")) return "XTZ Expenses";
   if (pathname.startsWith("/gig-workers")) return "Gig Workers";
   if (pathname.startsWith("/fsp/sp-multiplier")) return "SP Multiplier";
   if (pathname.startsWith("/tax-filings")) return "Tax & Filing";
@@ -216,6 +224,8 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "Finance", href: "/" }, { label: "Cap Table" });
   } else if (pathname.startsWith("/litigation")) {
     crumbs.push({ label: "Finance", href: "/" }, { label: "Litigation & Compliance" });
+  } else if (pathname.startsWith("/xtz-expenses")) {
+    crumbs.push({ label: "XTZ India" }, { label: "Expenses" });
   } else if (pathname.startsWith("/gig-workers")) {
     crumbs.push({ label: "XTZ India" }, { label: "Gig Workers" });
   } else if (pathname.startsWith("/fsp/sports")) {
@@ -265,7 +275,7 @@ export function SessionShell({ children, user }: SessionShellProps) {
       setExpandedCompany("TBR");
     } else if (pathname.startsWith("/fsp")) {
       setExpandedCompany("FSP");
-    } else if (pathname.startsWith("/gig-workers")) {
+    } else if (pathname.startsWith("/gig-workers") || pathname.startsWith("/xtz-expenses")) {
       setExpandedCompany("XTZ India");
     }
   }, [pathname]);
