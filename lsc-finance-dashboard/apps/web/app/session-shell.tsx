@@ -182,6 +182,7 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/litigation")) return "Litigation & Compliance";
   if (pathname.startsWith("/xtz-expenses")) return "XTZ Expenses";
   if (pathname.startsWith("/gig-workers")) return "Gig Workers";
+  if (pathname.startsWith("/sports-dashboard")) return "Sports Dashboard";
   if (pathname.startsWith("/fsp/consolidated")) return "FSP Consolidated P&L";
   if (pathname.startsWith("/fsp/sports/")) return "Sport Module";
   if (pathname.startsWith("/fsp/sp-multiplier")) return "SP Multiplier";
@@ -240,6 +241,8 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "XTZ India" }, { label: "Expenses" });
   } else if (pathname.startsWith("/gig-workers")) {
     crumbs.push({ label: "XTZ India" }, { label: "Gig Workers" });
+  } else if (pathname.startsWith("/sports-dashboard")) {
+    crumbs.push({ label: "Sports Dashboard" });
   } else if (pathname.startsWith("/fsp/consolidated")) {
     crumbs.push({ label: "FSP", href: "/fsp" }, { label: "Consolidated P&L" });
   } else if (pathname.startsWith("/fsp/sports/")) {
@@ -409,6 +412,11 @@ function SessionShellInner({ children, user }: SessionShellProps) {
               <li className="nav-item">
                 <Link className={pathname === "/" ? "active" : ""} href="/">
                   Overview
+                </Link>
+              </li>
+              <li className="nav-item">
+                <Link className={isActive("/sports-dashboard") ? "active" : ""} href={"/sports-dashboard" as Route}>
+                  Sports Dashboard
                 </Link>
               </li>
               <li className="nav-item">
