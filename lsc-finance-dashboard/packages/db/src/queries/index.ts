@@ -24,3 +24,8 @@ export * from "./employees";
 export * from "./fx-rates";
 export * from "./fsp-modules";
 export * from "./checklist";
+export * from "./event-budget";
+export * from "./deal-pipeline";
+export * from "./ai-ingestion";
+export * from "./treasury";
+export * from "./sport-infrastructure";

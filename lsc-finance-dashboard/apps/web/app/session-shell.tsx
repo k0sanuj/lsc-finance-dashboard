@@ -78,6 +78,15 @@ function getTbrNav(): CompanyNav {
         ],
       },
       {
+        label: "Intelligence",
+        links: [
+          { href: "/deal-pipeline" as Route, label: "Deal Pipeline", roles: ALL_ADMIN },
+          { href: "/treasury" as Route, label: "Treasury & Cash Flow", roles: ALL_ADMIN },
+          { href: "/event-budgets" as Route, label: "Event Budgets", roles: ALL_ADMIN },
+          { href: "/ai-ingest" as Route, label: "AI Data Ingestion", roles: ALL_ADMIN },
+        ],
+      },
+      {
         label: "Strategy",
         links: [
           { href: "/commercial-goals/TBR" as Route, label: "Commercial Goals", roles: ALL_ROLES },
@@ -182,6 +191,10 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/litigation")) return "Litigation & Compliance";
   if (pathname.startsWith("/xtz-expenses")) return "XTZ Expenses";
   if (pathname.startsWith("/gig-workers")) return "Gig Workers";
+  if (pathname.startsWith("/deal-pipeline")) return "Deal Pipeline";
+  if (pathname.startsWith("/treasury")) return "Treasury & Cash Flow";
+  if (pathname.startsWith("/event-budgets")) return "Event Budgets";
+  if (pathname.startsWith("/ai-ingest")) return "AI Data Ingestion";
   if (pathname.startsWith("/sports-dashboard")) return "Sports Dashboard";
   if (pathname.startsWith("/fsp/consolidated")) return "FSP Consolidated P&L";
   if (pathname.startsWith("/fsp/sports/")) return "Sport Module";
@@ -241,6 +254,14 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "XTZ India" }, { label: "Expenses" });
   } else if (pathname.startsWith("/gig-workers")) {
     crumbs.push({ label: "XTZ India" }, { label: "Gig Workers" });
+  } else if (pathname.startsWith("/deal-pipeline")) {
+    crumbs.push({ label: "Intelligence" }, { label: "Deal Pipeline" });
+  } else if (pathname.startsWith("/treasury")) {
+    crumbs.push({ label: "Intelligence" }, { label: "Treasury & Cash Flow" });
+  } else if (pathname.startsWith("/event-budgets")) {
+    crumbs.push({ label: "Intelligence" }, { label: "Event Budgets" });
+  } else if (pathname.startsWith("/ai-ingest")) {
+    crumbs.push({ label: "Intelligence" }, { label: "AI Data Ingestion" });
   } else if (pathname.startsWith("/sports-dashboard")) {
     crumbs.push({ label: "Sports Dashboard" });
   } else if (pathname.startsWith("/fsp/consolidated")) {
@@ -305,7 +326,7 @@ function SessionShellInner({ children, user }: SessionShellProps) {
       setExpandedCompany("XTZ India");
     } else if (pathname.startsWith("/fsp")) {
       setExpandedCompany("FSP");
-    } else if (pathname.startsWith("/tbr") || pathname.startsWith("/costs") || pathname.startsWith("/payments") || pathname.startsWith("/receivables") || pathname.startsWith("/documents") || pathname.startsWith("/subscriptions") || pathname.startsWith("/vendors") || pathname.startsWith("/cap-table") || pathname.startsWith("/litigation") || pathname.startsWith("/arena-ads") || pathname.startsWith("/tax-filings") || pathname.startsWith("/commercial-goals") || pathname.startsWith("/ai-analysis")) {
+    } else if (pathname.startsWith("/tbr") || pathname.startsWith("/costs") || pathname.startsWith("/payments") || pathname.startsWith("/receivables") || pathname.startsWith("/documents") || pathname.startsWith("/subscriptions") || pathname.startsWith("/vendors") || pathname.startsWith("/cap-table") || pathname.startsWith("/litigation") || pathname.startsWith("/arena-ads") || pathname.startsWith("/tax-filings") || pathname.startsWith("/deal-pipeline") || pathname.startsWith("/treasury") || pathname.startsWith("/event-budgets") || pathname.startsWith("/ai-ingest") || pathname.startsWith("/commercial-goals") || pathname.startsWith("/ai-analysis")) {
       setExpandedCompany("TBR");
     }
   }, [pathname, searchParams]);
