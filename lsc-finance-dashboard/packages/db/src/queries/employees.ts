@@ -16,6 +16,9 @@ export type EmployeeRow = {
   baseSalary: string;
   rawBaseSalary: number;
   salaryCurrency: string;
+  isUsdSalary: boolean;
+  salaryUsd: number;
+  endDate: string | null;
   companyCode: string;
 };
 
@@ -86,13 +89,17 @@ export async function getEmployees(companyCode?: string): Promise<EmployeeRow[]>
     employment_type: string;
     status: string;
     start_date: string | null;
+    end_date: string | null;
     base_salary: string;
     salary_currency: string;
+    is_usd_salary: boolean;
+    salary_usd: string;
     company_code: string;
   }>(
     `select e.id, e.full_name, e.email, e.designation, e.department, e.region,
-            e.employment_type, e.status, e.start_date::text,
-            e.base_salary, e.salary_currency, c.code::text as company_code
+            e.employment_type, e.status, e.start_date::text, e.end_date::text,
+            e.base_salary, e.salary_currency, e.is_usd_salary, e.salary_usd,
+            c.code::text as company_code
      from employees e
      join companies c on c.id = e.company_id
      ${where}
@@ -110,9 +117,12 @@ export async function getEmployees(companyCode?: string): Promise<EmployeeRow[]>
     employmentType: r.employment_type.replace(/_/g, " "),
     status: r.status.replace(/_/g, " "),
     startDate: formatDateLabel(r.start_date),
+    endDate: r.end_date ? formatDateLabel(r.end_date) : null,
     baseSalary: formatCurrency(r.base_salary),
     rawBaseSalary: Number(r.base_salary),
     salaryCurrency: r.salary_currency,
+    isUsdSalary: r.is_usd_salary,
+    salaryUsd: Number(r.salary_usd),
     companyCode: r.company_code
   }));
 }

@@ -1,140 +1,743 @@
+import Link from "next/link";
+import type { Route } from "next";
 import { requireRole } from "../../lib/auth";
-import { getPayrollInvoices } from "@lsc/db";
-import { generatePayrollInvoiceAction } from "./actions";
+import {
+  getXtzInvoices,
+  getXtzInvoiceSummary,
+  getMdgFees,
+  getProvisions,
+  getReimbursementItems,
+  getEmployees,
+  getFxRatesForDisplay
+} from "@lsc/db";
+import {
+  generateXtzInvoiceAction,
+  addMdgFeeAction,
+  addReimbursementAction,
+  addProvisionAction,
+  deleteMdgFeeAction,
+  deleteReimbursementAction,
+  deleteProvisionAction,
+  updateInvoiceStatusAction,
+  deleteInvoiceAction
+} from "./actions";
+import { BillUploader } from "../components/bill-uploader";
 
-type PayrollInvoicesPageProps = {
-  searchParams?: Promise<{
-    status?: string;
-    message?: string;
-  }>;
-};
+const fmtUsd = (n: number): string =>
+  n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2
+  });
 
-function parseCurrency(value: string): number {
-  return Number(String(value).replace(/[^0-9.-]/g, "")) || 0;
-}
+const fmtNum = (n: number, currency: string): string =>
+  n.toLocaleString("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2
+  });
 
-function statusPillClass(status: string): string {
+function statusPill(status: string): string {
   switch (status) {
     case "paid":
       return "signal-pill signal-good";
     case "generated":
     case "sent":
       return "signal-pill signal-warn";
+    case "draft":
+      return "subtle-pill";
     case "cancelled":
-    case "voided":
       return "signal-pill signal-risk";
     default:
       return "subtle-pill";
   }
 }
 
-export default async function PayrollInvoicesPage({ searchParams }: PayrollInvoicesPageProps) {
+const PROVISION_CATEGORIES = [
+  "travel",
+  "software",
+  "professional_services",
+  "infrastructure",
+  "marketing",
+  "other"
+];
+
+type PageProps = {
+  searchParams?: Promise<{
+    status?: string;
+    message?: string;
+    month?: string;
+  }>;
+};
+
+function defaultMonth(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
   await requireRole(["super_admin", "finance_admin"]);
   const params = searchParams ? await searchParams : undefined;
   const status = params?.status ?? null;
   const message = params?.message ?? null;
+  const selectedMonth = params?.month ?? defaultMonth();
 
-  const invoices = await getPayrollInvoices();
+  const [
+    invoices,
+    summary,
+    mdgFees,
+    reimbs,
+    provs,
+    xtzEmployees,
+    fxRates
+  ] = await Promise.all([
+    getXtzInvoices(),
+    getXtzInvoiceSummary(),
+    getMdgFees("XTZ"),
+    getReimbursementItems("XTZ"),
+    getProvisions("XTZ"),
+    getEmployees("XTZ"),
+    getFxRatesForDisplay()
+  ]);
 
-  const totalInvoices = invoices.length;
-  const totalValue = invoices.reduce((s, inv) => s + parseCurrency(inv.totalAmount), 0);
-  const paidCount = invoices.filter((inv) => inv.status === "paid").length;
-  const pendingCount = invoices.filter((inv) => inv.status !== "paid" && inv.status !== "cancelled" && inv.status !== "voided").length;
+  // Find current FX (USD-from-INR) for live preview
+  const liveInrUsd = fxRates.find(
+    (f) => f.baseCurrency === "INR" && f.targetCurrency === "USD"
+  );
+  const liveInrUsdRate = liveInrUsd?.rate ?? 0.01183;
+
+  // Pre-compute live preview of payroll for the selected month
+  const activeEmps = xtzEmployees.filter(
+    (e) =>
+      e.status === "active" ||
+      (e.status === "terminated" && e.endDate)
+  );
+
+  let payrollPreviewUsd = 0;
+  const previewLines = activeEmps.map((emp) => {
+    let usdAmount = 0;
+    let label = "";
+    if (emp.isUsdSalary && emp.salaryUsd > 0) {
+      usdAmount = emp.salaryUsd;
+      label = `Fixed USD $${emp.salaryUsd.toLocaleString()}`;
+    } else {
+      usdAmount = Number((emp.rawBaseSalary * liveInrUsdRate).toFixed(2));
+      label = `${emp.rawBaseSalary.toLocaleString("en-IN")} ${emp.salaryCurrency} → live FX`;
+    }
+    payrollPreviewUsd += usdAmount;
+    return { id: emp.id, name: emp.fullName, designation: emp.designation, label, usdAmount };
+  });
+
+  const monthMdg = mdgFees.filter((f) => f.feeMonthRaw.startsWith(selectedMonth));
+  const monthReimbs = reimbs.filter((r) => r.expenseMonthRaw.startsWith(selectedMonth));
+  const monthProvs = provs.filter((p) => p.provisionMonthRaw.startsWith(selectedMonth));
+
+  // Approximate non-USD amounts to USD for the preview total
+  function approxUsd(amount: number, currency: string): number {
+    if (currency === "USD") return amount;
+    if (currency === "INR") return Number((amount * liveInrUsdRate).toFixed(2));
+    if (currency === "AED") return Number((amount * 0.2723).toFixed(2));
+    return amount;
+  }
+
+  const previewMdgUsd = monthMdg.reduce(
+    (s, f) => s + approxUsd(f.amount, f.currency),
+    0
+  );
+  const previewReimbUsd = monthReimbs.reduce(
+    (s, r) => s + approxUsd(r.amount, r.currency),
+    0
+  );
+  const previewProvUsd = monthProvs.reduce(
+    (s, p) => s + approxUsd(p.estimatedAmount, p.currency),
+    0
+  );
+  const previewTotalUsd =
+    payrollPreviewUsd + previewMdgUsd + previewReimbUsd + previewProvUsd;
 
   return (
     <div className="page-grid">
-      <section className="workspace-header">
+      {/* ── Header ───────────────────────────────────────────── */}
+      <header className="workspace-header">
         <div className="workspace-header-left">
-          <span className="section-kicker">XTZ India &rarr; XTZ Esports Tech Ltd</span>
-          <h3>Payroll Invoices</h3>
+          <span className="section-kicker">
+            XTZ India Private Limited &rarr; XTZ Esports Tech Limited
+          </span>
+          <h3>XTZ Invoice Generator</h3>
+          <p className="muted">
+            Monthly invoice from XTZ India to XTE — payroll, MDG fees, reimbursements,
+            software expenses, and provisions in one unified invoice. Live INR→USD rate
+            applied to Anuj &amp; Sayan; everyone else uses fixed USD salaries.
+          </p>
         </div>
-      </section>
+      </header>
 
       {message ? (
         <section className={`notice ${status ?? "info"}`}>
-          <strong>{status === "error" ? "Action failed" : "Update"}</strong>
+          <strong>{status === "error" ? "Action failed" : "Saved"}</strong>
           <span>{message}</span>
         </section>
       ) : null}
 
+      {/* ── Top stats ────────────────────────────────────────── */}
       <section className="stats-grid compact-stats">
         <article className="metric-card accent-brand">
           <div className="metric-topline">
-            <span className="metric-label">Total invoices</span>
+            <span className="metric-label">Invoices generated</span>
           </div>
-          <div className="metric-value">{totalInvoices}</div>
+          <div className="metric-value">{summary.totalInvoices}</div>
+          <span className="metric-subvalue">Lifetime</span>
         </article>
         <article className="metric-card accent-good">
           <div className="metric-topline">
-            <span className="metric-label">Total invoiced value</span>
+            <span className="metric-label">Total invoiced (USD)</span>
           </div>
-          <div className="metric-value">
-            {totalValue.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 })}
-          </div>
-        </article>
-        <article className="metric-card accent-good">
-          <div className="metric-topline">
-            <span className="metric-label">Paid</span>
-          </div>
-          <div className="metric-value">{paidCount}</div>
+          <div className="metric-value">{fmtUsd(summary.totalInvoicedUsd)}</div>
+          <span className="metric-subvalue">USD invoices only</span>
         </article>
         <article className="metric-card accent-warn">
           <div className="metric-topline">
             <span className="metric-label">Pending</span>
           </div>
-          <div className="metric-value">{pendingCount}</div>
+          <div className="metric-value">{summary.pendingCount}</div>
+          <span className="metric-subvalue">Generated &amp; sent</span>
+        </article>
+        <article className="metric-card accent-good">
+          <div className="metric-topline">
+            <span className="metric-label">Paid</span>
+          </div>
+          <div className="metric-value">{summary.paidCount}</div>
+        </article>
+        <article className="metric-card">
+          <div className="metric-topline">
+            <span className="metric-label">Live INR → USD</span>
+          </div>
+          <div className="metric-value">
+            {liveInrUsdRate.toFixed(5)}
+          </div>
+          <span className="metric-subvalue">Auto-refreshed every hour</span>
         </article>
       </section>
 
-      {/* Generate invoice form */}
+      {/* ── Month selector ───────────────────────────────────── */}
       <section className="card">
         <div className="card-title-row">
           <div>
-            <span className="section-kicker">Generate</span>
-            <h3>Create payroll invoice</h3>
+            <span className="section-kicker">Working month</span>
+            <h3>Select invoice month</h3>
           </div>
+          <span className="badge">
+            Editing data for:{" "}
+            {new Date(`${selectedMonth}-01`).toLocaleDateString("en-US", {
+              month: "long",
+              year: "numeric"
+            })}
+          </span>
         </div>
-        <form action={generatePayrollInvoiceAction} className="stack-form">
+        <form method="get" className="inline-actions">
+          <input
+            type="month"
+            name="month"
+            defaultValue={selectedMonth}
+            aria-label="Invoice month"
+          />
+          <button className="action-button secondary" type="submit">
+            Switch month
+          </button>
+        </form>
+      </section>
+
+      {/* ── Live preview of what will be invoiced ────────────── */}
+      <section className="card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">Live preview</span>
+            <h3>What will be invoiced for {selectedMonth}</h3>
+          </div>
+          <span className="badge">Estimated total ≈ {fmtUsd(previewTotalUsd)}</span>
+        </div>
+
+        <div className="grid-two">
+          <article>
+            <h4 style={{ marginTop: 0 }}>Payroll lines</h4>
+            <div className="table-wrapper clean-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Salary basis</th>
+                    <th style={{ textAlign: "right" }}>USD equivalent</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewLines.length > 0 ? (
+                    previewLines.map((p) => (
+                      <tr key={p.id}>
+                        <td>
+                          <strong>{p.name}</strong>
+                          <br />
+                          <span className="muted">{p.designation}</span>
+                        </td>
+                        <td>
+                          <span className="pill subtle-pill">{p.label}</span>
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <strong>{fmtUsd(p.usdAmount)}</strong>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="muted" colSpan={3}>
+                        No active employees on XTZ India.
+                      </td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td colSpan={2} style={{ textAlign: "right" }}>
+                      <strong>Payroll subtotal</strong>
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <strong>{fmtUsd(payrollPreviewUsd)}</strong>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article>
+            <h4 style={{ marginTop: 0 }}>Other sections (this month)</h4>
+            <div className="table-wrapper clean-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Section</th>
+                    <th>Items</th>
+                    <th style={{ textAlign: "right" }}>USD ≈</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>MDG Fees</td>
+                    <td>{monthMdg.length}</td>
+                    <td style={{ textAlign: "right" }}>
+                      {fmtUsd(previewMdgUsd)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Reimbursements</td>
+                    <td>{monthReimbs.length}</td>
+                    <td style={{ textAlign: "right" }}>
+                      {fmtUsd(previewReimbUsd)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Provisions (estimates)</td>
+                    <td>{monthProvs.length}</td>
+                    <td style={{ textAlign: "right" }}>
+                      {fmtUsd(previewProvUsd)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan={2} style={{ textAlign: "right" }}>
+                      <strong>Grand total estimate</strong>
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <strong>{fmtUsd(previewTotalUsd)}</strong>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="muted" style={{ marginTop: 12 }}>
+              Approximate USD totals shown for non-USD items use the live INR/USD
+              rate above. Final invoice uses live rate at the moment of generation.
+            </p>
+          </article>
+        </div>
+
+        <form action={generateXtzInvoiceAction} className="inline-actions" style={{ marginTop: 16 }}>
           <input type="hidden" name="fromCompanyCode" value="XTZ" />
           <input type="hidden" name="toCompanyCode" value="XTE" />
+          <input type="hidden" name="payrollMonth" value={selectedMonth} />
+          <input type="hidden" name="invoiceCurrency" value="USD" />
+          <input type="hidden" name="paymentMethod" value="Wire transfer (USD)" />
+          <input
+            name="notes"
+            type="text"
+            placeholder="Optional invoice notes (e.g. 'February 2026 — payroll due Feb–April')"
+            style={{ flex: 1, minWidth: 280 }}
+          />
+          <button className="action-button primary" type="submit">
+            Generate XTZ → XTE invoice for {selectedMonth}
+          </button>
+        </form>
+      </section>
+
+      {/* ── MDG Fees ─────────────────────────────────────────── */}
+      <section className="card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">Section 2 — Management fees</span>
+            <h3>MDG Fees</h3>
+          </div>
+          <span className="badge">{monthMdg.length} for {selectedMonth}</span>
+        </div>
+
+        <form action={addMdgFeeAction}>
+          <input type="hidden" name="companyCode" value="XTZ" />
           <div className="form-grid">
             <label className="field">
-              <span>Payroll month</span>
-              <input name="payrollMonth" type="month" required />
+              <span>Month</span>
+              <input
+                type="month"
+                name="feeMonth"
+                defaultValue={selectedMonth}
+                required
+              />
             </label>
             <label className="field">
-              <span>Invoice currency</span>
-              <select name="invoiceCurrency" defaultValue="USD">
-                <option value="USD">USD (XTZ India → XTE invoices in USD)</option>
-                <option value="AED">AED</option>
-                <option value="INR">INR (same currency, no conversion)</option>
+              <span>Description</span>
+              <input
+                type="text"
+                name="description"
+                defaultValue="MDG Fees"
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Amount</span>
+              <input type="number" name="amount" min="0" step="0.01" required />
+            </label>
+            <label className="field">
+              <span>Currency</span>
+              <select name="currency" defaultValue="INR">
+                <option value="INR">INR</option>
+                <option value="USD">USD</option>
               </select>
             </label>
-            <label className="field">
-              <span>Payment method</span>
-              <input name="paymentMethod" type="text" placeholder="e.g. Wire transfer" />
-            </label>
-            <label className="field">
+            <label className="field" style={{ gridColumn: "span 2" }}>
               <span>Notes</span>
-              <input name="notes" type="text" placeholder="Optional invoice notes" />
+              <input type="text" name="notes" />
             </label>
             <div className="form-actions">
               <button className="action-button primary" type="submit">
-                Generate invoice (with live FX rate)
+                Save MDG fee
               </button>
             </div>
           </div>
         </form>
+
+        <div className="table-wrapper clean-table" style={{ marginTop: 16 }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mdgFees.length > 0 ? (
+                mdgFees.map((f) => (
+                  <tr key={f.id}>
+                    <td>{f.feeMonth}</td>
+                    <td>{f.description}</td>
+                    <td>{fmtNum(f.amount, f.currency)}</td>
+                    <td>
+                      <span className={`pill ${f.status === "invoiced" ? "signal-pill signal-good" : "subtle-pill"}`}>
+                        {f.status}
+                      </span>
+                    </td>
+                    <td>
+                      {f.status !== "invoiced" ? (
+                        <form action={deleteMdgFeeAction}>
+                          <input type="hidden" name="id" value={f.id} />
+                          <button className="action-button secondary" type="submit">
+                            Remove
+                          </button>
+                        </form>
+                      ) : (
+                        <span className="muted">locked</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="muted" colSpan={5}>
+                    No MDG fees yet. Add one above.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      {/* Invoice table */}
+      {/* ── Reimbursements ───────────────────────────────────── */}
+      <section className="card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">Section 3 — Reimbursements</span>
+            <h3>Software &amp; expense reimbursements</h3>
+          </div>
+          <span className="badge">{monthReimbs.length} for {selectedMonth}</span>
+        </div>
+
+        <BillUploader
+          formId="reimbursement-form"
+          fieldMap={{
+            vendor: "vendorName",
+            description: "description",
+            amount: "amount",
+            currency: "currency",
+            monthInput: "expenseMonth"
+          }}
+          label="Upload receipt — AI auto-fill"
+          helperText="Drop a receipt image/PDF and we'll fill vendor, amount, currency, and month."
+        />
+
+        <form id="reimbursement-form" action={addReimbursementAction}>
+          <input type="hidden" name="companyCode" value="XTZ" />
+          <div className="form-grid">
+            <label className="field">
+              <span>Month</span>
+              <input
+                type="month"
+                name="expenseMonth"
+                defaultValue={selectedMonth}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Description</span>
+              <input
+                type="text"
+                name="description"
+                placeholder="e.g. Domain repurchase reimbursement"
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Vendor</span>
+              <input type="text" name="vendorName" placeholder="GoDaddy" />
+            </label>
+            <label className="field">
+              <span>Amount</span>
+              <input type="number" name="amount" min="0" step="0.01" required />
+            </label>
+            <label className="field">
+              <span>Currency</span>
+              <select name="currency" defaultValue="USD">
+                <option value="USD">USD</option>
+                <option value="INR">INR</option>
+                <option value="AED">AED</option>
+              </select>
+            </label>
+            <label className="field" style={{ gridColumn: "span 2" }}>
+              <span>Notes</span>
+              <input type="text" name="notes" />
+            </label>
+            <div className="form-actions">
+              <button className="action-button primary" type="submit">
+                Add reimbursement
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <div className="table-wrapper clean-table" style={{ marginTop: 16 }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>Description</th>
+                <th>Vendor</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reimbs.length > 0 ? (
+                reimbs.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.expenseMonth}</td>
+                    <td>{r.description}</td>
+                    <td>{r.vendorName || <span className="muted">—</span>}</td>
+                    <td>{fmtNum(r.amount, r.currency)}</td>
+                    <td>
+                      <span className={`pill ${r.status === "invoiced" ? "signal-pill signal-good" : "subtle-pill"}`}>
+                        {r.status}
+                      </span>
+                    </td>
+                    <td>
+                      {r.status !== "invoiced" ? (
+                        <form action={deleteReimbursementAction}>
+                          <input type="hidden" name="id" value={r.id} />
+                          <button className="action-button secondary" type="submit">
+                            Remove
+                          </button>
+                        </form>
+                      ) : (
+                        <span className="muted">locked</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="muted" colSpan={6}>
+                    No reimbursements yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* ── Provisions ───────────────────────────────────────── */}
+      <section className="card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">Section 4 — Provisions (estimates)</span>
+            <h3>Provisions for items without final invoices</h3>
+          </div>
+          <span className="badge">{monthProvs.length} for {selectedMonth}</span>
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Use this section for items where the vendor invoice hasn't arrived yet
+          (e.g. TBR travel that still needs reconciliation, expected payroll dues).
+          Each line is flagged as a provision on the printed invoice.
+        </p>
+
+        <form action={addProvisionAction}>
+          <input type="hidden" name="companyCode" value="XTZ" />
+          <div className="form-grid">
+            <label className="field">
+              <span>Month</span>
+              <input
+                type="month"
+                name="provisionMonth"
+                defaultValue={selectedMonth}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Description</span>
+              <input
+                type="text"
+                name="description"
+                placeholder="e.g. TBR Travel Expenses (estimate)"
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Vendor / counterparty</span>
+              <input type="text" name="vendorName" />
+            </label>
+            <label className="field">
+              <span>Category</span>
+              <select name="category" defaultValue="other">
+                {PROVISION_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c.replace(/_/g, " ")}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Estimated amount</span>
+              <input type="number" name="amount" min="0" step="0.01" required />
+            </label>
+            <label className="field">
+              <span>Currency</span>
+              <select name="currency" defaultValue="USD">
+                <option value="USD">USD</option>
+                <option value="INR">INR</option>
+                <option value="AED">AED</option>
+              </select>
+            </label>
+            <label className="field" style={{ gridColumn: "span 2" }}>
+              <span>Notes</span>
+              <input type="text" name="notes" />
+            </label>
+            <div className="form-actions">
+              <button className="action-button primary" type="submit">
+                Add provision
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <div className="table-wrapper clean-table" style={{ marginTop: 16 }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>Vendor</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {provs.length > 0 ? (
+                provs.map((p) => (
+                  <tr key={p.id}>
+                    <td>{p.provisionMonth}</td>
+                    <td>{p.description}</td>
+                    <td>
+                      <span className="pill subtle-pill">{p.category.replace(/_/g, " ")}</span>
+                    </td>
+                    <td>{p.vendorName || <span className="muted">—</span>}</td>
+                    <td>{fmtNum(p.estimatedAmount, p.currency)}</td>
+                    <td>
+                      <span className={`pill ${p.status === "invoiced" ? "signal-pill signal-good" : "subtle-pill"}`}>
+                        {p.status}
+                      </span>
+                    </td>
+                    <td>
+                      {p.status !== "invoiced" ? (
+                        <form action={deleteProvisionAction}>
+                          <input type="hidden" name="id" value={p.id} />
+                          <button className="action-button secondary" type="submit">
+                            Remove
+                          </button>
+                        </form>
+                      ) : (
+                        <span className="muted">locked</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="muted" colSpan={7}>
+                    No provisions yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* ── Generated invoices ───────────────────────────────── */}
       <article className="card">
         <div className="card-title-row">
           <div>
             <span className="section-kicker">History</span>
-            <h3>All payroll invoices</h3>
+            <h3>Generated XTZ → XTE invoices</h3>
           </div>
-          <span className="badge">{totalInvoices} invoices</span>
+          <span className="badge">{invoices.length} invoices</span>
         </div>
         <div className="table-wrapper clean-table">
           <table>
@@ -143,47 +746,94 @@ export default async function PayrollInvoicesPage({ searchParams }: PayrollInvoi
                 <th>Invoice #</th>
                 <th>Date</th>
                 <th>Month</th>
-                <th>From</th>
-                <th>To</th>
-                <th>Subtotal</th>
-                <th>Tax</th>
                 <th>Total</th>
                 <th>Currency</th>
                 <th>Status</th>
-                <th>Payment method</th>
+                <th>Update</th>
+                <th>Open</th>
               </tr>
             </thead>
             <tbody>
               {invoices.length > 0 ? (
                 invoices.map((inv) => (
                   <tr key={inv.id}>
-                    <td><strong>{inv.invoiceNumber}</strong></td>
+                    <td>
+                      <strong>{inv.invoiceNumber}</strong>
+                    </td>
                     <td>{inv.invoiceDate}</td>
                     <td>{inv.payrollMonth}</td>
-                    <td>{inv.fromCompany}</td>
-                    <td>{inv.toCompany}</td>
-                    <td>{inv.subtotal}</td>
-                    <td>{inv.taxAmount}</td>
-                    <td><strong>{inv.totalAmount}</strong></td>
+                    <td>
+                      <strong>{fmtNum(inv.totalAmount, inv.currency)}</strong>
+                    </td>
                     <td>{inv.currency}</td>
                     <td>
-                      <span className={`pill ${statusPillClass(inv.status)}`}>
-                        {inv.status.replace(/_/g, " ")}
+                      <span className={`pill ${statusPill(inv.status)}`}>
+                        {inv.status}
                       </span>
                     </td>
-                    <td><span className="muted">{inv.paymentMethod || "—"}</span></td>
+                    <td>
+                      <form action={updateInvoiceStatusAction} className="inline-actions">
+                        <input type="hidden" name="invoiceId" value={inv.id} />
+                        <select
+                          name="newStatus"
+                          defaultValue=""
+                          aria-label="Change status"
+                        >
+                          <option value="" disabled>
+                            Set...
+                          </option>
+                          <option value="generated">Generated</option>
+                          <option value="sent">Sent</option>
+                          <option value="paid">Paid</option>
+                        </select>
+                        <button className="action-button secondary" type="submit">
+                          Apply
+                        </button>
+                      </form>
+                    </td>
+                    <td>
+                      <Link
+                        className="action-button primary"
+                        href={`/payroll-invoices/${inv.id}` as Route}
+                      >
+                        View / print
+                      </Link>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td className="muted" colSpan={11}>
-                    No payroll invoices yet. Use the form above to generate your first invoice from payroll data.
+                  <td className="muted" colSpan={8}>
+                    No invoices generated yet. Add MDG fees, reimbursements, or
+                    provisions above and click "Generate" to create your first invoice.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+        {invoices.length > 0 ? (
+          <details style={{ marginTop: 12 }}>
+            <summary className="muted">Danger zone — delete invoice</summary>
+            <div style={{ marginTop: 12 }}>
+              <form action={deleteInvoiceAction} className="inline-actions">
+                <select name="invoiceId" defaultValue="" aria-label="Select invoice to delete">
+                  <option value="" disabled>
+                    Select invoice…
+                  </option>
+                  {invoices.map((inv) => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.invoiceNumber} — {fmtNum(inv.totalAmount, inv.currency)}
+                    </option>
+                  ))}
+                </select>
+                <button className="action-button secondary" type="submit">
+                  Delete invoice (unlocks staged items)
+                </button>
+              </form>
+            </div>
+          </details>
+        ) : null}
       </article>
     </div>
   );

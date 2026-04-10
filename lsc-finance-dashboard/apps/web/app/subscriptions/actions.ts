@@ -6,6 +6,114 @@ import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
 import { requireRole } from "../../lib/auth";
 
+function clean(value: FormDataEntryValue | null): string {
+  return String(value ?? "").trim();
+}
+
+function num(value: FormDataEntryValue | null): number {
+  const n = Number(String(value ?? "0").replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function redirectToSubs(status: "success" | "error", message: string): never {
+  redirect(
+    `/subscriptions?status=${encodeURIComponent(status)}&message=${encodeURIComponent(message)}` as Route
+  );
+}
+
+export async function addSubscriptionAction(formData: FormData): Promise<void> {
+  await requireRole(["super_admin", "finance_admin"]);
+  const name = clean(formData.get("name"));
+  const provider = clean(formData.get("provider"));
+  const companyCode = clean(formData.get("companyCode"));
+  const monthlyCost = num(formData.get("monthlyCost"));
+  const billingCycle = clean(formData.get("billingCycle")) || "monthly";
+  const category = clean(formData.get("category")) || "other";
+  const currency = clean(formData.get("currency")) || "USD";
+  const nextBillingDate = clean(formData.get("nextBillingDate"));
+  const notes = clean(formData.get("notes"));
+
+  if (!name || !provider || monthlyCost <= 0) {
+    redirectToSubs("error", "Name, provider, and monthly cost are required.");
+  }
+
+  let companyId: string | null = null;
+  if (companyCode) {
+    const rows = await queryRowsAdmin<{ id: string }>(
+      `select id from companies where code = $1::company_code`,
+      [companyCode]
+    );
+    companyId = rows[0]?.id ?? null;
+  }
+
+  const annualCost =
+    billingCycle === "annual" ? monthlyCost : monthlyCost * 12;
+
+  await executeAdmin(
+    `insert into subscriptions
+       (name, provider, company_id, is_shared, monthly_cost, annual_cost,
+        currency_code, billing_cycle, category, status, auto_renew,
+        next_billing_date, notes)
+     values ($1, $2, $3, false, $4, $5, $6,
+             $7::billing_cycle, $8::subscription_category,
+             'active'::subscription_status, true,
+             nullif($9, '')::date, $10)`,
+    [
+      name,
+      provider,
+      companyId,
+      monthlyCost,
+      annualCost,
+      currency,
+      billingCycle,
+      category,
+      nextBillingDate,
+      notes || null
+    ]
+  );
+
+  revalidatePath("/subscriptions");
+  redirectToSubs("success", `${name} added.`);
+}
+
+export async function updateSubscriptionAction(formData: FormData): Promise<void> {
+  await requireRole(["super_admin", "finance_admin"]);
+  const id = clean(formData.get("id"));
+  const monthlyCost = num(formData.get("monthlyCost"));
+  const status = clean(formData.get("status"));
+  if (!id) redirectToSubs("error", "Missing subscription id.");
+
+  if (monthlyCost > 0) {
+    await executeAdmin(
+      `update subscriptions
+         set monthly_cost = $2, annual_cost = case
+           when billing_cycle = 'annual' then $2
+           else $2 * 12
+         end, updated_at = now()
+       where id = $1`,
+      [id, monthlyCost]
+    );
+  }
+  if (status) {
+    await executeAdmin(
+      `update subscriptions set status = $2::subscription_status, updated_at = now() where id = $1`,
+      [id, status]
+    );
+  }
+
+  revalidatePath("/subscriptions");
+  redirectToSubs("success", "Subscription updated.");
+}
+
+export async function deleteSubscriptionAction(formData: FormData): Promise<void> {
+  await requireRole(["super_admin", "finance_admin"]);
+  const id = clean(formData.get("id"));
+  if (!id) redirectToSubs("error", "Missing id.");
+  await executeAdmin(`delete from subscriptions where id = $1`, [id]);
+  revalidatePath("/subscriptions");
+  redirectToSubs("success", "Subscription removed.");
+}
+
 export async function generateSubscriptionAlertsAction() {
   await requireRole(["super_admin", "finance_admin"]);
 

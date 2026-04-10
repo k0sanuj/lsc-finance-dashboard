@@ -74,7 +74,7 @@ function getTbrNav(): CompanyNav {
         links: [
           { href: "/employees?company=TBR" as Route, label: "Employees", roles: ALL_ADMIN },
           { href: "/salary-payable?company=TBR" as Route, label: "Salary Payable", roles: ALL_ADMIN },
-          { href: "/payroll-invoices" as Route, label: "Payroll Invoices", roles: ALL_ADMIN },
+          { href: "/payroll-invoices" as Route, label: "XTZ Invoice Generator", roles: ALL_ADMIN },
         ],
       },
       {
@@ -139,7 +139,7 @@ function getXtzNav(): CompanyNav {
         links: [
           { href: "/employees?company=XTZ" as Route, label: "Employees", roles: ALL_ADMIN },
           { href: "/salary-payable?company=XTZ" as Route, label: "Salary Payable", roles: ALL_ADMIN },
-          { href: "/payroll-invoices" as Route, label: "Payroll Invoices", roles: ALL_ADMIN },
+          { href: "/payroll-invoices" as Route, label: "XTZ Invoice Generator", roles: ALL_ADMIN },
           { href: "/gig-workers" as Route, label: "Gig Workers", roles: ALL_ADMIN },
         ],
       },
@@ -203,7 +203,8 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/arena-ads")) return "Arena & Ads";
   if (pathname.startsWith("/employees")) return "Employees";
   if (pathname.startsWith("/salary-payable")) return "Salary Payable";
-  if (pathname.startsWith("/payroll-invoices")) return "Payroll Invoices";
+  if (pathname.startsWith("/payroll-invoices/")) return "Invoice Detail";
+  if (pathname.startsWith("/payroll-invoices")) return "XTZ Invoice Generator";
   if (pathname.startsWith("/fsp/sports")) return "FSP Sports";
   if (pathname.startsWith("/messaging")) return "Cross-Dashboard Messages";
   if (pathname.startsWith("/audit-reports")) return "Audit Reports";
