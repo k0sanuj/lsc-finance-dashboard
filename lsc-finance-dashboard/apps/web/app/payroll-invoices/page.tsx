@@ -18,6 +18,9 @@ import {
   deleteMdgFeeAction,
   deleteReimbursementAction,
   deleteProvisionAction,
+  updateMdgFeeAction,
+  updateReimbursementAction,
+  updateProvisionAction,
   updateInvoiceStatusAction,
   deleteInvoiceAction,
   createDirectInvoiceAction
@@ -164,7 +167,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
       <header className="workspace-header">
         <div className="workspace-header-left">
           <span className="section-kicker">
-            XTZ India Private Limited &rarr; XTZ Esports Tech Limited
+            XTZ India Private Limited &rarr; XTZ Dubai
           </span>
           <h3>XTZ Invoice Generator</h3>
           <p className="muted">
@@ -373,7 +376,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
             style={{ flex: 1, minWidth: 280 }}
           />
           <button className="action-button primary" type="submit">
-            Generate XTZ → XTE invoice for {selectedMonth}
+            Generate XTZ India → XTZ Dubai invoice for {selectedMonth}
           </button>
         </form>
       </section>
@@ -451,17 +454,21 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                     <td>{f.description}</td>
                     <td>{fmtNum(f.amount, f.currency)}</td>
                     <td>
-                      <span className={`pill ${f.status === "invoiced" ? "signal-pill signal-good" : "subtle-pill"}`}>
-                        {f.status}
-                      </span>
+                      <form action={updateMdgFeeAction} className="inline-actions">
+                        <input type="hidden" name="id" value={f.id} />
+                        <select name="status" defaultValue={f.status} aria-label="Status">
+                          <option value="pending">Pending</option>
+                          <option value="approved">Approved</option>
+                          <option value="invoiced">Invoiced</option>
+                        </select>
+                        <button className="action-button secondary" type="submit">Set</button>
+                      </form>
                     </td>
                     <td>
                       {f.status !== "invoiced" ? (
-                        <form action={deleteMdgFeeAction}>
+                        <form action={deleteMdgFeeAction} className="inline-actions">
                           <input type="hidden" name="id" value={f.id} />
-                          <button className="action-button secondary" type="submit">
-                            Remove
-                          </button>
+                          <button className="action-button secondary" type="submit">Remove</button>
                         </form>
                       ) : (
                         <span className="muted">locked</span>
@@ -574,17 +581,21 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                     <td>{r.vendorName || <span className="muted">—</span>}</td>
                     <td>{fmtNum(r.amount, r.currency)}</td>
                     <td>
-                      <span className={`pill ${r.status === "invoiced" ? "signal-pill signal-good" : "subtle-pill"}`}>
-                        {r.status}
-                      </span>
+                      <form action={updateReimbursementAction} className="inline-actions">
+                        <input type="hidden" name="id" value={r.id} />
+                        <select name="status" defaultValue={r.status} aria-label="Status">
+                          <option value="pending">Pending</option>
+                          <option value="approved">Approved</option>
+                          <option value="invoiced">Invoiced</option>
+                        </select>
+                        <button className="action-button secondary" type="submit">Set</button>
+                      </form>
                     </td>
                     <td>
                       {r.status !== "invoiced" ? (
-                        <form action={deleteReimbursementAction}>
+                        <form action={deleteReimbursementAction} className="inline-actions">
                           <input type="hidden" name="id" value={r.id} />
-                          <button className="action-button secondary" type="submit">
-                            Remove
-                          </button>
+                          <button className="action-button secondary" type="submit">Remove</button>
                         </form>
                       ) : (
                         <span className="muted">locked</span>
@@ -703,17 +714,25 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                     <td>{p.vendorName || <span className="muted">—</span>}</td>
                     <td>{fmtNum(p.estimatedAmount, p.currency)}</td>
                     <td>
-                      <span className={`pill ${p.status === "invoiced" ? "signal-pill signal-good" : "subtle-pill"}`}>
-                        {p.status}
-                      </span>
+                      <form action={updateProvisionAction} className="inline-actions">
+                        <input type="hidden" name="id" value={p.id} />
+                        <select name="status" defaultValue={p.status} aria-label="Status">
+                          <option value="estimated">Estimated</option>
+                          <option value="approved">Approved</option>
+                          <option value="document_pending">Doc pending</option>
+                          <option value="invoiced">Invoiced</option>
+                        </select>
+                        <button className="action-button secondary" type="submit">Set</button>
+                      </form>
                     </td>
                     <td>
+                      {p.notes ? (
+                        <span className="muted" style={{ fontSize: "0.74rem" }}>{p.notes}</span>
+                      ) : null}
                       {p.status !== "invoiced" ? (
-                        <form action={deleteProvisionAction}>
+                        <form action={deleteProvisionAction} className="inline-actions" style={{ marginTop: p.notes ? 4 : 0 }}>
                           <input type="hidden" name="id" value={p.id} />
-                          <button className="action-button secondary" type="submit">
-                            Remove
-                          </button>
+                          <button className="action-button secondary" type="submit">Remove</button>
                         </form>
                       ) : (
                         <span className="muted">locked</span>
@@ -825,7 +844,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
         <div className="card-title-row">
           <div>
             <span className="section-kicker">History</span>
-            <h3>Generated XTZ → XTE invoices</h3>
+            <h3>Generated invoices</h3>
           </div>
           <span className="badge">{invoices.length} invoices</span>
         </div>

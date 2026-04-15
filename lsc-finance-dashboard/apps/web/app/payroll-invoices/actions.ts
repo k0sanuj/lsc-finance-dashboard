@@ -74,6 +74,24 @@ export async function addMdgFeeAction(formData: FormData): Promise<void> {
   redirectTo("success", `MDG fee for ${feeMonth} saved.`);
 }
 
+export async function updateMdgFeeAction(formData: FormData): Promise<void> {
+  await requireRole(["super_admin", "finance_admin"]);
+  const id = clean(formData.get("id"));
+  const amount = num(formData.get("amount"));
+  const description = clean(formData.get("description"));
+  const status = clean(formData.get("status"));
+  if (!id) redirectTo("error", "Missing id.");
+  const sets: string[] = ["updated_at = now()"];
+  const vals: (string | number)[] = [id];
+  let p = 2;
+  if (amount > 0) { sets.push(`amount = $${p}`); vals.push(amount); p++; }
+  if (description) { sets.push(`description = $${p}`); vals.push(description); p++; }
+  if (status) { sets.push(`status = $${p}`); vals.push(status); p++; }
+  await executeAdmin(`update mdg_fees set ${sets.join(", ")} where id = $1`, vals);
+  revalidatePath("/payroll-invoices");
+  redirectTo("success", "MDG fee updated.");
+}
+
 export async function deleteMdgFeeAction(formData: FormData): Promise<void> {
   await requireRole(["super_admin", "finance_admin"]);
   const id = clean(formData.get("id"));
@@ -110,6 +128,24 @@ export async function addReimbursementAction(formData: FormData): Promise<void> 
 
   revalidatePath("/payroll-invoices");
   redirectTo("success", "Reimbursement added.");
+}
+
+export async function updateReimbursementAction(formData: FormData): Promise<void> {
+  await requireRole(["super_admin", "finance_admin"]);
+  const id = clean(formData.get("id"));
+  const amount = num(formData.get("amount"));
+  const description = clean(formData.get("description"));
+  const status = clean(formData.get("status"));
+  if (!id) redirectTo("error", "Missing id.");
+  const sets: string[] = ["updated_at = now()"];
+  const vals: (string | number)[] = [id];
+  let p = 2;
+  if (amount > 0) { sets.push(`amount = $${p}`); vals.push(amount); p++; }
+  if (description) { sets.push(`description = $${p}`); vals.push(description); p++; }
+  if (status) { sets.push(`status = $${p}`); vals.push(status); p++; }
+  await executeAdmin(`update reimbursement_items set ${sets.join(", ")} where id = $1`, vals);
+  revalidatePath("/payroll-invoices");
+  redirectTo("success", "Reimbursement updated.");
 }
 
 export async function deleteReimbursementAction(formData: FormData): Promise<void> {
@@ -161,6 +197,26 @@ export async function addProvisionAction(formData: FormData): Promise<void> {
 
   revalidatePath("/payroll-invoices");
   redirectTo("success", "Provision added.");
+}
+
+export async function updateProvisionAction(formData: FormData): Promise<void> {
+  await requireRole(["super_admin", "finance_admin"]);
+  const id = clean(formData.get("id"));
+  const amount = num(formData.get("amount"));
+  const description = clean(formData.get("description"));
+  const status = clean(formData.get("status"));
+  const notes = clean(formData.get("notes"));
+  if (!id) redirectTo("error", "Missing id.");
+  const sets: string[] = ["updated_at = now()"];
+  const vals: (string | number)[] = [id];
+  let p = 2;
+  if (amount > 0) { sets.push(`estimated_amount = $${p}`); vals.push(amount); p++; }
+  if (description) { sets.push(`description = $${p}`); vals.push(description); p++; }
+  if (status) { sets.push(`status = $${p}`); vals.push(status); p++; }
+  if (notes) { sets.push(`notes = $${p}`); vals.push(notes); p++; }
+  await executeAdmin(`update provisions set ${sets.join(", ")} where id = $1`, vals);
+  revalidatePath("/payroll-invoices");
+  redirectTo("success", "Provision updated.");
 }
 
 export async function deleteProvisionAction(formData: FormData): Promise<void> {

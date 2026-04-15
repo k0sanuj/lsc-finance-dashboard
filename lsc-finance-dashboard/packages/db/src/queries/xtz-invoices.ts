@@ -29,6 +29,20 @@ export const XTE_RECIPIENT = {
   address: "Unit 208, 209, Level 1\nGate Avenue – South Zone\nDubai International Financial Centre\nDubai, UAE"
 } as const;
 
+export const SAYAN_BENEFICIARY = {
+  name: "Sayan Mukherjee",
+  address: "D2, 4th Floor, AC 86, Gallery Suite\nNew Town, Kolkata — 700156\nWest Bengal, India",
+  email: "sayan0151996@gmail.com",
+  phone: "+91 9204384567",
+  bank: {
+    name: "HDFC Bank",
+    branchAddress: "No 89, Ground Floor, Badami Mansion, Main Road, Parsudih, East Singhbhum — 831002",
+    accountNumber: "50100153694001",
+    ifsc: "HDFC0009081",
+    swift: "HDFCINBBXXX"
+  }
+} as const;
+
 // XTE as an issuer (for invoices XTE sends TO individuals/companies like Yadav Jani)
 export const XTE_ISSUER = {
   legalName: "XTZ Esports Tech Ltd",
