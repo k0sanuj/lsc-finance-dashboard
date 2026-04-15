@@ -25,8 +25,22 @@ export const XTZ_ISSUER = {
 } as const;
 
 export const XTE_RECIPIENT = {
-  legalName: "XTZ ESPORTS TECH LIMITED",
-  address: "Dubai, United Arab Emirates"
+  legalName: "XTZ Esports Tech Ltd",
+  address: "Unit 208, 209, Level 1\nGate Avenue – South Zone\nDubai International Financial Centre\nDubai, UAE"
+} as const;
+
+// XTE as an issuer (for invoices XTE sends TO individuals/companies like Yadav Jani)
+export const XTE_ISSUER = {
+  legalName: "XTZ Esports Tech Ltd",
+  address: "Unit 208, 209, Level 1\nGate Avenue – South Zone\nDubai International Financial Centre\nDubai, UAE",
+  bank: {
+    name: "Emirates NBD Bank, PJSC",
+    branchAddress: "Baniyas Road, Deira, Dubai\nUnited Arab Emirates",
+    accountNumber: "1025783560602",
+    iban: "AE940260001025783560602",
+    routingCode: "302620122",
+    swift: "EBILAEAD"
+  }
 } as const;
 
 export type XtzInvoiceSection =

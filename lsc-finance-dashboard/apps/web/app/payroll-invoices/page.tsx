@@ -19,7 +19,8 @@ import {
   deleteReimbursementAction,
   deleteProvisionAction,
   updateInvoiceStatusAction,
-  deleteInvoiceAction
+  deleteInvoiceAction,
+  createDirectInvoiceAction
 } from "./actions";
 import { BillUploader } from "../components/bill-uploader";
 
@@ -730,6 +731,93 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
         </div>
       </section>
 
+      {/* ── Direct / custom invoice (XTE→anyone, XTZ→anyone) ── */}
+      <section className="card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">Custom invoice</span>
+            <h3>Create direct invoice (any issuer → any recipient)</h3>
+          </div>
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Use this for invoices from XTE Dubai or XTZ India to individuals (e.g. Sayan Mukherjee payroll due)
+          or external parties. Supports up to 5 line items.
+        </p>
+        <form action={createDirectInvoiceAction}>
+          <div className="form-grid">
+            <label className="field">
+              <span>Issuing entity</span>
+              <select name="issuerEntity" defaultValue="XTE" required>
+                <option value="XTE">XTZ Esports Tech Ltd (Dubai / XTE)</option>
+                <option value="XTZ">XTZ India Private Limited</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Recipient name</span>
+              <input type="text" name="recipientName" placeholder="e.g. Sayan Mukherjee" required />
+            </label>
+            <label className="field">
+              <span>Recipient address (optional)</span>
+              <input type="text" name="recipientAddress" placeholder="City, Country" />
+            </label>
+            <label className="field">
+              <span>Invoice month</span>
+              <input type="month" name="invoiceMonth" defaultValue={selectedMonth} required />
+            </label>
+            <label className="field">
+              <span>Currency</span>
+              <select name="invoiceCurrency" defaultValue="USD">
+                <option value="USD">USD</option>
+                <option value="AED">AED</option>
+                <option value="INR">INR</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Notes</span>
+              <input type="text" name="notes" placeholder="e.g. Payroll Due Feb to April 2026" />
+            </label>
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <strong style={{ fontSize: "0.82rem" }}>Line items</strong>
+          </div>
+          <div className="table-wrapper clean-table" style={{ marginTop: 8 }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Description</th>
+                  <th>Qty</th>
+                  <th>Unit Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <tr key={i}>
+                    <td>{i + 1}</td>
+                    <td>
+                      <input type="text" name={`lineDesc_${i}`} placeholder="Description" style={{ width: "100%" }} />
+                    </td>
+                    <td>
+                      <input type="number" name={`lineQty_${i}`} defaultValue="1" min="1" step="1" style={{ width: 60 }} />
+                    </td>
+                    <td>
+                      <input type="number" name={`linePrice_${i}`} min="0" step="0.01" placeholder="0.00" style={{ width: 120 }} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="form-actions" style={{ marginTop: 12 }}>
+            <button className="action-button primary" type="submit">
+              Create direct invoice
+            </button>
+          </div>
+        </form>
+      </section>
+
       {/* ── Generated invoices ───────────────────────────────── */}
       <article className="card">
         <div className="card-title-row">
@@ -817,7 +905,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
             <summary className="muted">Danger zone — delete invoice</summary>
             <div style={{ marginTop: 12 }}>
               <form action={deleteInvoiceAction} className="inline-actions">
-                <select name="invoiceId" defaultValue="" aria-label="Select invoice to delete">
+                <select name="invoiceId" defaultValue="" aria-label="Invoice to delete">
                   <option value="" disabled>
                     Select invoice…
                   </option>

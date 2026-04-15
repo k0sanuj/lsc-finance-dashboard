@@ -8,7 +8,8 @@ import {
   queryRowsAdmin,
   convertCurrency,
   XTZ_ISSUER,
-  XTE_RECIPIENT
+  XTE_RECIPIENT,
+  XTE_ISSUER
 } from "@lsc/db";
 import { requireRole } from "../../lib/auth";
 
@@ -641,4 +642,129 @@ export async function deleteInvoiceAction(formData: FormData): Promise<void> {
 
   revalidatePath("/payroll-invoices");
   redirectTo("success", "Invoice deleted.");
+}
+
+// ── Create a direct/custom invoice (any issuer → any recipient) ──
+
+export async function createDirectInvoiceAction(formData: FormData): Promise<void> {
+  await requireRole(["super_admin", "finance_admin"]);
+
+  const issuerEntity = clean(formData.get("issuerEntity")); // "XTZ" or "XTE"
+  const recipientName = clean(formData.get("recipientName"));
+  const recipientAddress = clean(formData.get("recipientAddress"));
+  const invoiceMonth = clean(formData.get("invoiceMonth"));
+  const invoiceCurrency = clean(formData.get("invoiceCurrency")) || "USD";
+  const paymentMethod = clean(formData.get("paymentMethod")) || "Wire transfer (USD)";
+  const notes = clean(formData.get("notes"));
+
+  // Parse line items from form (up to 20 lines)
+  const lineItems: { description: string; qty: number; unitPrice: number }[] = [];
+  for (let i = 0; i < 20; i++) {
+    const desc = clean(formData.get(`lineDesc_${i}`));
+    const qty = num(formData.get(`lineQty_${i}`));
+    const price = num(formData.get(`linePrice_${i}`));
+    if (desc && price > 0) {
+      lineItems.push({ description: desc, qty: qty || 1, unitPrice: price });
+    }
+  }
+
+  if (!recipientName || !invoiceMonth || lineItems.length === 0) {
+    redirectTo("error", "Recipient, month, and at least one line item are required.");
+  }
+
+  const monthDate = invoiceMonth.length === 7 ? `${invoiceMonth}-01` : invoiceMonth;
+  const fromCompanyCode = issuerEntity || "XTE";
+  const fromCompanyId = await getCompanyIdByCode(fromCompanyCode);
+  if (!fromCompanyId) redirectTo("error", `Issuer company ${fromCompanyCode} not found.`);
+
+  // Use XTE or XTZ India as issuer based on selection
+  const issuer = fromCompanyCode === "XTZ" ? XTZ_ISSUER : XTE_ISSUER;
+  const isXteIssuer = fromCompanyCode !== "XTZ";
+
+  const subtotal = Number(
+    lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0).toFixed(2)
+  );
+  const yyyymm = invoiceMonth.replace("-", "");
+  const rand4 = String(Math.floor(1000 + Math.random() * 9000));
+  const prefix = isXteIssuer ? "INV" : "XTZ";
+  const invoiceNumber = `${prefix}-${yyyymm}-${rand4}`;
+
+  // For direct invoices, from and to can be the same company — we use from_company_id
+  // for both and store recipient info in the text fields
+  const invoiceRows = await queryRowsAdmin<{ id: string }>(
+    `insert into payroll_invoices (
+       invoice_number, invoice_date, payroll_month,
+       from_company_id, to_company_id,
+       subtotal, tax_amount, total_amount,
+       currency_code, status, payment_method, notes, generated_at,
+       issuer_legal_name, issuer_gstin, issuer_cin, issuer_pan, issuer_address,
+       bank_name, bank_account_number, bank_ifsc, bank_swift, bank_ad_code,
+       bank_branch, bank_branch_address,
+       recipient_legal_name, recipient_address
+     ) values (
+       $1, current_date, $2::date, $3, $3,
+       $4, 0, $4, $5, 'generated', $6, $7, now(),
+       $8, $9, $10, $11, $12,
+       $13, $14, $15, $16, $17,
+       $18, $19,
+       $20, $21
+     )
+     returning id`,
+    [
+      invoiceNumber,
+      monthDate,
+      fromCompanyId,
+      subtotal,
+      invoiceCurrency,
+      paymentMethod,
+      notes || null,
+      issuer.legalName,
+      isXteIssuer ? null : (issuer as typeof XTZ_ISSUER).gstin,
+      isXteIssuer ? null : (issuer as typeof XTZ_ISSUER).cin,
+      isXteIssuer ? null : (issuer as typeof XTZ_ISSUER).pan,
+      issuer.address,
+      issuer.bank.name,
+      issuer.bank.accountNumber,
+      isXteIssuer ? (issuer as typeof XTE_ISSUER).bank.iban : (issuer as typeof XTZ_ISSUER).bank.ifsc,
+      issuer.bank.swift,
+      isXteIssuer ? (issuer as typeof XTE_ISSUER).bank.routingCode : (issuer as typeof XTZ_ISSUER).bank.adCode,
+      isXteIssuer ? null : (issuer as typeof XTZ_ISSUER).bank.branch,
+      isXteIssuer ? (issuer as typeof XTE_ISSUER).bank.branchAddress : (issuer as typeof XTZ_ISSUER).bank.branchAddress,
+      recipientName,
+      recipientAddress || null
+    ]
+  );
+
+  const invoiceId = invoiceRows[0]?.id;
+  if (!invoiceId) redirectTo("error", "Failed to create invoice.");
+
+  let order = 0;
+  for (const line of lineItems) {
+    order += 10;
+    await queryRowsAdmin<{ id: string }>(
+      `insert into payroll_invoice_items
+         (payroll_invoice_id, section, description,
+          quantity, unit_price, amount,
+          display_order)
+       values ($1, 'other'::xtz_invoice_section, $2,
+               $3, $4, $5, $6)
+       returning id`,
+      [
+        invoiceId,
+        line.description,
+        line.qty,
+        line.unitPrice,
+        Number((line.qty * line.unitPrice).toFixed(2)),
+        order
+      ]
+    );
+  }
+
+  revalidatePath("/payroll-invoices");
+  revalidatePath(`/payroll-invoices/${invoiceId}`);
+  redirectTo(
+    "success",
+    `Invoice ${invoiceNumber} created: ${lineItems.length} lines, ${subtotal.toLocaleString("en-US", { style: "currency", currency: invoiceCurrency })}`,
+    invoiceId
+  );
 }

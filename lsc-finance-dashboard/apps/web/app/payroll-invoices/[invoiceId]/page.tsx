@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { requireRole } from "../../../lib/auth";
-import { getXtzInvoiceById } from "@lsc/db";
+import { getXtzInvoiceById, XTZ_ISSUER, XTE_ISSUER } from "@lsc/db";
 import type { XtzInvoiceItemRow } from "@lsc/db";
 import { updateInvoiceStatusAction } from "../actions";
 
@@ -60,6 +60,17 @@ export default async function InvoiceDetailPage({ params, searchParams }: PagePr
     sectionTotals[sec] = grouped[sec]!.reduce((s, i) => s + i.amount, 0);
   }
 
+  // Determine if the issuer is XTZ India or XTE (for bank details display)
+  const isXteIssuer =
+    header.issuerLegalName.includes("Esports Tech") ||
+    header.issuerLegalName.includes("XTZ Esports");
+
+  // For XTE invoices, detect if bank has IBAN (UAE) vs IFSC (India)
+  const hasIban = isXteIssuer;
+
+  // Flatten all items into a single numbered list (matching the XTE template)
+  let globalLineNum = 0;
+
   return (
     <div className="page-grid invoice-page">
       {/* ── Toolbar (hidden on print) ───────────────────────── */}
@@ -70,7 +81,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: PagePr
           </Link>
           <h3>Invoice {header.invoiceNumber}</h3>
           <p className="muted">
-            {header.payrollMonth} · {header.fromCompany} → {header.toCompany}
+            {header.payrollMonth} &middot; {header.fromCompany} &rarr; {header.toCompany}
           </p>
         </div>
         <div className="inline-actions">
@@ -79,7 +90,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: PagePr
           </a>
           <form action={updateInvoiceStatusAction} className="inline-actions">
             <input type="hidden" name="invoiceId" value={header.id} />
-            <select name="newStatus" defaultValue={header.status}>
+            <select name="newStatus" defaultValue={header.status} aria-label="Invoice status">
               <option value="generated">Generated</option>
               <option value="sent">Sent</option>
               <option value="paid">Paid</option>
@@ -98,175 +109,225 @@ export default async function InvoiceDetailPage({ params, searchParams }: PagePr
         </section>
       ) : null}
 
-      {/* ── Printable invoice template ─────────────────────── */}
+      {/* ── Printable invoice ─────────────────────────────── */}
       <article className="invoice-sheet">
-        {/* Header band */}
+        <div className="invoice-topbar" />
+
+        {/* ── Header: company + INVOICE title ──────────────── */}
         <div className="invoice-header">
-          <div className="invoice-brand">
-            <div className="invoice-brand-mark">XTZ</div>
-            <div>
-              <div className="invoice-brand-name">{header.issuerLegalName}</div>
-              <div className="invoice-brand-tag">Tax Invoice</div>
+          <div>
+            <div className="invoice-company-name">{header.issuerLegalName}</div>
+            <div className="invoice-company-address">
+              {header.issuerAddress.split("\n").map((line, i) => (
+                <span key={i}>
+                  {line}
+                  {i < header.issuerAddress.split("\n").length - 1 ? <br /> : null}
+                </span>
+              ))}
             </div>
           </div>
-          <div className="invoice-meta">
-            <div className="invoice-meta-row">
-              <span className="invoice-meta-label">Invoice #</span>
-              <span className="invoice-meta-value">{header.invoiceNumber}</span>
+          <div>
+            <div className="invoice-title">INVOICE</div>
+            <div className="invoice-meta">
+              <div className="invoice-meta-row">
+                <span className="invoice-meta-label">Invoice No:</span>
+                <span className="invoice-meta-value">{header.invoiceNumber}</span>
+              </div>
+              <div className="invoice-meta-row">
+                <span className="invoice-meta-label">Date:</span>
+                <span className="invoice-meta-value">{header.invoiceDate}</span>
+              </div>
+              <div className="invoice-meta-row">
+                <span className="invoice-meta-label">Period:</span>
+                <span className="invoice-meta-value">{header.payrollMonth}</span>
+              </div>
+              <div className="invoice-meta-row">
+                <span className="invoice-meta-label">Payment Terms:</span>
+                <span className="invoice-meta-value">Payable on Receipt</span>
+              </div>
             </div>
-            <div className="invoice-meta-row">
-              <span className="invoice-meta-label">Issue date</span>
-              <span className="invoice-meta-value">{header.invoiceDate}</span>
-            </div>
-            <div className="invoice-meta-row">
-              <span className="invoice-meta-label">Period</span>
-              <span className="invoice-meta-value">{header.payrollMonth}</span>
-            </div>
-            <div className="invoice-meta-row">
-              <span className="invoice-meta-label">Status</span>
-              <span className="invoice-meta-value">{header.status.toUpperCase()}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* From / To band */}
-        <div className="invoice-parties">
-          <div className="invoice-party">
-            <div className="invoice-party-label">From</div>
-            <div className="invoice-party-name">{header.issuerLegalName}</div>
-            <div className="invoice-party-detail">{header.issuerAddress}</div>
-            <div className="invoice-party-detail">
-              GSTIN: <strong>{header.issuerGstin}</strong>
-            </div>
-            <div className="invoice-party-detail">
-              CIN: {header.issuerCin}
-            </div>
-            <div className="invoice-party-detail">
-              PAN: {header.issuerPan}
-            </div>
-          </div>
-          <div className="invoice-party">
-            <div className="invoice-party-label">Bill to</div>
-            <div className="invoice-party-name">{header.recipientLegalName}</div>
-            <div className="invoice-party-detail">{header.recipientAddress}</div>
           </div>
         </div>
 
-        {/* Line items */}
-        <div className="invoice-lines">
-          {SECTION_ORDER.filter((sec) => grouped[sec]).map((sec) => (
-            <div className="invoice-section" key={sec}>
-              <div className="invoice-section-title">{SECTION_LABELS[sec]}</div>
-              <table className="invoice-line-table">
-                <thead>
-                  <tr>
-                    <th className="col-num">#</th>
-                    <th className="col-desc">Description</th>
-                    <th className="col-orig">Original</th>
-                    <th className="col-fx">FX rate</th>
-                    <th className="col-amt">Amount ({header.currency})</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {grouped[sec]!.map((item, idx) => (
-                    <tr key={item.id} className={item.isProvision ? "provision-row" : ""}>
-                      <td className="col-num">{idx + 1}</td>
-                      <td className="col-desc">
-                        <div>{item.description}</div>
-                        {item.referenceNote ? (
-                          <div className="invoice-line-note">{item.referenceNote}</div>
-                        ) : null}
-                      </td>
-                      <td className="col-orig">
-                        {item.originalAmount != null && item.originalCurrency ? (
-                          <>
-                            {item.originalAmount.toLocaleString("en-IN")}{" "}
-                            {item.originalCurrency}
-                          </>
-                        ) : (
-                          <span className="muted">—</span>
-                        )}
-                      </td>
-                      <td className="col-fx">
-                        {item.fxRate != null && item.fxRate !== 1 ? (
-                          item.fxRate.toFixed(5)
-                        ) : (
-                          <span className="muted">—</span>
-                        )}
-                      </td>
-                      <td className="col-amt">
-                        <strong>{fmt(item.amount, header.currency)}</strong>
-                      </td>
-                    </tr>
+        {/* ── Bill To ──────────────────────────────────────── */}
+        <div className="invoice-billto">
+          <div className="invoice-billto-label">BILL TO</div>
+          <div className="invoice-billto-name">
+            {header.recipientLegalName}
+            {header.recipientAddress ? (
+              <>
+                <br />
+                <span style={{ fontWeight: 400, fontSize: "0.85rem", color: "#6b7280" }}>
+                  {header.recipientAddress.split("\n").map((line, i) => (
+                    <span key={i}>
+                      {line}
+                      {i < header.recipientAddress.split("\n").length - 1 ? <br /> : null}
+                    </span>
                   ))}
-                  <tr className="invoice-section-subtotal">
-                    <td colSpan={4}>{SECTION_LABELS[sec]} subtotal</td>
-                    <td className="col-amt">
-                      <strong>{fmt(sectionTotals[sec] ?? 0, header.currency)}</strong>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          ))}
+                </span>
+              </>
+            ) : null}
+          </div>
         </div>
 
-        {/* Totals */}
+        {/* ── Line items ───────────────────────────────────── */}
+        <div className="invoice-lines">
+          {SECTION_ORDER.filter((sec) => grouped[sec]).map((sec) => {
+            const sectionItems = grouped[sec]!;
+            const hasMultipleSections = SECTION_ORDER.filter((s) => grouped[s]).length > 1;
+
+            return (
+              <div className="invoice-section" key={sec}>
+                {hasMultipleSections ? (
+                  <div className="invoice-section-title">{SECTION_LABELS[sec]}</div>
+                ) : null}
+                <table className="invoice-line-table">
+                  <thead>
+                    <tr>
+                      <th className="col-desc">DESCRIPTION</th>
+                      <th className="col-qty">QTY</th>
+                      <th className="col-unit-price">UNIT PRICE</th>
+                      <th className="col-amt">AMOUNT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sectionItems.map((item) => {
+                      globalLineNum++;
+                      return (
+                        <tr
+                          key={item.id}
+                          className={item.isProvision ? "provision-row" : ""}
+                        >
+                          <td className="col-desc">
+                            <div>{item.description}</div>
+                            {item.referenceNote ? (
+                              <div className="invoice-line-note">
+                                {item.referenceNote}
+                              </div>
+                            ) : null}
+                          </td>
+                          <td className="col-qty">{item.quantity}</td>
+                          <td className="col-unit-price">
+                            {fmt(item.unitPrice, header.currency)}
+                          </td>
+                          <td className="col-amt">
+                            {fmt(item.amount, header.currency)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {hasMultipleSections ? (
+                      <tr className="invoice-section-subtotal">
+                        <td colSpan={3}>
+                          {SECTION_LABELS[sec]} subtotal
+                        </td>
+                        <td className="col-amt">
+                          {fmt(sectionTotals[sec] ?? 0, header.currency)}
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Totals ───────────────────────────────────────── */}
         <div className="invoice-totals">
           <div className="invoice-totals-table">
             <div className="invoice-totals-row">
               <span>Subtotal</span>
               <span>{fmt(header.subtotal, header.currency)}</span>
             </div>
-            {header.taxAmount > 0 ? (
-              <div className="invoice-totals-row">
-                <span>Tax</span>
-                <span>{fmt(header.taxAmount, header.currency)}</span>
-              </div>
-            ) : null}
-            <div className="invoice-totals-row invoice-totals-grand">
-              <span>Total due</span>
+            <div className="invoice-totals-row">
+              <span>Tax ({header.taxAmount > 0 ? "" : "0"}%)</span>
+              <span>{fmt(header.taxAmount, header.currency)}</span>
+            </div>
+            <div className="invoice-totals-grand">
+              <span>TOTAL DUE</span>
               <span>{fmt(header.totalAmount, header.currency)}</span>
             </div>
           </div>
         </div>
 
-        {/* Banking details */}
+        {/* ── Bank Details ─────────────────────────────────── */}
         <div className="invoice-banking">
-          <div className="invoice-banking-title">Wire transfer details (international)</div>
-          <div className="invoice-banking-grid">
-            <div>
+          <div className="invoice-banking-title">BANK DETAILS</div>
+          <div className="invoice-banking-box">
+            <div className="invoice-banking-row">
               <div className="invoice-banking-label">Beneficiary</div>
               <div className="invoice-banking-value">{header.issuerLegalName}</div>
             </div>
-            <div>
-              <div className="invoice-banking-label">Bank</div>
+            <div className="invoice-banking-row">
+              <div className="invoice-banking-label">Address</div>
+              <div className="invoice-banking-value">
+                {header.issuerAddress.split("\n").map((line, i) => (
+                  <span key={i}>
+                    {line}
+                    {i < header.issuerAddress.split("\n").length - 1 ? <br /> : null}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="invoice-banking-row">
+              <div className="invoice-banking-label">Bank Name</div>
               <div className="invoice-banking-value">{header.bankName}</div>
             </div>
-            <div>
-              <div className="invoice-banking-label">Account number</div>
+            <div className="invoice-banking-row">
+              <div className="invoice-banking-label">Branch Address</div>
+              <div className="invoice-banking-value">{header.bankBranchAddress || header.bankBranch}</div>
+            </div>
+            <div className="invoice-banking-row">
+              <div className="invoice-banking-label">Account No.</div>
               <div className="invoice-banking-value">{header.bankAccountNumber}</div>
             </div>
-            <div>
-              <div className="invoice-banking-label">SWIFT / BIC</div>
+            {hasIban ? (
+              <div className="invoice-banking-row">
+                <div className="invoice-banking-label">IBAN</div>
+                <div className="invoice-banking-value">{header.bankIfsc}</div>
+              </div>
+            ) : (
+              <div className="invoice-banking-row">
+                <div className="invoice-banking-label">IFSC</div>
+                <div className="invoice-banking-value">{header.bankIfsc}</div>
+              </div>
+            )}
+            {hasIban ? (
+              <div className="invoice-banking-row">
+                <div className="invoice-banking-label">Routing Code</div>
+                <div className="invoice-banking-value">{header.bankAdCode}</div>
+              </div>
+            ) : (
+              <div className="invoice-banking-row">
+                <div className="invoice-banking-label">AD Code</div>
+                <div className="invoice-banking-value">{header.bankAdCode}</div>
+              </div>
+            )}
+            <div className="invoice-banking-row">
+              <div className="invoice-banking-label">SWIFT Code</div>
               <div className="invoice-banking-value">{header.bankSwift}</div>
             </div>
-            <div>
-              <div className="invoice-banking-label">IFSC</div>
-              <div className="invoice-banking-value">{header.bankIfsc}</div>
-            </div>
-            <div>
-              <div className="invoice-banking-label">AD code</div>
-              <div className="invoice-banking-value">{header.bankAdCode}</div>
-            </div>
-            <div className="invoice-banking-wide">
-              <div className="invoice-banking-label">Branch</div>
-              <div className="invoice-banking-value">{header.bankBranch}</div>
-              <div className="invoice-banking-detail">{header.bankBranchAddress}</div>
-            </div>
+            {!hasIban && header.issuerGstin ? (
+              <>
+                <div className="invoice-banking-row">
+                  <div className="invoice-banking-label">GSTIN</div>
+                  <div className="invoice-banking-value">{header.issuerGstin}</div>
+                </div>
+                <div className="invoice-banking-row">
+                  <div className="invoice-banking-label">PAN</div>
+                  <div className="invoice-banking-value">{header.issuerPan}</div>
+                </div>
+                <div className="invoice-banking-row">
+                  <div className="invoice-banking-label">CIN</div>
+                  <div className="invoice-banking-value">{header.issuerCin}</div>
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
 
+        {/* ── Notes ────────────────────────────────────────── */}
         {header.notes ? (
           <div className="invoice-notes">
             <div className="invoice-notes-label">Notes</div>
@@ -274,10 +335,13 @@ export default async function InvoiceDetailPage({ params, searchParams }: PagePr
           </div>
         ) : null}
 
-        <div className="invoice-footer">
-          <div>Payment method: {header.paymentMethod || "Wire transfer"}</div>
-          <div>This is a computer generated invoice and does not require a signature.</div>
+        {/* ── Footer ───────────────────────────────────────── */}
+        <div className="invoice-footer-text">
+          {header.issuerLegalName} &bull;{" "}
+          {header.issuerAddress.split("\n").join(", ")} &bull;{" "}
+          Thank you for your business
         </div>
+        <div className="invoice-footer-bar" />
       </article>
     </div>
   );
