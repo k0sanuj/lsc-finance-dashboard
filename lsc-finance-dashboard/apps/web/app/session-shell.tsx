@@ -36,7 +36,7 @@ const ALL_ADMIN: AppUserRole[] = ["super_admin", "finance_admin"];
 const ALL_ROLES: AppUserRole[] = ["super_admin", "finance_admin", "commercial_user", "viewer"];
 
 /** Routes that appear in multiple company navs — use ?company= to disambiguate */
-const SHARED_PEOPLE_ROUTES = ["/employees", "/salary-payable", "/payroll-invoices"];
+const SHARED_PEOPLE_ROUTES = ["/employees", "/salary-payable"];
 
 function getTbrNav(): CompanyNav {
   return {
@@ -322,7 +322,7 @@ function SessionShellInner({ children, user }: SessionShellProps) {
       } else {
         setExpandedCompany("TBR");
       }
-    } else if (pathname.startsWith("/gig-workers") || pathname.startsWith("/xtz-expenses")) {
+    } else if (pathname.startsWith("/gig-workers") || pathname.startsWith("/xtz-expenses") || pathname.startsWith("/payroll-invoices")) {
       setExpandedCompany("XTZ India");
     } else if (pathname.startsWith("/fsp")) {
       setExpandedCompany("FSP");
