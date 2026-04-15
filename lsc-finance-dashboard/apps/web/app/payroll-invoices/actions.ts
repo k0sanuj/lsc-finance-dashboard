@@ -238,6 +238,7 @@ export async function generateXtzInvoiceAction(formData: FormData): Promise<void
      where c.code = $1::company_code
        and (e.status = 'active'
             or (e.status = 'terminated' and e.end_date >= $2::date - interval '60 days'))
+       and e.full_name != 'Sayan Mukherjee'
      order by e.full_name`,
     [fromCompanyCode, monthDate]
   );

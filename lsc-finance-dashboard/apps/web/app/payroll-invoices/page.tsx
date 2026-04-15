@@ -108,10 +108,12 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
   const liveInrUsdRate = liveInrUsd?.rate ?? 0.01183;
 
   // Pre-compute live preview of payroll for the selected month
+  // Sayan is invoiced separately (directly by XTE) — excluded from XTZ India invoice
   const activeEmps = xtzEmployees.filter(
     (e) =>
-      e.status === "active" ||
-      (e.status === "terminated" && e.endDate)
+      e.fullName !== "Sayan Mukherjee" &&
+      (e.status === "active" ||
+        (e.status === "terminated" && e.endDate))
   );
 
   let payrollPreviewUsd = 0;

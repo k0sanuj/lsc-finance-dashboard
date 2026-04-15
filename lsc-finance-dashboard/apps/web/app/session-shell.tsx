@@ -74,7 +74,6 @@ function getTbrNav(): CompanyNav {
         links: [
           { href: "/employees?company=TBR" as Route, label: "Employees", roles: ALL_ADMIN },
           { href: "/salary-payable?company=TBR" as Route, label: "Salary Payable", roles: ALL_ADMIN },
-          { href: "/payroll-invoices" as Route, label: "XTZ Invoice Generator", roles: ALL_ADMIN },
         ],
       },
       {
