@@ -88,17 +88,6 @@ export default async function InvoiceDetailPage({ params, searchParams }: PagePr
         <div className="inline-actions">
           <DownloadPdfButton invoiceId={header.id} />
           <PrintButton />
-          <form action={updateInvoiceStatusAction} className="inline-actions">
-            <input type="hidden" name="invoiceId" value={header.id} />
-            <select name="newStatus" defaultValue={header.status} aria-label="Invoice status">
-              <option value="generated">Generated</option>
-              <option value="sent">Sent</option>
-              <option value="paid">Paid</option>
-            </select>
-            <button className="action-button secondary" type="submit">
-              Update status
-            </button>
-          </form>
         </div>
       </header>
 
