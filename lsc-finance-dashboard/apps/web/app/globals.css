@@ -2934,20 +2934,45 @@ textarea {
 
 /* ── Print styles ── */
 @media print {
+  /* Reset everything */
   body {
     background: #ffffff !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
+  /* Kill the entire app shell grid — just show content */
+  .app-shell {
+    display: block !important;
+    grid-template-columns: none !important;
+  }
+
+  /* Hide sidebar, nav, breadcrumbs, toolbar, toggle, backdrop, user pill — EVERYTHING except invoice */
+  .sidebar,
+  .sidebar-toggle,
+  .sidebar-backdrop,
   .no-print,
+  .breadcrumb,
+  .user-pill,
+  .workspace-header,
+  .notice,
   aside,
-  nav,
-  .session-shell-sidebar,
-  .session-breadcrumbs {
+  nav {
     display: none !important;
   }
 
+  /* Content area needs no padding */
+  .main-content {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .page-grid {
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+
+  /* Invoice sheet fills the page cleanly */
   .invoice-page {
     max-width: 100% !important;
     margin: 0 !important;
@@ -2961,27 +2986,11 @@ textarea {
     margin: 0 !important;
   }
 
+  /* Force color printing for dark backgrounds */
   .invoice-topbar,
-  .invoice-footer-bar {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .invoice-line-table thead th {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .invoice-totals-grand {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .invoice-banking {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
+  .invoice-footer-bar,
+  .invoice-line-table thead th,
+  .invoice-totals-grand,
   .provision-row {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;

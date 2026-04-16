@@ -5,7 +5,7 @@ import { requireRole } from "../../../lib/auth";
 import { getXtzInvoiceById, XTZ_ISSUER, XTE_ISSUER } from "@lsc/db";
 import type { XtzInvoiceItemRow } from "@lsc/db";
 import { updateInvoiceStatusAction } from "../actions";
-import { PrintButton } from "../../components/print-button";
+import { PrintButton, DownloadPdfButton } from "../../components/print-button";
 
 const fmt = (n: number, currency: string): string =>
   n.toLocaleString("en-US", {
@@ -86,6 +86,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: PagePr
           </p>
         </div>
         <div className="inline-actions">
+          <DownloadPdfButton invoiceId={header.id} />
           <PrintButton />
           <form action={updateInvoiceStatusAction} className="inline-actions">
             <input type="hidden" name="invoiceId" value={header.id} />
