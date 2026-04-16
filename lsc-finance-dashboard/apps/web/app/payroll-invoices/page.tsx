@@ -8,7 +8,8 @@ import {
   getProvisions,
   getReimbursementItems,
   getEmployees,
-  getFxRatesForDisplay
+  getFxRatesForDisplay,
+  getVendorsWithBank
 } from "@lsc/db";
 import {
   generateXtzInvoiceAction,
@@ -26,6 +27,7 @@ import {
   createDirectInvoiceAction
 } from "./actions";
 import { BillUploader } from "../components/bill-uploader";
+import { VendorSelector } from "../components/vendor-selector";
 
 const fmtUsd = (n: number): string =>
   n.toLocaleString("en-US", {
@@ -93,7 +95,8 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
     reimbs,
     provs,
     xtzEmployees,
-    fxRates
+    fxRates,
+    allVendors
   ] = await Promise.all([
     getXtzInvoices(),
     getXtzInvoiceSummary(),
@@ -101,7 +104,8 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
     getReimbursementItems("XTZ"),
     getProvisions("XTZ"),
     getEmployees("XTZ"),
-    getFxRatesForDisplay()
+    getFxRatesForDisplay(),
+    getVendorsWithBank()
   ]);
 
   // Find current FX (USD-from-INR) for live preview
@@ -764,7 +768,8 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
           Use this for invoices from XTE Dubai or XTZ India to individuals (e.g. Sayan Mukherjee payroll due)
           or external parties. Supports up to 5 line items.
         </p>
-        <form action={createDirectInvoiceAction}>
+        <VendorSelector vendors={allVendors} formId="direct-invoice-form" />
+        <form id="direct-invoice-form" action={createDirectInvoiceAction}>
           <div className="form-grid">
             <label className="field">
               <span>Issuing entity</span>

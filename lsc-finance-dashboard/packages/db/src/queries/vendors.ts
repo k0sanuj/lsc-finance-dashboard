@@ -59,6 +59,101 @@ export type VendorContactRow = {
   isPrimary: boolean;
 };
 
+export type VendorWithBankRow = {
+  id: string;
+  name: string;
+  vendorType: string;
+  status: string;
+  paymentTerms: string;
+  address: string;
+  city: string;
+  country: string;
+  email: string;
+  phone: string;
+  bankName: string;
+  bankBranch: string;
+  bankAccountNumber: string;
+  bankIfsc: string;
+  bankSwift: string;
+  bankIban: string;
+  bankRoutingCode: string;
+  currencyCode: string;
+  taxId: string;
+  notes: string;
+  entityCodes: string;
+};
+
+export async function getVendorsWithBank(companyCode?: string): Promise<VendorWithBankRow[]> {
+  if (getBackend() !== "database") return [];
+
+  const where = companyCode
+    ? `where exists (select 1 from vendor_entity_links vel join companies c on c.id = vel.company_id where vel.vendor_id = v.id and c.code = $1::company_code)`
+    : "";
+  const params = companyCode ? [companyCode] : [];
+
+  const rows = await queryRows<{
+    id: string;
+    name: string;
+    vendor_type: string;
+    status: string;
+    payment_terms: string | null;
+    address: string | null;
+    city: string | null;
+    country: string | null;
+    email: string | null;
+    phone: string | null;
+    bank_name: string | null;
+    bank_branch: string | null;
+    bank_account_number: string | null;
+    bank_ifsc: string | null;
+    bank_swift: string | null;
+    bank_iban: string | null;
+    bank_routing_code: string | null;
+    currency_code: string;
+    tax_id: string | null;
+    notes: string | null;
+    entity_codes: string | null;
+  }>(
+    `select v.id, v.name, v.vendor_type, v.status, v.payment_terms,
+            v.address, v.city, v.country, v.email, v.phone,
+            v.bank_name, v.bank_branch, v.bank_account_number,
+            v.bank_ifsc, v.bank_swift, v.bank_iban, v.bank_routing_code,
+            v.currency_code, v.tax_id, v.notes,
+            (select string_agg(c2.code::text, ', ')
+             from vendor_entity_links vel2
+             join companies c2 on c2.id = vel2.company_id
+             where vel2.vendor_id = v.id) as entity_codes
+     from vendors v
+     ${where}
+     order by v.name`,
+    params
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    vendorType: r.vendor_type.replace(/_/g, " "),
+    status: r.status,
+    paymentTerms: r.payment_terms ?? "",
+    address: r.address ?? "",
+    city: r.city ?? "",
+    country: r.country ?? "",
+    email: r.email ?? "",
+    phone: r.phone ?? "",
+    bankName: r.bank_name ?? "",
+    bankBranch: r.bank_branch ?? "",
+    bankAccountNumber: r.bank_account_number ?? "",
+    bankIfsc: r.bank_ifsc ?? "",
+    bankSwift: r.bank_swift ?? "",
+    bankIban: r.bank_iban ?? "",
+    bankRoutingCode: r.bank_routing_code ?? "",
+    currencyCode: r.currency_code,
+    taxId: r.tax_id ?? "",
+    notes: r.notes ?? "",
+    entityCodes: r.entity_codes ?? ""
+  }));
+}
+
 export async function getVendors(): Promise<VendorRow[]> {
   if (getBackend() !== "database") return [];
 
