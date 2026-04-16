@@ -767,34 +767,35 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
         </div>
       </section>
 
-      {/* ── Direct / custom invoice (XTE→anyone, XTZ→anyone) ── */}
+      {/* ── Incoming invoice (vendor/contractor → company) ── */}
       <section className="card">
         <div className="card-title-row">
           <div>
-            <span className="section-kicker">Custom invoice</span>
-            <h3>Create direct invoice (any issuer → any recipient)</h3>
+            <span className="section-kicker">Incoming invoice</span>
+            <h3>Record invoice from vendor / contractor</h3>
           </div>
         </div>
         <p className="muted" style={{ marginTop: 0 }}>
-          Use this for invoices from XTE Dubai or XTZ India to individuals (e.g. Sayan Mukherjee payroll due)
-          or external parties. Supports up to 5 line items.
+          Use this when a vendor or contractor (e.g. Sayan Mukherjee) sends an invoice
+          to XTZ Dubai or XTZ India. The vendor&apos;s bank details are pulled from the vendor
+          directory. Add vendors on the <a href="/vendors" className="ghost-link">Vendors page</a>.
         </p>
         <VendorSelector vendors={allVendors} formId="direct-invoice-form" />
         <form id="direct-invoice-form" action={createDirectInvoiceAction}>
           <div className="form-grid">
             <label className="field">
-              <span>Issuing entity</span>
+              <span>Billed to (receiving company)</span>
               <select name="issuerEntity" defaultValue="XTE" required>
-                <option value="XTE">XTZ Esports Tech Ltd (Dubai / XTE)</option>
+                <option value="XTE">XTZ Esports Tech Ltd (Dubai)</option>
                 <option value="XTZ">XTZ India Private Limited</option>
               </select>
             </label>
             <label className="field">
-              <span>Recipient name</span>
+              <span>Invoice from (vendor name)</span>
               <input type="text" name="recipientName" placeholder="e.g. Sayan Mukherjee" required />
             </label>
             <label className="field">
-              <span>Recipient address (optional)</span>
+              <span>Vendor address</span>
               <input type="text" name="recipientAddress" placeholder="City, Country" />
             </label>
             <label className="field">
@@ -849,7 +850,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
 
           <div className="form-actions" style={{ marginTop: 12 }}>
             <button className="action-button primary" type="submit">
-              Create direct invoice
+              Record vendor invoice
             </button>
           </div>
         </form>

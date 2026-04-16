@@ -702,18 +702,29 @@ export async function deleteInvoiceAction(formData: FormData): Promise<void> {
   redirectTo("success", "Invoice deleted.", undefined, getMonth(formData));
 }
 
-// ── Create a direct/custom invoice (any issuer → any recipient) ──
+// ── Record incoming invoice (vendor/contractor → company) ──
+// The vendor is the ISSUER (their name + bank on the invoice header).
+// The company (XTE/XTZ) is the RECIPIENT (billed to).
 
 export async function createDirectInvoiceAction(formData: FormData): Promise<void> {
   await requireRole(["super_admin", "finance_admin"]);
 
-  const issuerEntity = clean(formData.get("issuerEntity")); // "XTZ" or "XTE"
-  const recipientName = clean(formData.get("recipientName"));
-  const recipientAddress = clean(formData.get("recipientAddress"));
+  const billedToEntity = clean(formData.get("issuerEntity")); // "XTZ" or "XTE" — the company being billed
+  const vendorName = clean(formData.get("recipientName")); // the vendor sending the invoice
+  const vendorAddress = clean(formData.get("recipientAddress"));
   const invoiceMonth = clean(formData.get("invoiceMonth"));
   const invoiceCurrency = clean(formData.get("invoiceCurrency")) || "USD";
   const paymentMethod = clean(formData.get("paymentMethod")) || "Wire transfer (USD)";
   const notes = clean(formData.get("notes"));
+
+  // Vendor bank details from VendorSelector hidden fields
+  const vendorBankName = clean(formData.get("vendorBankName"));
+  const vendorBankBranch = clean(formData.get("vendorBankBranch"));
+  const vendorBankAccount = clean(formData.get("vendorBankAccount"));
+  const vendorBankIfsc = clean(formData.get("vendorBankIfsc"));
+  const vendorBankSwift = clean(formData.get("vendorBankSwift"));
+  const vendorBankIban = clean(formData.get("vendorBankIban"));
+  const vendorBankRouting = clean(formData.get("vendorBankRouting"));
 
   // Parse line items from form (up to 20 lines)
   const lineItems: { description: string; qty: number; unitPrice: number }[] = [];
@@ -726,29 +737,29 @@ export async function createDirectInvoiceAction(formData: FormData): Promise<voi
     }
   }
 
-  if (!recipientName || !invoiceMonth || lineItems.length === 0) {
-    redirectTo("error", "Recipient, month, and at least one line item are required.");
+  if (!vendorName || !invoiceMonth || lineItems.length === 0) {
+    redirectTo("error", "Vendor name, month, and at least one line item are required.", undefined, getMonth(formData));
   }
 
   const monthDate = invoiceMonth.length === 7 ? `${invoiceMonth}-01` : invoiceMonth;
-  const fromCompanyCode = issuerEntity || "XTE";
-  const fromCompanyId = await getCompanyIdByCode(fromCompanyCode);
-  if (!fromCompanyId) redirectTo("error", `Issuer company ${fromCompanyCode} not found.`);
+  const billedToCode = billedToEntity || "XTE";
+  const billedToCompanyId = await getCompanyIdByCode(billedToCode);
+  if (!billedToCompanyId) redirectTo("error", `Company ${billedToCode} not found.`, undefined, getMonth(formData));
 
-  // Use XTE or XTZ India as issuer based on selection
-  const issuer = fromCompanyCode === "XTZ" ? XTZ_ISSUER : XTE_ISSUER;
-  const isXteIssuer = fromCompanyCode !== "XTZ";
+  // The billed-to company's details go in the "recipient" fields
+  const billedTo = billedToCode === "XTZ" ? XTZ_ISSUER : XTE_ISSUER;
+  const billedToAddress = billedTo.address;
+  const billedToLegalName = billedTo.legalName;
 
   const subtotal = Number(
     lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0).toFixed(2)
   );
   const yyyymm = invoiceMonth.replace("-", "");
   const rand4 = String(Math.floor(1000 + Math.random() * 9000));
-  const prefix = isXteIssuer ? "INV" : "XTZ";
-  const invoiceNumber = `${prefix}-${yyyymm}-${rand4}`;
+  const invoiceNumber = `VND-${yyyymm}-${rand4}`;
 
-  // For direct invoices, from and to can be the same company — we use from_company_id
-  // for both and store recipient info in the text fields
+  // issuer = vendor (who sends the invoice)
+  // recipient = company (who pays)
   const invoiceRows = await queryRowsAdmin<{ id: string }>(
     `insert into payroll_invoices (
        invoice_number, invoice_date, payroll_month,
@@ -762,34 +773,31 @@ export async function createDirectInvoiceAction(formData: FormData): Promise<voi
      ) values (
        $1, current_date, $2::date, $3, $3,
        $4, 0, $4, $5, 'generated', $6, $7, now(),
-       $8, $9, $10, $11, $12,
-       $13, $14, $15, $16, $17,
-       $18, $19,
-       $20, $21
+       $8, null, null, null, $9,
+       $10, $11, $12, $13, $14,
+       $15, $16,
+       $17, $18
      )
      returning id`,
     [
       invoiceNumber,
       monthDate,
-      fromCompanyId,
+      billedToCompanyId,
       subtotal,
       invoiceCurrency,
       paymentMethod,
       notes || null,
-      issuer.legalName,
-      isXteIssuer ? null : (issuer as typeof XTZ_ISSUER).gstin,
-      isXteIssuer ? null : (issuer as typeof XTZ_ISSUER).cin,
-      isXteIssuer ? null : (issuer as typeof XTZ_ISSUER).pan,
-      issuer.address,
-      issuer.bank.name,
-      issuer.bank.accountNumber,
-      isXteIssuer ? (issuer as typeof XTE_ISSUER).bank.iban : (issuer as typeof XTZ_ISSUER).bank.ifsc,
-      issuer.bank.swift,
-      isXteIssuer ? (issuer as typeof XTE_ISSUER).bank.routingCode : (issuer as typeof XTZ_ISSUER).bank.adCode,
-      isXteIssuer ? null : (issuer as typeof XTZ_ISSUER).bank.branch,
-      isXteIssuer ? (issuer as typeof XTE_ISSUER).bank.branchAddress : (issuer as typeof XTZ_ISSUER).bank.branchAddress,
-      recipientName,
-      recipientAddress || null
+      vendorName,                                    // issuer_legal_name = vendor
+      vendorAddress || null,                         // issuer_address = vendor address
+      vendorBankName || null,                        // bank_name
+      vendorBankAccount || null,                     // bank_account_number
+      vendorBankIfsc || vendorBankIban || null,       // bank_ifsc (or IBAN)
+      vendorBankSwift || null,                        // bank_swift
+      vendorBankRouting || null,                      // bank_ad_code (routing)
+      vendorBankBranch || null,                       // bank_branch
+      null,                                           // bank_branch_address
+      billedToLegalName,                             // recipient = the company
+      billedToAddress                                // recipient address
     ]
   );
 
