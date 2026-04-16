@@ -304,10 +304,7 @@ export async function generateXtzInvoiceAction(formData: FormData): Promise<void
     let originalAmount = 0;
     let originalCurrency = "INR";
     let fxRate = 1;
-    let descSuffix = "";
-
     if (emp.is_usd_salary && Number(emp.salary_usd) > 0) {
-      // Fixed USD salary — no conversion
       originalAmount = Number(emp.salary_usd);
       originalCurrency = "USD";
       if (invoiceCurrency === "USD") {
@@ -317,9 +314,7 @@ export async function generateXtzInvoiceAction(formData: FormData): Promise<void
         convertedAmount = fx.converted;
         fxRate = fx.rate;
       }
-      descSuffix = ` — Fixed USD $${originalAmount.toLocaleString()}/mo`;
     } else {
-      // Live FX from base_salary in salary_currency
       originalAmount = Number(emp.base_salary);
       originalCurrency = emp.salary_currency;
       if (originalCurrency === invoiceCurrency) {
@@ -329,13 +324,12 @@ export async function generateXtzInvoiceAction(formData: FormData): Promise<void
         convertedAmount = fx.converted;
         fxRate = fx.rate;
       }
-      descSuffix = ` — ${originalAmount.toLocaleString("en-IN")} ${originalCurrency} @ ${fxRate.toFixed(5)}`;
     }
 
     lines.push({
       employeeId: emp.id,
       section: "payroll",
-      description: `${emp.full_name} (${emp.designation})${descSuffix}`,
+      description: `${emp.full_name} — ${emp.designation}`,
       convertedAmount,
       originalAmount,
       originalCurrency,

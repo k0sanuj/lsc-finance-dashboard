@@ -21,7 +21,7 @@ const fmt = (n: number, currency: string): string =>
 
 const SECTION_LABELS: Record<string, string> = {
   payroll: "PAYROLL",
-  mdg_fees: "MDG FEES",
+  mdg_fees: "THIRD PARTY VENDORS",
   reimbursement: "REIMBURSEMENTS",
   software_expense: "SOFTWARE EXPENSES",
   provision: "PROVISIONS",

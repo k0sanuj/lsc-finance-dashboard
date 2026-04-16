@@ -28,6 +28,7 @@ import {
 } from "./actions";
 import { BillUploader } from "../components/bill-uploader";
 import { VendorSelector } from "../components/vendor-selector";
+import { MonthPicker } from "../components/month-picker";
 
 const fmtUsd = (n: number): string =>
   n.toLocaleString("en-US", {
@@ -175,8 +176,8 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
           </span>
           <h3>XTZ Invoice Generator</h3>
           <p className="muted">
-            Monthly invoice from XTZ India to XTE — payroll, MDG fees, reimbursements,
-            software expenses, and provisions in one unified invoice. Live INR→USD rate
+            Monthly invoice from XTZ India to XTZ Dubai — payroll, third party vendors,
+            reimbursements, software expenses, and provisions in one unified invoice. Live INR→USD rate
             applied to Anuj &amp; Sayan; everyone else uses fixed USD salaries.
           </p>
         </div>
@@ -233,28 +234,16 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
       <section className="card">
         <div className="card-title-row">
           <div>
-            <span className="section-kicker">Working month</span>
-            <h3>Select invoice month</h3>
+            <span className="section-kicker">
+              {new Date(`${selectedMonth}-01`).toLocaleDateString("en-US", {
+                month: "long",
+                year: "numeric"
+              })}
+            </span>
+            <h3>Invoice month</h3>
           </div>
-          <span className="badge">
-            Editing data for:{" "}
-            {new Date(`${selectedMonth}-01`).toLocaleDateString("en-US", {
-              month: "long",
-              year: "numeric"
-            })}
-          </span>
+          <MonthPicker value={selectedMonth} />
         </div>
-        <form method="get" className="inline-actions">
-          <input
-            type="month"
-            name="month"
-            defaultValue={selectedMonth}
-            aria-label="Invoice month"
-          />
-          <button className="action-button secondary" type="submit">
-            Switch month
-          </button>
-        </form>
       </section>
 
       {/* ── Live preview of what will be invoiced ────────────── */}
@@ -329,7 +318,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                 </thead>
                 <tbody>
                   <tr>
-                    <td>MDG Fees</td>
+                    <td>Third Party Vendors</td>
                     <td>{monthMdg.length}</td>
                     <td style={{ textAlign: "right" }}>
                       {fmtUsd(previewMdgUsd)}
@@ -385,12 +374,12 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
         </form>
       </section>
 
-      {/* ── MDG Fees ─────────────────────────────────────────── */}
+      {/* ── Third Party Vendors ─────────────────────────────────────────── */}
       <section className="card">
         <div className="card-title-row">
           <div>
-            <span className="section-kicker">Section 2 — Management fees</span>
-            <h3>MDG Fees</h3>
+            <span className="section-kicker">Section 2 — Third party vendors</span>
+            <h3>Third Party Vendors</h3>
           </div>
           <span className="badge">{monthMdg.length} for {selectedMonth}</span>
         </div>
@@ -412,7 +401,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
               <input
                 type="text"
                 name="description"
-                defaultValue="MDG Fees"
+                placeholder="e.g. MDG Fees, Consulting, Legal services"
                 required
               />
             </label>
@@ -433,7 +422,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
             </label>
             <div className="form-actions">
               <button className="action-button primary" type="submit">
-                Save MDG fee
+                Add vendor expense
               </button>
             </div>
           </div>
@@ -483,7 +472,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
               ) : (
                 <tr>
                   <td className="muted" colSpan={5}>
-                    No MDG fees yet. Add one above.
+                    No third party vendor expenses yet. Add one above.
                   </td>
                 </tr>
               )}
@@ -918,7 +907,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
               ) : (
                 <tr>
                   <td className="muted" colSpan={8}>
-                    No invoices generated yet. Add MDG fees, reimbursements, or
+                    No invoices generated yet. Add vendor expenses, reimbursements, or
                     provisions above and click "Generate" to create your first invoice.
                   </td>
                 </tr>
