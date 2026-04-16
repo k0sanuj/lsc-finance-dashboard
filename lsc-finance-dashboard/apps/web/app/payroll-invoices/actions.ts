@@ -16,9 +16,11 @@ import { requireRole } from "../../lib/auth";
 function redirectTo(
   status: "success" | "error",
   message: string,
-  invoiceId?: string
+  invoiceId?: string,
+  month?: string
 ): never {
   const params = new URLSearchParams({ status, message });
+  if (month) params.set("month", month);
   const target = invoiceId
     ? `/payroll-invoices/${invoiceId}?${params.toString()}`
     : `/payroll-invoices?${params.toString()}`;
@@ -32,6 +34,11 @@ function clean(value: FormDataEntryValue | null): string {
 function num(value: FormDataEntryValue | null): number {
   const n = Number(String(value ?? "0").replace(/[^0-9.-]/g, ""));
   return Number.isFinite(n) ? n : 0;
+}
+
+/** Extract the working month from form to preserve across redirects */
+function getMonth(formData: FormData): string {
+  return clean(formData.get("month")) || "";
 }
 
 async function getCompanyIdByCode(code: string): Promise<string | null> {
@@ -71,7 +78,7 @@ export async function addMdgFeeAction(formData: FormData): Promise<void> {
   );
 
   revalidatePath("/payroll-invoices");
-  redirectTo("success", `MDG fee for ${feeMonth} saved.`);
+  redirectTo("success", `MDG fee for ${feeMonth} saved.`, undefined, getMonth(formData));
 }
 
 export async function updateMdgFeeAction(formData: FormData): Promise<void> {
@@ -89,7 +96,7 @@ export async function updateMdgFeeAction(formData: FormData): Promise<void> {
   if (status) { sets.push(`status = $${p}`); vals.push(status); p++; }
   await executeAdmin(`update mdg_fees set ${sets.join(", ")} where id = $1`, vals);
   revalidatePath("/payroll-invoices");
-  redirectTo("success", "MDG fee updated.");
+  redirectTo("success", "MDG fee updated.", undefined, getMonth(formData));
 }
 
 export async function deleteMdgFeeAction(formData: FormData): Promise<void> {
@@ -98,7 +105,7 @@ export async function deleteMdgFeeAction(formData: FormData): Promise<void> {
   if (!id) redirectTo("error", "Missing id.");
   await executeAdmin(`delete from mdg_fees where id = $1 and invoiced_item_id is null`, [id]);
   revalidatePath("/payroll-invoices");
-  redirectTo("success", "MDG fee removed.");
+  redirectTo("success", "MDG fee removed.", undefined, getMonth(formData));
 }
 
 export async function addReimbursementAction(formData: FormData): Promise<void> {
@@ -127,7 +134,7 @@ export async function addReimbursementAction(formData: FormData): Promise<void> 
   );
 
   revalidatePath("/payroll-invoices");
-  redirectTo("success", "Reimbursement added.");
+  redirectTo("success", "Reimbursement added.", undefined, getMonth(formData));
 }
 
 export async function updateReimbursementAction(formData: FormData): Promise<void> {
@@ -145,7 +152,7 @@ export async function updateReimbursementAction(formData: FormData): Promise<voi
   if (status) { sets.push(`status = $${p}`); vals.push(status); p++; }
   await executeAdmin(`update reimbursement_items set ${sets.join(", ")} where id = $1`, vals);
   revalidatePath("/payroll-invoices");
-  redirectTo("success", "Reimbursement updated.");
+  redirectTo("success", "Reimbursement updated.", undefined, getMonth(formData));
 }
 
 export async function deleteReimbursementAction(formData: FormData): Promise<void> {
@@ -157,7 +164,7 @@ export async function deleteReimbursementAction(formData: FormData): Promise<voi
     [id]
   );
   revalidatePath("/payroll-invoices");
-  redirectTo("success", "Reimbursement removed.");
+  redirectTo("success", "Reimbursement removed.", undefined, getMonth(formData));
 }
 
 export async function addProvisionAction(formData: FormData): Promise<void> {
@@ -196,7 +203,7 @@ export async function addProvisionAction(formData: FormData): Promise<void> {
   );
 
   revalidatePath("/payroll-invoices");
-  redirectTo("success", "Provision added.");
+  redirectTo("success", "Provision added.", undefined, getMonth(formData));
 }
 
 export async function updateProvisionAction(formData: FormData): Promise<void> {
@@ -216,7 +223,7 @@ export async function updateProvisionAction(formData: FormData): Promise<void> {
   if (notes) { sets.push(`notes = $${p}`); vals.push(notes); p++; }
   await executeAdmin(`update provisions set ${sets.join(", ")} where id = $1`, vals);
   revalidatePath("/payroll-invoices");
-  redirectTo("success", "Provision updated.");
+  redirectTo("success", "Provision updated.", undefined, getMonth(formData));
 }
 
 export async function deleteProvisionAction(formData: FormData): Promise<void> {
@@ -228,7 +235,7 @@ export async function deleteProvisionAction(formData: FormData): Promise<void> {
     [id]
   );
   revalidatePath("/payroll-invoices");
-  redirectTo("success", "Provision removed.");
+  redirectTo("success", "Provision removed.", undefined, getMonth(formData));
 }
 
 // ── Generate full XTZ invoice ────────────────────────────────
@@ -692,7 +699,7 @@ export async function deleteInvoiceAction(formData: FormData): Promise<void> {
   await executeAdmin(`delete from payroll_invoices where id = $1`, [invoiceId]);
 
   revalidatePath("/payroll-invoices");
-  redirectTo("success", "Invoice deleted.");
+  redirectTo("success", "Invoice deleted.", undefined, getMonth(formData));
 }
 
 // ── Create a direct/custom invoice (any issuer → any recipient) ──

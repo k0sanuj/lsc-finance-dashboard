@@ -29,6 +29,7 @@ import {
 import { BillUploader } from "../components/bill-uploader";
 import { VendorSelector } from "../components/vendor-selector";
 import { MonthPicker } from "../components/month-picker";
+import { AutoFormSelect } from "../components/auto-form-select";
 
 const fmtUsd = (n: number): string =>
   n.toLocaleString("en-US", {
@@ -386,6 +387,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
 
         <form action={addMdgFeeAction}>
           <input type="hidden" name="companyCode" value="XTZ" />
+          <input type="hidden" name="month" value={selectedMonth} />
           <div className="form-grid">
             <label className="field">
               <span>Month</span>
@@ -447,20 +449,26 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                     <td>{f.description}</td>
                     <td>{fmtNum(f.amount, f.currency)}</td>
                     <td>
-                      <form action={updateMdgFeeAction} className="inline-actions">
+                      <form action={updateMdgFeeAction}>
                         <input type="hidden" name="id" value={f.id} />
-                        <select name="status" defaultValue={f.status} aria-label="Status">
-                          <option value="pending">Pending</option>
-                          <option value="approved">Approved</option>
-                          <option value="invoiced">Invoiced</option>
-                        </select>
-                        <button className="action-button secondary" type="submit">Set</button>
+                        <input type="hidden" name="month" value={selectedMonth} />
+                        <AutoFormSelect
+                          name="status"
+                          defaultValue={f.status}
+                          label="Status"
+                          options={[
+                            { value: "pending", label: "Pending" },
+                            { value: "approved", label: "Approved" },
+                            { value: "invoiced", label: "Invoiced" }
+                          ]}
+                        />
                       </form>
                     </td>
                     <td>
                       {f.status !== "invoiced" ? (
-                        <form action={deleteMdgFeeAction} className="inline-actions">
+                        <form action={deleteMdgFeeAction}>
                           <input type="hidden" name="id" value={f.id} />
+                          <input type="hidden" name="month" value={selectedMonth} />
                           <button className="action-button secondary" type="submit">Remove</button>
                         </form>
                       ) : (
@@ -506,6 +514,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
 
         <form id="reimbursement-form" action={addReimbursementAction}>
           <input type="hidden" name="companyCode" value="XTZ" />
+          <input type="hidden" name="month" value={selectedMonth} />
           <div className="form-grid">
             <label className="field">
               <span>Month</span>
@@ -574,20 +583,26 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                     <td>{r.vendorName || <span className="muted">—</span>}</td>
                     <td>{fmtNum(r.amount, r.currency)}</td>
                     <td>
-                      <form action={updateReimbursementAction} className="inline-actions">
+                      <form action={updateReimbursementAction}>
                         <input type="hidden" name="id" value={r.id} />
-                        <select name="status" defaultValue={r.status} aria-label="Status">
-                          <option value="pending">Pending</option>
-                          <option value="approved">Approved</option>
-                          <option value="invoiced">Invoiced</option>
-                        </select>
-                        <button className="action-button secondary" type="submit">Set</button>
+                        <input type="hidden" name="month" value={selectedMonth} />
+                        <AutoFormSelect
+                          name="status"
+                          defaultValue={r.status}
+                          label="Status"
+                          options={[
+                            { value: "pending", label: "Pending" },
+                            { value: "approved", label: "Approved" },
+                            { value: "invoiced", label: "Invoiced" }
+                          ]}
+                        />
                       </form>
                     </td>
                     <td>
                       {r.status !== "invoiced" ? (
-                        <form action={deleteReimbursementAction} className="inline-actions">
+                        <form action={deleteReimbursementAction}>
                           <input type="hidden" name="id" value={r.id} />
+                          <input type="hidden" name="month" value={selectedMonth} />
                           <button className="action-button secondary" type="submit">Remove</button>
                         </form>
                       ) : (
@@ -625,6 +640,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
 
         <form action={addProvisionAction}>
           <input type="hidden" name="companyCode" value="XTZ" />
+          <input type="hidden" name="month" value={selectedMonth} />
           <div className="form-grid">
             <label className="field">
               <span>Month</span>
@@ -707,15 +723,20 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                     <td>{p.vendorName || <span className="muted">—</span>}</td>
                     <td>{fmtNum(p.estimatedAmount, p.currency)}</td>
                     <td>
-                      <form action={updateProvisionAction} className="inline-actions">
+                      <form action={updateProvisionAction}>
                         <input type="hidden" name="id" value={p.id} />
-                        <select name="status" defaultValue={p.status} aria-label="Status">
-                          <option value="estimated">Estimated</option>
-                          <option value="approved">Approved</option>
-                          <option value="document_pending">Doc pending</option>
-                          <option value="invoiced">Invoiced</option>
-                        </select>
-                        <button className="action-button secondary" type="submit">Set</button>
+                        <input type="hidden" name="month" value={selectedMonth} />
+                        <AutoFormSelect
+                          name="status"
+                          defaultValue={p.status}
+                          label="Status"
+                          options={[
+                            { value: "estimated", label: "Estimated" },
+                            { value: "approved", label: "Approved" },
+                            { value: "document_pending", label: "Doc pending" },
+                            { value: "invoiced", label: "Invoiced" }
+                          ]}
+                        />
                       </form>
                     </td>
                     <td>
@@ -723,8 +744,9 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                         <span className="muted" style={{ fontSize: "0.74rem" }}>{p.notes}</span>
                       ) : null}
                       {p.status !== "invoiced" ? (
-                        <form action={deleteProvisionAction} className="inline-actions" style={{ marginTop: p.notes ? 4 : 0 }}>
+                        <form action={deleteProvisionAction} style={{ marginTop: p.notes ? 4 : 0 }}>
                           <input type="hidden" name="id" value={p.id} />
+                          <input type="hidden" name="month" value={selectedMonth} />
                           <button className="action-button secondary" type="submit">Remove</button>
                         </form>
                       ) : (
@@ -852,7 +874,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                 <th>Total</th>
                 <th>Currency</th>
                 <th>Status</th>
-                <th>Update</th>
+                <th>Status</th>
                 <th>Open</th>
               </tr>
             </thead>
@@ -875,23 +897,19 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                       </span>
                     </td>
                     <td>
-                      <form action={updateInvoiceStatusAction} className="inline-actions">
+                      <form action={updateInvoiceStatusAction}>
                         <input type="hidden" name="invoiceId" value={inv.id} />
-                        <select
+                        <input type="hidden" name="month" value={selectedMonth} />
+                        <AutoFormSelect
                           name="newStatus"
-                          defaultValue=""
-                          aria-label="Change status"
-                        >
-                          <option value="" disabled>
-                            Set...
-                          </option>
-                          <option value="generated">Generated</option>
-                          <option value="sent">Sent</option>
-                          <option value="paid">Paid</option>
-                        </select>
-                        <button className="action-button secondary" type="submit">
-                          Apply
-                        </button>
+                          defaultValue={inv.status}
+                          label="Invoice status"
+                          options={[
+                            { value: "generated", label: "Generated" },
+                            { value: "sent", label: "Sent" },
+                            { value: "paid", label: "Paid" }
+                          ]}
+                        />
                       </form>
                     </td>
                     <td>
