@@ -38,6 +38,25 @@ const ALL_ROLES: AppUserRole[] = ["super_admin", "finance_admin", "commercial_us
 /** Routes that appear in multiple company navs — use ?company= to disambiguate */
 const SHARED_PEOPLE_ROUTES = ["/employees", "/salary-payable"];
 
+/** Routes with /[company] segment (e.g. /costs/TBR, /documents/FSP) */
+const COMPANY_SCOPED_ROUTES = [
+  "/costs",
+  "/payments",
+  "/receivables",
+  "/documents",
+  "/commercial-goals",
+];
+
+/** Map a company code in URL to sidebar section label */
+function companyCodeToLabel(code: string | undefined | null): string | null {
+  if (!code) return null;
+  const upper = code.toUpperCase();
+  if (upper === "FSP") return "FSP";
+  if (upper === "XTZ" || upper === "XTE") return "XTZ India";
+  if (upper === "TBR" || upper === "LSC") return "TBR";
+  return null;
+}
+
 function getTbrNav(): CompanyNav {
   return {
     href: "/tbr",
@@ -233,15 +252,20 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     };
     if (labels[sub]) crumbs.push({ label: labels[sub] });
   } else if (pathname.startsWith("/costs/")) {
-    crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Costs" });
+    const c = companyCodeToLabel(pathname.slice("/costs/".length).split("/")[0]) ?? "TBR";
+    crumbs.push({ label: c, href: c === "FSP" ? "/fsp" : c === "XTZ India" ? "/gig-workers" : "/tbr" }, { label: "Costs" });
   } else if (pathname.startsWith("/payments/")) {
-    crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Payments" });
+    const c = companyCodeToLabel(pathname.slice("/payments/".length).split("/")[0]) ?? "TBR";
+    crumbs.push({ label: c, href: c === "FSP" ? "/fsp" : c === "XTZ India" ? "/gig-workers" : "/tbr" }, { label: "Payments" });
   } else if (pathname.startsWith("/receivables/")) {
-    crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Receivables" });
+    const c = companyCodeToLabel(pathname.slice("/receivables/".length).split("/")[0]) ?? "TBR";
+    crumbs.push({ label: c, href: c === "FSP" ? "/fsp" : c === "XTZ India" ? "/gig-workers" : "/tbr" }, { label: "Receivables" });
   } else if (pathname.startsWith("/documents/")) {
-    crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Documents" });
+    const c = companyCodeToLabel(pathname.slice("/documents/".length).split("/")[0]) ?? "TBR";
+    crumbs.push({ label: c, href: c === "FSP" ? "/fsp" : c === "XTZ India" ? "/gig-workers" : "/tbr" }, { label: "Documents" });
   } else if (pathname.startsWith("/commercial-goals/")) {
-    crumbs.push({ label: "TBR", href: "/tbr" }, { label: "Commercial Goals" });
+    const c = companyCodeToLabel(pathname.slice("/commercial-goals/".length).split("/")[0]) ?? "TBR";
+    crumbs.push({ label: c, href: c === "FSP" ? "/fsp" : c === "XTZ India" ? "/gig-workers" : "/tbr" }, { label: "Commercial Goals" });
   } else if (pathname.startsWith("/subscriptions")) {
     crumbs.push({ label: "Finance", href: "/" }, { label: "Subscriptions" });
   } else if (pathname.startsWith("/vendors")) {
@@ -310,25 +334,69 @@ function SessionShellInner({ children, user }: SessionShellProps) {
 
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
-  // Auto-expand company based on current path + search params
+  // Auto-expand company based on current path + search params.
+  // Priority order (first match wins):
+  //   1. /[company]-scoped routes — use the URL segment (e.g. /documents/FSP → FSP)
+  //   2. Shared people routes — use ?company= query param
+  //   3. XTZ-only routes (/gig-workers, /xtz-expenses, /payroll-invoices)
+  //   4. /fsp/* routes
+  //   5. TBR-exclusive routes (/tbr, /vendors, /subscriptions, /cap-table, etc.)
   useEffect(() => {
-    const companyParam = searchParams.get("company");
-    const isSharedPeopleRoute = SHARED_PEOPLE_ROUTES.some((r) => pathname.startsWith(r));
-
-    if (isSharedPeopleRoute) {
-      // Use the company query param to decide which section to expand
-      if (companyParam === "XTZ" || companyParam === "XTE") {
-        setExpandedCompany("XTZ India");
-      } else {
-        setExpandedCompany("TBR");
+    // 1. Company-scoped dynamic routes: /costs/FSP, /documents/FSP, etc.
+    const scopedMatch = COMPANY_SCOPED_ROUTES.find((r) => pathname.startsWith(`${r}/`));
+    if (scopedMatch) {
+      const companyCode = pathname.slice(scopedMatch.length + 1).split("/")[0];
+      const label = companyCodeToLabel(companyCode);
+      if (label) {
+        setExpandedCompany(label);
+        return;
       }
-    } else if (pathname.startsWith("/gig-workers") || pathname.startsWith("/xtz-expenses") || pathname.startsWith("/payroll-invoices")) {
-      setExpandedCompany("XTZ India");
-    } else if (pathname.startsWith("/fsp")) {
-      setExpandedCompany("FSP");
-    } else if (pathname.startsWith("/tbr") || pathname.startsWith("/costs") || pathname.startsWith("/payments") || pathname.startsWith("/receivables") || pathname.startsWith("/documents") || pathname.startsWith("/subscriptions") || pathname.startsWith("/vendors") || pathname.startsWith("/cap-table") || pathname.startsWith("/litigation") || pathname.startsWith("/arena-ads") || pathname.startsWith("/tax-filings") || pathname.startsWith("/deal-pipeline") || pathname.startsWith("/treasury") || pathname.startsWith("/event-budgets") || pathname.startsWith("/ai-ingest") || pathname.startsWith("/commercial-goals") || pathname.startsWith("/ai-analysis")) {
-      setExpandedCompany("TBR");
     }
+
+    // 2. Shared people routes — disambiguate via ?company=
+    const isSharedPeopleRoute = SHARED_PEOPLE_ROUTES.some((r) => pathname.startsWith(r));
+    if (isSharedPeopleRoute) {
+      const companyParam = searchParams.get("company");
+      const label = companyCodeToLabel(companyParam) ?? "TBR";
+      setExpandedCompany(label);
+      return;
+    }
+
+    // 3. XTZ-only routes
+    if (
+      pathname.startsWith("/gig-workers") ||
+      pathname.startsWith("/xtz-expenses") ||
+      pathname.startsWith("/payroll-invoices")
+    ) {
+      setExpandedCompany("XTZ India");
+      return;
+    }
+
+    // 4. FSP routes
+    if (pathname.startsWith("/fsp")) {
+      setExpandedCompany("FSP");
+      return;
+    }
+
+    // 5. TBR-exclusive routes (these do NOT have /[company] segments)
+    if (
+      pathname.startsWith("/tbr") ||
+      pathname.startsWith("/subscriptions") ||
+      pathname.startsWith("/vendors") ||
+      pathname.startsWith("/cap-table") ||
+      pathname.startsWith("/litigation") ||
+      pathname.startsWith("/arena-ads") ||
+      pathname.startsWith("/tax-filings") ||
+      pathname.startsWith("/deal-pipeline") ||
+      pathname.startsWith("/treasury") ||
+      pathname.startsWith("/event-budgets") ||
+      pathname.startsWith("/ai-ingest") ||
+      pathname.startsWith("/ai-analysis")
+    ) {
+      setExpandedCompany("TBR");
+      return;
+    }
+    // Otherwise: leave current expansion alone (don't force-close on Portfolio pages)
   }, [pathname, searchParams]);
 
   // Close sidebar on navigation (mobile)
