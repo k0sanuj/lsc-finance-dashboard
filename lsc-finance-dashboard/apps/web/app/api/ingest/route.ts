@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
+import { callGemini } from "@lsc/skills/shared/gemini";
 
 type IngestPayload = {
   sourceType: string;
@@ -21,63 +22,40 @@ const VALID_MODULES = [
   "opex_item"
 ];
 
-async function classifyWithGemini(rawContent: string, targetModule: string): Promise<{
-  classification: string;
-  extractedFields: Record<string, unknown>;
-}> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return { classification: targetModule, extractedFields: {} };
-  }
-
+async function classifyWithGemini(
+  rawContent: string,
+  targetModule: string
+): Promise<{ classification: string; extractedFields: Record<string, unknown> }> {
   const systemPrompt = [
     "You are a financial data classifier for a sports company.",
     "Given the input text, classify it into one of: pnl_line_item, sponsorship, expense, payroll, deal_pipeline, event_budget, production_cost, opex_item.",
     "Extract structured fields (amounts, dates, names, categories, descriptions).",
-    "Return JSON with keys: classification (string), extractedFields (object)."
+    "Return JSON with keys: classification (string), extractedFields (object).",
   ].join(" ");
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [
-                {
-                  text: `${systemPrompt}\n\nTarget module hint: ${targetModule}\n\nInput text:\n${rawContent}`
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            responseMimeType: "application/json"
-          }
-        })
-      }
+  const result = await callGemini<{
+    classification?: string;
+    extractedFields?: Record<string, unknown>;
+  }>({
+    tier: "T1",
+    purpose: "ai-ingest-classify",
+    systemPrompt,
+    prompt: `Target module hint: ${targetModule}\n\nInput text:\n${rawContent}`,
+    jsonSchema: {}, // JSON mode without strict schema (we want free-form extractedFields)
+  });
+
+  if (!result.ok || !result.data) {
+    console.error(
+      "[AI Ingest] Gemini classify failed:",
+      result.error ?? "no data"
     );
-
-    if (!response.ok) {
-      console.error("[AI Ingest] Gemini API error:", response.status, await response.text());
-      return { classification: targetModule, extractedFields: {} };
-    }
-
-    const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
-    const parsed = JSON.parse(text) as { classification?: string; extractedFields?: Record<string, unknown> };
-
-    return {
-      classification: parsed.classification ?? targetModule,
-      extractedFields: parsed.extractedFields ?? {}
-    };
-  } catch (error) {
-    console.error("[AI Ingest] Gemini call failed:", error instanceof Error ? error.message : error);
     return { classification: targetModule, extractedFields: {} };
   }
+
+  return {
+    classification: result.data.classification ?? targetModule,
+    extractedFields: result.data.extractedFields ?? {},
+  };
 }
 
 export async function POST(request: Request) {

@@ -1,7 +1,7 @@
 import "server-only";
 
-const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
-const FALLBACK_GEMINI_MODEL = "gemini-2.5-flash";
+import { callGemini } from "@lsc/skills/shared/gemini";
+
 const MAX_INLINE_BYTES = 8 * 1024 * 1024;
 const MAX_TEXT_CHARS = 12000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 2000;
@@ -227,33 +227,6 @@ function extractTextPreview(buffer: Buffer) {
   return buffer.toString("utf8").replace(/\u0000/g, " ").slice(0, MAX_TEXT_CHARS);
 }
 
-function extractJsonObject(text: string) {
-  const stripped = text
-    .trim()
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/i, "");
-
-  const firstBrace = stripped.indexOf("{");
-  const lastBrace = stripped.lastIndexOf("}");
-
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    return stripped.slice(firstBrace, lastBrace + 1);
-  }
-
-  return stripped;
-}
-
-function tryParseJson(text: string) {
-  const candidate = extractJsonObject(text);
-
-  try {
-    return JSON.parse(candidate);
-  } catch {
-    return null;
-  }
-}
-
 function coerceAnalysis(json: unknown): GeminiAnalysisResult {
   const fallback: GeminiAnalysisResult = {
     documentType: "Unknown",
@@ -298,115 +271,55 @@ export async function analyzeDocumentWithGemini(params: {
   note: string | null;
   context: GeminiAnalyzerContext | null;
 }) {
-  const apiKey = (process.env.GEMINI_API_KEY ?? "").trim().replace(/[\r\n]/g, "");
-
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured.");
-  }
-
   if (params.buffer.byteLength > MAX_INLINE_BYTES) {
     throw new Error("Document exceeds the current inline analysis size limit of 8 MB.");
   }
 
-  function buildParts(compact = false) {
-    const parts: Array<Record<string, unknown>> = [
-      { text: buildPrompt(params.fileName, params.mimeType, params.note, params.context, compact) }
-    ];
+  const inlineParts = isTextLikeMimeType(params.mimeType)
+    ? []
+    : [
+        {
+          mimeType: params.mimeType || "application/octet-stream",
+          dataBase64: params.buffer.toString("base64"),
+        },
+      ];
 
-    if (isTextLikeMimeType(params.mimeType)) {
-      parts.push({
-        text: `Document text preview:\n${extractTextPreview(params.buffer)}`
-      });
-    } else {
-      parts.push({
-        inline_data: {
-          mime_type: params.mimeType || "application/octet-stream",
-          data: params.buffer.toString("base64")
-        }
-      });
-    }
+  const textPreview = isTextLikeMimeType(params.mimeType)
+    ? `Document text preview:\n${extractTextPreview(params.buffer)}`
+    : "";
 
-    return parts;
+  async function runAnalysis(compact: boolean) {
+    const prompt = [
+      buildPrompt(params.fileName, params.mimeType, params.note, params.context, compact),
+      textPreview,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    return callGemini<Record<string, unknown>>({
+      tier: "T2",
+      purpose: compact ? "document-analyze-compact-retry" : "document-analyze",
+      prompt,
+      inlineParts,
+      jsonSchema: responseSchema,
+      enforceStrictSchema: true,
+      disableThinking: true,
+      maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
+    });
   }
 
-  async function requestAnalysis(model: string, compact = false) {
-    return fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: buildParts(compact) }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
-            responseMimeType: "application/json",
-            responseJsonSchema: responseSchema,
-            thinkingConfig: {
-              thinkingBudget: 0
-            }
-          }
-        }),
-        cache: "no-store"
-      }
-    );
+  const first = await runAnalysis(false);
+  if (first.ok && first.data) {
+    return coerceAnalysis(first.data);
   }
 
-  let response = await requestAnalysis(DEFAULT_GEMINI_MODEL, false);
-
-  if (!response.ok && response.status === 404 && DEFAULT_GEMINI_MODEL !== FALLBACK_GEMINI_MODEL) {
-    response = await requestAnalysis(FALLBACK_GEMINI_MODEL, false);
+  // Retry once with compact mode on parse/extraction failures
+  const retry = await runAnalysis(true);
+  if (retry.ok && retry.data) {
+    return coerceAnalysis(retry.data);
   }
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini analysis failed: ${response.status} ${errorText}`);
-  }
-
-  const payload = (await response.json()) as {
-    candidates?: Array<{
-      content?: { parts?: Array<{ text?: string }> };
-      finishReason?: string;
-    }>;
-  };
-
-  const candidate = payload.candidates?.[0];
-  const jsonText = candidate?.content?.parts?.find((part) => typeof part.text === "string")?.text ?? "";
-
-  if (!jsonText) {
-    throw new Error("Gemini returned no structured analysis payload.");
-  }
-
-  let parsed = tryParseJson(jsonText);
-
-  if (!parsed) {
-    const retryResponse = await requestAnalysis(DEFAULT_GEMINI_MODEL, true);
-
-    if (!retryResponse.ok) {
-      const retryErrorText = await retryResponse.text();
-      throw new Error(`Gemini retry failed: ${retryResponse.status} ${retryErrorText}`);
-    }
-
-    const retryPayload = (await retryResponse.json()) as {
-      candidates?: Array<{
-        content?: { parts?: Array<{ text?: string }> };
-        finishReason?: string;
-      }>;
-    };
-
-    const retryCandidate = retryPayload.candidates?.[0];
-    const retryText =
-      retryCandidate?.content?.parts?.find((part) => typeof part.text === "string")?.text ?? "";
-
-    parsed = retryText ? tryParseJson(retryText) : null;
-
-    if (!parsed) {
-      const finishReason = retryCandidate?.finishReason ?? candidate?.finishReason ?? "unknown";
-      throw new Error(
-        `Gemini returned invalid JSON after retry. Finish reason: ${finishReason}.`
-      );
-    }
-  }
-
-  return coerceAnalysis(parsed);
+  throw new Error(
+    `Gemini analysis failed: ${retry.error ?? first.error ?? "unknown error"}`
+  );
 }

@@ -23,12 +23,33 @@ const TIER_MODELS: Record<GeminiTier, { model: string; temperature: number }> = 
   T3: { model: "gemini-2.5-flash", temperature: 0.2 },
 };
 
+/** Binary attachment sent as an inline_data part alongside the text prompt. */
+export type GeminiInlinePart = {
+  mimeType: string;
+  /** Base64-encoded bytes. */
+  dataBase64: string;
+};
+
 export type GeminiCallInput = {
   tier: GeminiTier;
   systemPrompt?: string;
   prompt: string;
-  /** If set, forces JSON output and parses to this type. */
+  /** Binary attachments (images, PDFs). Sent inline, max ~8 MB total. */
+  inlineParts?: GeminiInlinePart[];
+  /**
+   * If set, forces JSON output (responseMimeType=application/json) and parses
+   * the response to this type. The schema is NOT sent to Gemini by default —
+   * Gemini's strict responseSchema strips unknown properties (bad for
+   * open-ended payloads). Pass enforceStrictSchema=true if you want the
+   * server-side enforcement.
+   */
   jsonSchema?: Record<string, unknown>;
+  /** Send the schema via responseJsonSchema (permissive; preserves unknown keys). */
+  enforceStrictSchema?: boolean;
+  /** Disable Gemini 2.5 thinking mode for speed on simple extraction. */
+  disableThinking?: boolean;
+  /** Override max output tokens (default 2048). */
+  maxOutputTokens?: number;
   /** Logical purpose — logged for cost attribution. */
   purpose: string;
   /** Request-level timeout (default 30s). */
@@ -89,18 +110,30 @@ async function callGeminiOnce<T = unknown>(
     contents.push({ role: "user", parts: [{ text: input.systemPrompt }] });
     contents.push({ role: "model", parts: [{ text: "Understood." }] });
   }
-  contents.push({ role: "user", parts: [{ text: input.prompt }] });
+
+  const userParts: Array<Record<string, unknown>> = [{ text: input.prompt }];
+  for (const inline of input.inlineParts ?? []) {
+    userParts.push({
+      inline_data: { mime_type: inline.mimeType, data: inline.dataBase64 },
+    });
+  }
+  contents.push({ role: "user", parts: userParts });
 
   const generationConfig: Record<string, unknown> = {
     temperature,
-    maxOutputTokens: 2048,
+    maxOutputTokens: input.maxOutputTokens ?? 2048,
   };
   if (input.jsonSchema) {
-    // NOTE: We deliberately do NOT set responseSchema. Gemini's structured
-    // output mode strips properties not declared in the schema (e.g. our
-    // payload object is intentionally open-ended). We just enforce JSON
-    // mime type and rely on the system prompt + parse-on-read for validation.
     generationConfig.responseMimeType = "application/json";
+    if (input.enforceStrictSchema) {
+      // responseJsonSchema is permissive — validates structure but preserves
+      // properties not declared in the schema. Safe for extraction flows.
+      generationConfig.responseJsonSchema = input.jsonSchema;
+    }
+    // If !enforceStrictSchema, we rely on prompt + parse-on-read.
+  }
+  if (input.disableThinking) {
+    generationConfig.thinkingConfig = { thinkingBudget: 0 };
   }
 
   const controller = new AbortController();

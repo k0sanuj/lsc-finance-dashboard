@@ -4,6 +4,7 @@ import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
+import { callGemini } from "@lsc/skills/shared/gemini";
 import { requireRole, requireSession } from "../../../lib/auth";
 
 function normalizeWhitespace(value: string) {
@@ -109,23 +110,6 @@ function inferBudgetUsdAmount(amount: number, currencyCode: string) {
 
 function normalizeBudgetLabel(value: string) {
   return normalizeWhitespace(value).replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function extractJsonObject(text: string) {
-  const stripped = text
-    .trim()
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/i, "");
-
-  const firstBrace = stripped.indexOf("{");
-  const lastBrace = stripped.lastIndexOf("}");
-
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    return stripped.slice(firstBrace, lastBrace + 1);
-  }
-
-  return stripped;
 }
 
 function matchBudgetCategoryId(label: string, options: BudgetCategoryOption[]) {
@@ -557,14 +541,6 @@ export async function analyzeRaceBudgetDocumentAction(
     };
   }
 
-  if (!process.env.GEMINI_API_KEY) {
-    return {
-      ...INITIAL_BUDGET_ANALYSIS_STATE,
-      status: "error",
-      message: "GEMINI_API_KEY is not configured."
-    };
-  }
-
   const schema = {
     type: "object",
     required: ["summary", "rules"],
@@ -632,61 +608,7 @@ export async function analyzeRaceBudgetDocumentAction(
   ].join("\n");
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL ?? "gemini-2.5-flash"}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [
-                { text: prompt },
-                {
-                  inline_data: {
-                    mime_type: file.type || "application/octet-stream",
-                    data: Buffer.from(await file.arrayBuffer()).toString("base64")
-                  }
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 1400,
-            responseMimeType: "application/json",
-            responseJsonSchema: schema,
-            thinkingConfig: {
-              thinkingBudget: 0
-            }
-          }
-        }),
-        cache: "no-store"
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return {
-        ...INITIAL_BUDGET_ANALYSIS_STATE,
-        status: "error",
-        message: `AI analysis failed: ${response.status} ${errorText}`
-      };
-    }
-
-    const payload = (await response.json()) as {
-      candidates?: Array<{
-        content?: {
-          parts?: Array<{
-            text?: string;
-          }>;
-        };
-      }>;
-    };
-
-    const rawText = payload.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    const parsed = JSON.parse(extractJsonObject(rawText)) as {
+    const result = await callGemini<{
       summary?: string;
       rules?: Array<{
         categoryName: string;
@@ -698,7 +620,31 @@ export async function analyzeRaceBudgetDocumentAction(
         closeThresholdPercent: number;
         notes: string;
       }>;
-    };
+    }>({
+      tier: "T2",
+      purpose: "race-budget-extraction",
+      prompt,
+      inlineParts: [
+        {
+          mimeType: file.type || "application/octet-stream",
+          dataBase64: Buffer.from(await file.arrayBuffer()).toString("base64"),
+        },
+      ],
+      jsonSchema: schema,
+      enforceStrictSchema: true,
+      disableThinking: true,
+      maxOutputTokens: 1400,
+    });
+
+    if (!result.ok || !result.data) {
+      return {
+        ...INITIAL_BUDGET_ANALYSIS_STATE,
+        status: "error",
+        message: `AI analysis failed: ${result.error ?? "no data"}`,
+      };
+    }
+
+    const parsed = result.data;
 
     const rules =
       parsed.rules?.map((rule) => {
