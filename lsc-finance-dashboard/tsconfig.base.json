@@ -21,6 +21,15 @@
       ],
       "@lsc/db/*": [
         "packages/db/src/*"
+      ],
+      "@lsc/skills/*": [
+        "skills/*"
+      ],
+      "@lsc/ontology/*": [
+        "ontology/*"
+      ],
+      "@lsc/agents/*": [
+        "agents/*"
       ]
     }
   }

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
 import { requireRole, requireSession } from "../../../lib/auth";
 
 function normalizeWhitespace(value: string) {
@@ -268,6 +269,36 @@ export async function approveAndPostInvoiceIntakeAction(formData: FormData) {
      where id = $1`,
     [intakeId, canonicalInvoiceId, session.id]
   );
+
+  // Cascade: canonical invoice was created from an approved intake
+  await cascadeUpdate({
+    trigger: "invoice:created",
+    entityType: "invoice",
+    entityId: canonicalInvoiceId as string,
+    action: "post-from-intake",
+    after: {
+      intakeId,
+      vendorName: intake.vendor_name,
+      invoiceNumber: intake.invoice_number,
+      totalAmount: intake.total_amount,
+      dueDate: intake.due_date,
+      raceEventId: intake.race_event_id,
+      isReimbursement,
+    },
+    performedBy: session.id,
+    agentId: "invoice-agent",
+  });
+
+  // Cascade: the intake itself moved to 'posted'
+  await cascadeUpdate({
+    trigger: "invoice-intake:posted",
+    entityType: "invoice_intake",
+    entityId: intakeId,
+    action: "approve",
+    after: { canonicalInvoiceId },
+    performedBy: session.id,
+    agentId: "invoice-agent",
+  });
 
   // If reimbursement, also create an expense record linked to this invoice
   if (isReimbursement) {

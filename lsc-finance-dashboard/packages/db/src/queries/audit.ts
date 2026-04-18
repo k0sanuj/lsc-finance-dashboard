@@ -1,7 +1,151 @@
 import "server-only";
 
-import { queryRows } from "../query";
+import { queryRows, queryRowsAdmin } from "../query";
 import { formatDateLabel, getBackend } from "./shared";
+
+// ─── audit_log (mutation trail — written by skills/shared/cascade-update.ts) ───
+
+export type AuditLogRow = {
+  id: string;
+  entityType: string;
+  entityId: string;
+  trigger: string;
+  action: string;
+  beforeState: Record<string, unknown> | null;
+  afterState: Record<string, unknown> | null;
+  cascadeResult: { actions: string[]; errors: Array<{ action: string; error: string }> } | null;
+  performedBy: string | null;
+  agentId: string | null;
+  createdAt: string;
+};
+
+function rowToLogEntry(row: Record<string, unknown>): AuditLogRow {
+  return {
+    id: String(row.id),
+    entityType: String(row.entity_type),
+    entityId: String(row.entity_id),
+    trigger: String(row.trigger),
+    action: String(row.action),
+    beforeState: (row.before_state as AuditLogRow["beforeState"]) ?? null,
+    afterState: (row.after_state as AuditLogRow["afterState"]) ?? null,
+    cascadeResult: (row.cascade_result as AuditLogRow["cascadeResult"]) ?? null,
+    performedBy: row.performed_by ? String(row.performed_by) : null,
+    agentId: row.agent_id ? String(row.agent_id) : null,
+    createdAt: String(row.created_at),
+  };
+}
+
+export type AuditLogFilter = {
+  entityType?: string;
+  entityId?: string;
+  trigger?: string;
+  agentId?: string;
+  performedBy?: string;
+  sinceHours?: number;
+  limit?: number;
+};
+
+export async function getAuditLog(filter: AuditLogFilter = {}): Promise<AuditLogRow[]> {
+  if (getBackend() !== "database") return [];
+
+  const where: string[] = [];
+  const values: unknown[] = [];
+
+  if (filter.entityType) {
+    values.push(filter.entityType);
+    where.push(`entity_type = $${values.length}`);
+  }
+  if (filter.entityId) {
+    values.push(filter.entityId);
+    where.push(`entity_id = $${values.length}`);
+  }
+  if (filter.trigger) {
+    values.push(filter.trigger);
+    where.push(`trigger = $${values.length}`);
+  }
+  if (filter.agentId) {
+    values.push(filter.agentId);
+    where.push(`agent_id = $${values.length}`);
+  }
+  if (filter.performedBy) {
+    values.push(filter.performedBy);
+    where.push(`performed_by = $${values.length}`);
+  }
+  if (filter.sinceHours !== undefined) {
+    where.push(`created_at >= now() - interval '${Math.max(1, filter.sinceHours)} hours'`);
+  }
+
+  const whereClause = where.length > 0 ? `where ${where.join(" and ")}` : "";
+  const limit = Math.min(filter.limit ?? 100, 500);
+  values.push(limit);
+
+  const rows = await queryRowsAdmin<Record<string, unknown>>(
+    `select id, entity_type, entity_id, trigger, action,
+            before_state, after_state, cascade_result,
+            performed_by, agent_id, created_at::text as created_at
+     from audit_log
+     ${whereClause}
+     order by created_at desc
+     limit $${values.length}`,
+    values
+  );
+  return rows.map(rowToLogEntry);
+}
+
+export type AuditLogSummary = {
+  totalEntries: number;
+  entriesLast24h: number;
+  entriesLast7d: number;
+  byTrigger: Array<{ trigger: string; count: number }>;
+  byAgent: Array<{ agentId: string; count: number }>;
+  byEntityType: Array<{ entityType: string; count: number }>;
+};
+
+export async function getAuditLogSummary(): Promise<AuditLogSummary> {
+  if (getBackend() !== "database") {
+    return {
+      totalEntries: 0,
+      entriesLast24h: 0,
+      entriesLast7d: 0,
+      byTrigger: [],
+      byAgent: [],
+      byEntityType: [],
+    };
+  }
+
+  const [total, last24h, last7d, byTrigger, byAgent, byEntity] = await Promise.all([
+    queryRowsAdmin<{ c: number }>(`select count(*)::int as c from audit_log`),
+    queryRowsAdmin<{ c: number }>(
+      `select count(*)::int as c from audit_log where created_at >= now() - interval '24 hours'`
+    ),
+    queryRowsAdmin<{ c: number }>(
+      `select count(*)::int as c from audit_log where created_at >= now() - interval '7 days'`
+    ),
+    queryRowsAdmin<{ trigger: string; c: number }>(
+      `select trigger, count(*)::int as c from audit_log group by trigger order by c desc limit 20`
+    ),
+    queryRowsAdmin<{ agent_id: string | null; c: number }>(
+      `select agent_id, count(*)::int as c from audit_log
+       where agent_id is not null group by agent_id order by c desc limit 20`
+    ),
+    queryRowsAdmin<{ entity_type: string; c: number }>(
+      `select entity_type, count(*)::int as c from audit_log group by entity_type order by c desc limit 20`
+    ),
+  ]);
+
+  return {
+    totalEntries: total[0]?.c ?? 0,
+    entriesLast24h: last24h[0]?.c ?? 0,
+    entriesLast7d: last7d[0]?.c ?? 0,
+    byTrigger: byTrigger.map((r) => ({ trigger: r.trigger, count: r.c })),
+    byAgent: byAgent
+      .filter((r) => r.agent_id !== null)
+      .map((r) => ({ agentId: r.agent_id as string, count: r.c })),
+    byEntityType: byEntity.map((r) => ({ entityType: r.entity_type, count: r.c })),
+  };
+}
+
+// ─── audit_reports (monthly reconciliation — written by AuditAgent) ───
 
 export type AuditReportRow = {
   id: string;

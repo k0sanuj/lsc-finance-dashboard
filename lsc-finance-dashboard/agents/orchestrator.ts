@@ -57,7 +57,7 @@ export function validatePlan(plan: RoutingPlan): { valid: boolean; errors: strin
     }
   }
 
-  // Use the agent graph validation
+  // Use the agent graph validation (also surfaces HITL steps)
   const graphValidation = validateRoutingPlan(plan.steps);
   errors.push(...graphValidation.errors);
 
