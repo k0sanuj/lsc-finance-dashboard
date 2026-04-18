@@ -18,8 +18,6 @@
  * executing other steps in the plan.
  */
 
-import "server-only";
-
 import { AgentId, AGENT_GRAPH, hasSkill } from "../agents/agent-graph";
 import * as queries from "@lsc/db";
 
