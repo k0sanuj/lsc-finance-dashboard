@@ -33,7 +33,7 @@ async function main() {
       console.log(`  - ${s.agentId}:${s.skill}`, s.payload);
     }
     console.log("HITL steps:", r.plan.hitlSteps);
-    console.log("Gemini tokens:", r.tokensUsed);
+    console.log("LLM tokens:", r.tokensUsed);
     console.log("Classify ms:", r.durationMs);
   }
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
-import { callGemini } from "@lsc/skills/shared/gemini";
+import { callLlm } from "@lsc/skills/shared/llm";
 
 type IngestPayload = {
   sourceType: string;
@@ -33,7 +33,7 @@ async function classifyWithGemini(
     "Return JSON with keys: classification (string), extractedFields (object).",
   ].join(" ");
 
-  const result = await callGemini<{
+  const result = await callLlm<{
     classification?: string;
     extractedFields?: Record<string, unknown>;
   }>({

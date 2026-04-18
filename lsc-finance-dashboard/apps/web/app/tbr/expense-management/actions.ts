@@ -4,7 +4,7 @@ import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
-import { callGemini } from "@lsc/skills/shared/gemini";
+import { callLlm } from "@lsc/skills/shared/llm";
 import { requireRole, requireSession } from "../../../lib/auth";
 
 function normalizeWhitespace(value: string) {
@@ -608,7 +608,7 @@ export async function analyzeRaceBudgetDocumentAction(
   ].join("\n");
 
   try {
-    const result = await callGemini<{
+    const result = await callLlm<{
       summary?: string;
       rules?: Array<{
         categoryName: string;

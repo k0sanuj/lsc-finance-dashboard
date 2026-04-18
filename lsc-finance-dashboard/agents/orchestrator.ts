@@ -2,11 +2,12 @@
  * LSC Finance Dashboard — Orchestrator
  *
  * Single entry point for AI-powered operations.
- * Classifies user intent via Gemini (T1), produces a RoutingPlan, validates
- * against the agent graph, executes via the skill dispatcher, and merges
- * results.
+ * Classifies user intent via an LLM (T1 — routed to Anthropic Haiku by the
+ * purpose registry in skills/shared/llm.ts), produces a RoutingPlan,
+ * validates against the agent graph, executes via the skill dispatcher,
+ * and merges results.
  *
- * Failure modes are conservative: if Gemini returns an invalid plan, or
+ * Failure modes are conservative: if the LLM returns an invalid plan, or
  * if validation fails, we fall back to a safe default plan (finance overview).
  * The orchestrator never throws — callers always get an OrchestratorResult.
  */
@@ -18,7 +19,7 @@ import {
   canRoute,
   validateRoutingPlan,
 } from "./agent-graph";
-import { callGemini } from "../skills/shared/gemini";
+import { callLlm } from "../skills/shared/llm";
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -232,7 +233,7 @@ export async function classifyAndPlan(
     ? `\n\nCONTEXT: ${JSON.stringify(input.context)}`
     : "";
 
-  const call = await callGemini<RawPlan>({
+  const call = await callLlm<RawPlan>({
     tier: "T1",
     purpose: "orchestrator-intent-classify",
     systemPrompt: buildSystemPrompt(),
@@ -244,7 +245,7 @@ export async function classifyAndPlan(
   if (!call.ok || !call.data) {
     return {
       plan: safeFallbackPlan(
-        `Gemini classify failed: ${call.error ?? "no data"} — defaulting to finance overview`
+        `LLM classify failed: ${call.error ?? "no data"} — defaulting to finance overview`
       ),
       tokensUsed: call.tokensUsed,
       durationMs: Date.now() - started,

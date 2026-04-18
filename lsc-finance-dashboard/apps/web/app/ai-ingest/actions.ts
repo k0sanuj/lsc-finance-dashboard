@@ -4,7 +4,7 @@ import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
-import { callGemini } from "@lsc/skills/shared/gemini";
+import { callLlm } from "@lsc/skills/shared/llm";
 import { requireRole } from "../../lib/auth";
 
 const VALID_MODULES = [
@@ -29,7 +29,7 @@ async function classifyWithGemini(
     "Return JSON with keys: classification (string), extractedFields (object).",
   ].join(" ");
 
-  const result = await callGemini<{
+  const result = await callLlm<{
     classification?: string;
     extractedFields?: Record<string, unknown>;
   }>({

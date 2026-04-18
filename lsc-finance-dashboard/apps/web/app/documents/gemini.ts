@@ -1,6 +1,6 @@
 import "server-only";
 
-import { callGemini } from "@lsc/skills/shared/gemini";
+import { callLlm } from "@lsc/skills/shared/llm";
 
 const MAX_INLINE_BYTES = 8 * 1024 * 1024;
 const MAX_TEXT_CHARS = 12000;
@@ -296,7 +296,7 @@ export async function analyzeDocumentWithGemini(params: {
       .filter(Boolean)
       .join("\n\n");
 
-    return callGemini<Record<string, unknown>>({
+    return callLlm<Record<string, unknown>>({
       tier: "T2",
       purpose: compact ? "document-analyze-compact-retry" : "document-analyze",
       prompt,

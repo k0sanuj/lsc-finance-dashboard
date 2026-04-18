@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "../../../lib/auth";
-import { callGemini } from "@lsc/skills/shared/gemini";
+import { callLlm } from "@lsc/skills/shared/llm";
 
 // Lightweight Gemini-powered bill parser. Used by the XTZ invoice generator and
 // the subscriptions dashboard to auto-fill add forms from an uploaded receipt.
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const mimeType = file.type || "application/octet-stream";
 
-    const result = await callGemini<ParsedBill>({
+    const result = await callLlm<ParsedBill>({
       tier: "T2",
       purpose: "parse-bill",
       prompt: PROMPT,
