@@ -586,6 +586,11 @@ function SessionShellInner({ children, user }: SessionShellProps) {
                   </Link>
                 </li>
                 <li className="nav-item">
+                  <Link className={isActive("/agent-graph/dispatcher-status") ? "active" : ""} href={"/agent-graph/dispatcher-status" as Route}>
+                    Dispatcher Status
+                  </Link>
+                </li>
+                <li className="nav-item">
                   <Link className={isActive("/workflow-graph") ? "active" : ""} href="/workflow-graph">
                     Workflow Graph
                   </Link>
