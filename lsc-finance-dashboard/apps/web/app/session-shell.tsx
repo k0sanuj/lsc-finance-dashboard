@@ -6,6 +6,9 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useState, useCallback, useEffect, Suspense } from "react";
 import type { AppUserRole } from "../lib/auth";
 import { ToastNotice } from "./components/toast-notice";
+import { CommandPalette } from "./components/command-palette";
+import { PALETTE_COMMANDS } from "./components/command-list";
+import { CmdKTrigger } from "./components/cmdk-trigger";
 
 type NavLink = {
   href: Route;
@@ -645,6 +648,7 @@ function SessionShellInner({ children, user }: SessionShellProps) {
 
       <main className="main" id="main-content">
         <ToastNotice />
+        <CommandPalette commands={PALETTE_COMMANDS} />
         <div className="workspace-topbar">
           <div className="workspace-title-block">
             {breadcrumbs.length > 0 && (
@@ -664,12 +668,15 @@ function SessionShellInner({ children, user }: SessionShellProps) {
             )}
             <strong>{getWorkspaceLabel(pathname)}</strong>
           </div>
-          <div className="profile-chip">
-            <span className="profile-avatar">{getInitials(user?.fullName)}</span>
-            <span className="profile-copy">
-              <strong>{user?.fullName ?? "Signed in user"}</strong>
-              <span>{user ? user.role.replace(/_/g, " ") : "Authenticated session"}</span>
-            </span>
+          <div className="topbar-right">
+            <CmdKTrigger />
+            <div className="profile-chip">
+              <span className="profile-avatar">{getInitials(user?.fullName)}</span>
+              <span className="profile-copy">
+                <strong>{user?.fullName ?? "Signed in user"}</strong>
+                <span>{user ? user.role.replace(/_/g, " ") : "Authenticated session"}</span>
+              </span>
+            </div>
           </div>
         </div>
         {children}
