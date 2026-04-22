@@ -286,6 +286,32 @@ const SKILL_REGISTRY: Record<string, SkillHandler> = {
     const { analyzeGoals } = await import("./analyzers/goal-tracker");
     return ok(await analyzeGoals());
   },
+
+  // ── AuditAgent (HITL, T3) ─────────────────────────────────
+  "audit-agent:run-monthly-audit": async (p) => {
+    const { runMonthlyAuditAll, runMonthlyAudit } = await import("./analyzers/monthly-audit");
+    const companyCode = optionalString(p, "companyCode");
+    const periodStart = requireString(p, "periodStart");
+    const periodEnd = requireString(p, "periodEnd");
+    if (!periodStart || !periodEnd) {
+      return fail("periodStart and periodEnd are required (YYYY-MM-DD)", "INVALID_INPUT");
+    }
+    if (companyCode) {
+      return ok(await runMonthlyAudit({ companyCode, periodStart, periodEnd }));
+    }
+    return ok(await runMonthlyAuditAll({ periodStart, periodEnd }));
+  },
+  "audit-agent:reconcile-invoices": async (p) => {
+    const invoiceId = requireString(p, "invoiceId");
+    if (!invoiceId) return fail("invoiceId is required", "INVALID_INPUT");
+    const target = optionalString(p, "target") ?? "payroll-invoice";
+    if (target === "canonical-invoice") {
+      const { verifyCanonicalInvoiceMath } = await import("./analyzers/invoice-math-verify");
+      return ok(await verifyCanonicalInvoiceMath(invoiceId));
+    }
+    const { verifyPayrollInvoiceMath } = await import("./analyzers/invoice-math-verify");
+    return ok(await verifyPayrollInvoiceMath(invoiceId));
+  },
 };
 
 // ─── Introspection ─────────────────────────────────────────

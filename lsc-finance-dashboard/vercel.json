@@ -4,5 +4,11 @@
   "installCommand": "npm exec -- pnpm install --no-frozen-lockfile",
   "buildCommand": "npm exec -- pnpm --filter web build",
   "outputDirectory": "apps/web/.next",
-  "devCommand": "npm exec -- pnpm --filter web dev"
+  "devCommand": "npm exec -- pnpm --filter web dev",
+  "crons": [
+    {
+      "path": "/api/cron/monthly-audit",
+      "schedule": "0 3 1 * *"
+    }
+  ]
 }
