@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
-import { requireRole } from "../../../lib/auth";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
+import { requireRole, requireSession } from "../../../lib/auth";
 
 function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -17,6 +18,7 @@ function redirectToTeamManagement(status: "success" | "error" | "info", message:
 
 export async function createTeamAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const teamName = normalizeWhitespace(String(formData.get("teamName") ?? ""));
   const teamCode = normalizeWhitespace(String(formData.get("teamCode") ?? "")).toUpperCase();
   const description = normalizeWhitespace(String(formData.get("description") ?? "")) || null;
@@ -44,6 +46,16 @@ export async function createTeamAction(formData: FormData) {
     [companyId, teamCode, teamName, description]
   );
 
+  await cascadeUpdate({
+    trigger: "team:created",
+    entityType: "app_team",
+    entityId: teamCode,
+    action: "create-or-update",
+    after: { teamCode, teamName, description },
+    performedBy: session.id,
+    agentId: "finance-agent",
+  });
+
   revalidatePath("/tbr/team-management");
   revalidatePath("/tbr");
   redirectToTeamManagement("success", "Team saved.");
@@ -51,6 +63,7 @@ export async function createTeamAction(formData: FormData) {
 
 export async function assignUserToTeamAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const teamId = normalizeWhitespace(String(formData.get("teamId") ?? ""));
   const userId = normalizeWhitespace(String(formData.get("userId") ?? ""));
   const membershipRole = normalizeWhitespace(String(formData.get("membershipRole") ?? "member"));
@@ -66,6 +79,16 @@ export async function assignUserToTeamAction(formData: FormData) {
        set membership_role = excluded.membership_role`,
     [teamId, userId, membershipRole]
   );
+
+  await cascadeUpdate({
+    trigger: "team:member:assigned",
+    entityType: "team_membership",
+    entityId: teamId,
+    action: "assign",
+    after: { teamId, userId, membershipRole },
+    performedBy: session.id,
+    agentId: "finance-agent",
+  });
 
   revalidatePath("/tbr/team-management");
   redirectToTeamManagement("success", "User assigned to team.");

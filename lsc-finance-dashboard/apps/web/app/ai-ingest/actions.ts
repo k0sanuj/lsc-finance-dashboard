@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
 import { callLlm } from "@lsc/skills/shared/llm";
-import { requireRole } from "../../lib/auth";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
+import { requireRole, requireSession } from "../../lib/auth";
 
 const VALID_MODULES = [
   "pnl_line_item",
@@ -56,6 +57,7 @@ async function classifyWithGemini(
 
 export async function submitIngestionAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const rawContent = String(formData.get("rawContent") ?? "").trim();
   const targetModule = String(formData.get("targetModule") ?? "").trim();
@@ -103,6 +105,16 @@ export async function submitIngestionAction(formData: FormData) {
      where id = $3`,
     [classification, JSON.stringify(extractedFields), ingestionId]
   );
+
+  await cascadeUpdate({
+    trigger: "ai-ingest:queued",
+    entityType: "ai_ingestion_queue",
+    entityId: ingestionId as string,
+    action: "submit-and-classify",
+    after: { module, classification, targetSport },
+    performedBy: session.id,
+    agentId: "document-agent",
+  });
 
   revalidatePath("/ai-ingest");
   redirect(`${returnPath}?status=success&message=${encodeURIComponent(`Ingestion complete — classified as "${classification}".`)}` as Route);

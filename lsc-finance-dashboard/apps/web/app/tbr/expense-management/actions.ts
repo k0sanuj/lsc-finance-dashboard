@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
 import { callLlm } from "@lsc/skills/shared/llm";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
 import { requireRole, requireSession } from "../../../lib/auth";
 
 function normalizeWhitespace(value: string) {
@@ -245,6 +246,18 @@ export async function createExpenseSubmissionAction(formData: FormData) {
     }
   }
 
+  if (submissionId) {
+    await cascadeUpdate({
+      trigger: "expense-submission:approved",
+      entityType: "expense_submission",
+      entityId: submissionId,
+      action: "create",
+      after: { title, companyId, raceEventId },
+      performedBy: session.id,
+      agentId: "expense-agent",
+    });
+  }
+
   revalidatePath("/tbr");
   revalidatePath("/tbr/expense-management");
   redirectToExpenseWorkflow("success", "Expense submission created.");
@@ -473,6 +486,19 @@ export async function updateExpenseSubmissionStatusAction(formData: FormData) {
     [submissionId, nextStatus, session.id, reviewNote]
   );
 
+  await cascadeUpdate({
+    trigger:
+      nextStatus === "rejected"
+        ? "expense-submission:rejected"
+        : "expense-submission:approved",
+    entityType: "expense_submission",
+    entityId: submissionId,
+    action: nextStatus === "rejected" ? "reject" : `set-${nextStatus}`,
+    after: { status: nextStatus, reviewNote },
+    performedBy: session.id,
+    agentId: "expense-agent",
+  });
+
   revalidatePath("/tbr/expense-management");
   revalidatePath(`/tbr/expense-management/${submissionId}`);
   revalidatePath(returnPath);
@@ -509,6 +535,16 @@ export async function approveExpenseSubmissionAction(formData: FormData) {
      where id = $1`,
     [submissionId, session.id, reviewNote]
   );
+
+  await cascadeUpdate({
+    trigger: "expense-submission:approved",
+    entityType: "expense_submission",
+    entityId: submissionId,
+    action: "approve-invoice-ready",
+    after: { status: "approved", reviewNote },
+    performedBy: session.id,
+    agentId: "expense-agent",
+  });
 
   revalidatePath("/tbr");
   revalidatePath("/tbr/expense-management");
@@ -832,6 +868,16 @@ export async function createOrUpdateRaceBudgetRuleAction(formData: FormData) {
     ]
   );
 
+  await cascadeUpdate({
+    trigger: "race-budget-rule:created",
+    entityType: "race_budget_rule",
+    entityId: raceEventId,
+    action: "create-or-update",
+    after: { raceEventId, costCategoryId, ruleKind, unitLabel, approvedAmountUsd, closeThresholdPercent },
+    performedBy: session.id,
+    agentId: "expense-agent",
+  });
+
   revalidatePath("/tbr/expense-management");
   revalidatePath(returnPath);
   redirectToExpenseWorkflow("success", "Race budget rule saved.", returnPath);
@@ -839,6 +885,7 @@ export async function createOrUpdateRaceBudgetRuleAction(formData: FormData) {
 
 export async function deleteRaceBudgetRuleAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const ruleId = normalizeWhitespace(String(formData.get("ruleId") ?? ""));
   const returnPath =
     normalizeWhitespace(String(formData.get("returnPath") ?? "")) || "/tbr/expense-management";
@@ -848,6 +895,15 @@ export async function deleteRaceBudgetRuleAction(formData: FormData) {
   }
 
   await executeAdmin(`delete from race_budget_rules where id = $1`, [ruleId]);
+
+  await cascadeUpdate({
+    trigger: "race-budget-rule:deleted",
+    entityType: "race_budget_rule",
+    entityId: ruleId,
+    action: "delete",
+    performedBy: session.id,
+    agentId: "expense-agent",
+  });
 
   revalidatePath("/tbr/expense-management");
   revalidatePath(returnPath);

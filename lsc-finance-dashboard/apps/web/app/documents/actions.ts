@@ -6,7 +6,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Pool, type PoolClient } from "pg";
 import { getImportDatabaseUrl, storeUploadedDocument, type StoredDocumentMetadata } from "@lsc/db";
-import { requireRole } from "../../lib/auth";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
+import { requireRole, requireSession } from "../../lib/auth";
 import { analyzeDocumentWithGemini, type GeminiAnalyzerContext } from "./gemini";
 
 const ANALYZER_TYPE = "gemini_document_analyzer";
@@ -1373,6 +1374,16 @@ export async function analyzeDocumentAction(formData: FormData) {
     client.release();
   }
 
+  await cascadeUpdate({
+    trigger: "document:analyzed",
+    entityType: "document_analysis_run",
+    entityId: workflowContext,
+    action: "analyze-batch",
+    after: { workflowContext, uploadedCount: uploads.length, companyCode },
+    performedBy: session.id,
+    agentId: "document-agent",
+  });
+
   revalidatePath("/documents");
   revalidatePath(redirectPath);
   redirect(redirectUrl);
@@ -1380,6 +1391,7 @@ export async function analyzeDocumentAction(formData: FormData) {
 
 export async function approveDocumentAnalysisAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const analysisRunId = normalizeWhitespace(String(formData.get("analysisRunId") ?? ""));
   const redirectPath = sanitizeRedirectPath(String(formData.get("redirectPath") ?? "/documents"));
 
@@ -1439,6 +1451,15 @@ export async function approveDocumentAnalysisAction(formData: FormData) {
   } finally {
     client.release();
   }
+
+  await cascadeUpdate({
+    trigger: "document:approved",
+    entityType: "document_analysis_run",
+    entityId: analysisRunId,
+    action: "approve-and-post",
+    performedBy: session.id,
+    agentId: "document-agent",
+  });
 
   revalidatePath("/documents");
   revalidatePath(redirectPath);

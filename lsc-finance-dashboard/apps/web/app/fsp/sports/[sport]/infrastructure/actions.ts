@@ -4,7 +4,8 @@ import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
-import { requireRole } from "../../../../../lib/auth";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
+import { requireRole, requireSession } from "../../../../../lib/auth";
 
 function clean(v: unknown): string {
   return String(v ?? "").replace(/\s+/g, " ").trim();
@@ -29,6 +30,7 @@ async function getSportId(sportCode: string): Promise<string> {
 
 export async function addInfrastructureAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const sport = clean(formData.get("sport"));
   const component = clean(formData.get("component"));
   const criticalRequirement = clean(formData.get("criticalRequirement"));
@@ -50,6 +52,16 @@ export async function addInfrastructureAction(formData: FormData) {
     [sportId, component, criticalRequirement || null, whatToCheck || null, verificationProof || null, estimatedCost, vendorName || null, status]
   );
 
+  await cascadeUpdate({
+    trigger: "sport-infrastructure:created",
+    entityType: "sport_infrastructure",
+    entityId: sportId,
+    action: "create",
+    after: { sport, component, estimatedCost, vendorName, status },
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
+
   revalidatePath(`/fsp/sports/${sport}/infrastructure`);
   redir(sport, "infrastructure", "success", `Added infrastructure item "${component}".`);
 }
@@ -58,6 +70,7 @@ export async function addInfrastructureAction(formData: FormData) {
 
 export async function addBroadcastSpecAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const sport = clean(formData.get("sport"));
   const category = clean(formData.get("category"));
   const specName = clean(formData.get("specName"));
@@ -77,6 +90,16 @@ export async function addBroadcastSpecAction(formData: FormData) {
      values ($1, $2, $3, $4, $5, $6::numeric, $7)`,
     [sportId, category || "General", specName, technicalRequirement || null, whatToCheck || null, estimatedCost, status]
   );
+
+  await cascadeUpdate({
+    trigger: "sport-broadcast-spec:created",
+    entityType: "broadcast_spec",
+    entityId: sportId,
+    action: "create",
+    after: { sport, category, specName, estimatedCost, status },
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
 
   revalidatePath(`/fsp/sports/${sport}/infrastructure`);
   redir(sport, "broadcast", "success", `Added broadcast spec "${specName}".`);

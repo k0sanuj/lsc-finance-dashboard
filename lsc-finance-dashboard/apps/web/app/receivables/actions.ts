@@ -29,6 +29,7 @@ type TrancheDraft = {
 
 export async function createContractTranchesAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin", "commercial_user"]);
+  const session = await requireSession();
 
   const contractId = normalizeWhitespace(String(formData.get("contractId") ?? ""));
   const returnPath = normalizeWhitespace(String(formData.get("returnPath") ?? "")) || "/receivables/TBR?view=schedule";
@@ -94,6 +95,16 @@ export async function createContractTranchesAction(formData: FormData) {
     );
   }
 
+  await cascadeUpdate({
+    trigger: "tranche:created",
+    entityType: "contract_tranche",
+    entityId: contractId,
+    action: "create-batch",
+    after: { contractId, trancheCount: tranches.length, contractValue },
+    performedBy: session.id,
+    agentId: "finance-agent",
+  });
+
   revalidatePath("/receivables");
   revalidatePath("/commercial-goals");
   redirect(`${returnPath}&status=success&message=${encodeURIComponent(`${tranches.length} tranches created.`)}` as Route);
@@ -101,6 +112,7 @@ export async function createContractTranchesAction(formData: FormData) {
 
 export async function activateTrancheAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const trancheId = normalizeWhitespace(String(formData.get("trancheId") ?? ""));
   const returnPath = normalizeWhitespace(String(formData.get("returnPath") ?? "")) || "/receivables/TBR?view=schedule";
@@ -134,6 +146,17 @@ export async function activateTrancheAction(formData: FormData) {
      where id = $1 and tranche_status = 'scheduled'`,
     [trancheId]
   );
+
+  await cascadeUpdate({
+    trigger: "tranche:activated",
+    entityType: "contract_tranche",
+    entityId: trancheId,
+    action: "activate",
+    before: { status: "scheduled" },
+    after: { status: "active" },
+    performedBy: session.id,
+    agentId: "finance-agent",
+  });
 
   revalidatePath("/receivables");
   redirect(`${returnPath}&status=success&message=${encodeURIComponent("Tranche activated.")}` as Route);
@@ -205,6 +228,17 @@ export async function generateTrancheInvoiceAction(formData: FormData) {
      where id = $2`,
     [invoiceId, trancheId]
   );
+
+  await cascadeUpdate({
+    trigger: "tranche:invoiced",
+    entityType: "contract_tranche",
+    entityId: trancheId,
+    action: "generate-invoice",
+    before: { status: "active" },
+    after: { status: "invoiced", trancheLabel: tranche.tranche_label, amount: tranche.tranche_amount, invoiceId },
+    performedBy: session.id,
+    agentId: "finance-agent",
+  });
 
   revalidatePath("/receivables");
   revalidatePath("/payments");

@@ -4,6 +4,7 @@ import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
 import { requireRole, requireSession } from "../../lib/auth";
 
 function normalizeWhitespace(value: string) {
@@ -97,6 +98,16 @@ export async function createDeliverableChecklistAction(formData: FormData) {
     );
   }
 
+  await cascadeUpdate({
+    trigger: "commercial-target:changed",
+    entityType: "deliverable_checklist",
+    entityId: checklistId,
+    action: "create-with-items",
+    after: { contractId, sponsorId, checklistTitle, totalRevenueValue, currencyCode, itemCount: items.length },
+    performedBy: session.id,
+    agentId: "commercial-agent",
+  });
+
   revalidatePath("/commercial-goals");
   revalidatePath("/receivables");
   redirect(`${returnPath}&status=success&message=${encodeURIComponent(`Checklist "${checklistTitle}" created with ${items.length} deliverables.`)}` as Route);
@@ -140,6 +151,16 @@ export async function updateDeliverableItemStatusAction(formData: FormData) {
     );
   }
 
+  await cascadeUpdate({
+    trigger: "commercial-target:changed",
+    entityType: "deliverable_item",
+    entityId: itemId,
+    action: "status-change",
+    after: { status: newStatus, notes },
+    performedBy: session.id,
+    agentId: "commercial-agent",
+  });
+
   revalidatePath("/commercial-goals");
   revalidatePath("/receivables");
   redirect(`${returnPath}&status=success&message=${encodeURIComponent(`Item updated to "${newStatus}".`)}` as Route);
@@ -147,6 +168,7 @@ export async function updateDeliverableItemStatusAction(formData: FormData) {
 
 export async function addDeliverableItemAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin", "commercial_user"]);
+  const session = await requireSession();
 
   const checklistId = normalizeWhitespace(String(formData.get("checklistId") ?? ""));
   const itemLabel = normalizeWhitespace(String(formData.get("itemLabel") ?? ""));
@@ -174,6 +196,16 @@ export async function addDeliverableItemAction(formData: FormData) {
      values ($1, $2, $3, $4, $5, $6)`,
     [checklistId, itemLabel, responsibleOwnerId, dueDate, revenueAmount, nextSort]
   );
+
+  await cascadeUpdate({
+    trigger: "commercial-target:changed",
+    entityType: "deliverable_item",
+    entityId: checklistId,
+    action: "add-item",
+    after: { itemLabel, revenueAmount, responsibleOwnerId, dueDate },
+    performedBy: session.id,
+    agentId: "commercial-agent",
+  });
 
   revalidatePath("/commercial-goals");
   redirect(`${returnPath}&status=success&message=${encodeURIComponent(`Item "${itemLabel}" added.`)}` as Route);

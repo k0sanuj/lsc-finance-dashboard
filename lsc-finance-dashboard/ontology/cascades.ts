@@ -70,7 +70,18 @@ export type CascadeTrigger =
   | "sport-pnl:deleted"
   | "sport-sponsorship:created"
   | "sport-sponsorship:status:changed"
-  | "sport-event:config:changed";
+  | "sport-event:config:changed"
+  | "sport-infrastructure:created"
+  | "sport-broadcast-spec:created"
+  // Team management
+  | "team:created"
+  | "team:member:assigned"
+  // Document intake (HITL)
+  | "document:posted"
+  // AI ingestion
+  | "ai-ingest:queued"
+  // Project checklist (portfolio-level task tracking)
+  | "project-checklist:item:changed";
 
 export type CascadeActionType =
   | "refresh-company-metrics"

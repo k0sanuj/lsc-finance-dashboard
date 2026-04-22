@@ -4,7 +4,8 @@ import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
-import { requireRole } from "../../../../lib/auth";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
+import { requireRole, requireSession } from "../../../../lib/auth";
 
 function clean(v: unknown): string { return String(v ?? "").replace(/\s+/g, " ").trim(); }
 
@@ -24,6 +25,7 @@ async function getSportId(sportCode: string): Promise<string> {
 
 export async function addPnlLineItemAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const sport = clean(formData.get("sport"));
   const section = clean(formData.get("section"));
   const category = clean(formData.get("category"));
@@ -48,12 +50,23 @@ export async function addPnlLineItemAction(formData: FormData) {
     [sportId, section, category, y1, y2, y3, scenario, Number(maxOrder[0]?.mx ?? 0) + 10]
   );
 
+  await cascadeUpdate({
+    trigger: "sport-pnl:created",
+    entityType: "fsp_pnl_line_item",
+    entityId: sportId,
+    action: "create",
+    after: { sport, section, category, y1, y2, y3, scenario },
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
+
   revalidatePath(`/fsp/sports/${sport}`);
   redir(sport, "summary", "success", `Added "${category}" to ${section}.`);
 }
 
 export async function updatePnlLineItemAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const sport = clean(formData.get("sport"));
   const itemId = clean(formData.get("itemId"));
   const y1 = clean(formData.get("y1Budget"));
@@ -69,16 +82,36 @@ export async function updatePnlLineItemAction(formData: FormData) {
     [itemId, y1 || "0", y2 || "0", y3 || "0"]
   );
 
+  await cascadeUpdate({
+    trigger: "sport-pnl:updated",
+    entityType: "fsp_pnl_line_item",
+    entityId: itemId,
+    action: "update",
+    after: { sport, y1, y2, y3 },
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
+
   revalidatePath(`/fsp/sports/${sport}`);
   redir(sport, "summary", "success", "Line item updated.");
 }
 
 export async function deletePnlLineItemAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const sport = clean(formData.get("sport"));
   const itemId = clean(formData.get("itemId"));
 
   await executeAdmin(`delete from fsp_pnl_line_items where id = $1`, [itemId]);
+
+  await cascadeUpdate({
+    trigger: "sport-pnl:deleted",
+    entityType: "fsp_pnl_line_item",
+    entityId: itemId,
+    action: "delete",
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
 
   revalidatePath(`/fsp/sports/${sport}`);
   redir(sport, "summary", "success", "Line item removed.");
@@ -88,6 +121,7 @@ export async function deletePnlLineItemAction(formData: FormData) {
 
 export async function addSponsorshipAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const sport = clean(formData.get("sport"));
   const segment = clean(formData.get("segment"));
   const sponsorName = clean(formData.get("sponsorName"));
@@ -115,12 +149,23 @@ export async function addSponsorshipAction(formData: FormData) {
      contractStart || null, contractEnd || null, paymentSchedule || null, deliverables || null]
   );
 
+  await cascadeUpdate({
+    trigger: "sport-sponsorship:created",
+    entityType: "fsp_sponsorship",
+    entityId: sportId,
+    action: "create",
+    after: { sport, segment, sponsorName, tier, contractStatus, y1, y2, y3 },
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
+
   revalidatePath(`/fsp/sports/${sport}`);
   redir(sport, "sponsorship", "success", `Sponsorship "${segment}" added.`);
 }
 
 export async function updateSponsorshipStatusAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const sport = clean(formData.get("sport"));
   const sponsorshipId = clean(formData.get("sponsorshipId"));
   const newStatus = clean(formData.get("newStatus"));
@@ -129,6 +174,16 @@ export async function updateSponsorshipStatusAction(formData: FormData) {
     `update fsp_sponsorships set contract_status = $2::sponsorship_contract_status, updated_at = now() where id = $1`,
     [sponsorshipId, newStatus]
   );
+
+  await cascadeUpdate({
+    trigger: "sport-sponsorship:status:changed",
+    entityType: "fsp_sponsorship",
+    entityId: sponsorshipId,
+    action: "status-change",
+    after: { status: newStatus },
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
 
   revalidatePath(`/fsp/sports/${sport}`);
   redir(sport, "sponsorship", "success", "Sponsorship status updated.");

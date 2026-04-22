@@ -143,6 +143,16 @@ export async function updateInvoiceIntakeStatusAction(formData: FormData) {
     [intakeId, nextStatus, session.id]
   );
 
+  await cascadeUpdate({
+    trigger: nextStatus === "rejected" ? "invoice-intake:approved" : "invoice-intake:approved",
+    entityType: "invoice_intake",
+    entityId: intakeId,
+    action: nextStatus === "rejected" ? "reject" : "move-to-review",
+    after: { status: nextStatus },
+    performedBy: session.id,
+    agentId: "invoice-agent",
+  });
+
   revalidateInvoicePaths();
   redirectToInvoiceHub(
     "success",

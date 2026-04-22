@@ -13,6 +13,7 @@ function normalizeWhitespace(value: string) {
 
 export async function generatePayoutsAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const companyCode = normalizeWhitespace(String(formData.get("companyCode") ?? "XTZ"));
 
@@ -84,6 +85,18 @@ export async function generatePayoutsAction(formData: FormData) {
       ]
     );
     created++;
+  }
+
+  if (created > 0) {
+    await cascadeUpdate({
+      trigger: "gig-payout:generated",
+      entityType: "gig_worker_payout",
+      entityId: companyId,
+      action: "generate-batch",
+      after: { companyCode, periodStart: periodStart.toISOString().slice(0, 10), periodEnd: periodEnd.toISOString().slice(0, 10), count: created },
+      performedBy: session.id,
+      agentId: "gig-worker-agent",
+    });
   }
 
   revalidatePath("/gig-workers");

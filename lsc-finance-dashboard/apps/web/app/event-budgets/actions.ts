@@ -73,6 +73,7 @@ export async function createEventAction(formData: FormData) {
 
 export async function addBudgetItemAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const eventId = clean(formData.get("eventId"));
   const category = clean(formData.get("category"));
@@ -97,6 +98,16 @@ export async function addBudgetItemAction(formData: FormData) {
     [eventId, category, subCategory, description || null, vendorName || null, budgetAmount, Number(maxOrder[0]?.mx ?? 0) + 10]
   );
 
+  await cascadeUpdate({
+    trigger: "sport-event:config:changed",
+    entityType: "fsp_event_budget_item",
+    entityId: eventId,
+    action: "add-budget-item",
+    after: { category, subCategory, vendorName, budgetAmount },
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
+
   revalidatePath("/event-budgets");
   redir(eventId, "success", `Budget item "${subCategory}" added.`);
 }
@@ -105,6 +116,7 @@ export async function addBudgetItemAction(formData: FormData) {
 
 export async function addChecklistItemAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const eventId = clean(formData.get("eventId"));
   const category = clean(formData.get("category"));
@@ -130,6 +142,16 @@ export async function addChecklistItemAction(formData: FormData) {
     [eventId, category, requirement, whatToCheck || null, verificationProof || null, owner || null, dueDate || null, Number(maxOrder[0]?.mx ?? 0) + 10]
   );
 
+  await cascadeUpdate({
+    trigger: "sport-event:config:changed",
+    entityType: "fsp_event_checklist",
+    entityId: eventId,
+    action: "add-checklist-item",
+    after: { category, requirement, owner, dueDate },
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
+
   revalidatePath("/event-budgets");
   redir(eventId, "success", `Checklist item "${requirement}" added.`);
 }
@@ -138,6 +160,7 @@ export async function addChecklistItemAction(formData: FormData) {
 
 export async function updateChecklistStatusAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const eventId = clean(formData.get("eventId"));
   const itemId = clean(formData.get("itemId"));
@@ -158,6 +181,17 @@ export async function updateChecklistStatusAction(formData: FormData) {
      where id = $2`,
     [newStatus, itemId]
   );
+
+  await cascadeUpdate({
+    trigger: "sport-event:config:changed",
+    entityType: "fsp_event_checklist",
+    entityId: itemId,
+    action: "status-change",
+    before: { status: currentStatus },
+    after: { status: newStatus },
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
 
   revalidatePath("/event-budgets");
   redir(eventId, "success", `Checklist item status updated to ${newStatus}.`);
