@@ -11,7 +11,11 @@ export type SearchHitKind =
   | "payroll-invoice"
   | "deal"
   | "subscription"
-  | "sponsor";
+  | "sponsor"
+  | "document"
+  | "payment"
+  | "fsp-sport"
+  | "race-season";
 
 export type SearchHit = {
   id: string;
@@ -43,9 +47,26 @@ export async function searchEntities(
   const perType = opts.perTypeLimit ?? 5;
   const pattern = `%${q}%`;
 
+  // Detect 4-digit year in query — triggers the race-season synthetic hit
+  const yearMatch = q.match(/\b(20\d{2})\b/);
+  const matchedYear = yearMatch ? Number(yearMatch[1]) : null;
+
   // Each sub-query owns its own catch so one broken table doesn't kill the
   // whole palette. We log but return [] for failed sources.
-  const [vendors, employees, races, intakes, payrollInvoices, deals, subscriptions, sponsors] =
+  const [
+    vendors,
+    employees,
+    races,
+    intakes,
+    payrollInvoices,
+    deals,
+    subscriptions,
+    sponsors,
+    documents,
+    payments,
+    fspSports,
+    raceSeason,
+  ] =
     await Promise.all([
       queryRows<{ id: string; name: string; vendor_type: string | null; currency_code: string }>(
         `select id, name, vendor_type::text, currency_code
@@ -120,6 +141,90 @@ export async function searchEntities(
          limit $2`,
         [pattern, perType]
       ).catch(() => []),
+
+      // Documents by source_name OR by the vendor/sponsor on the linked invoice
+      queryRows<{
+        id: string;
+        source_name: string;
+        document_type: string;
+        company_code: string | null;
+        vendor_hint: string | null;
+      }>(
+        `select sd.id, sd.source_name, sd.document_type::text,
+                c.code::text as company_code,
+                coalesce(ii.vendor_name, soc.name) as vendor_hint
+         from source_documents sd
+         left join companies c on c.id = sd.company_id
+         left join invoice_intakes ii on ii.source_document_id = sd.id
+         left join invoices inv on inv.source_document_id = sd.id
+         left join sponsors_or_customers soc on soc.id = inv.sponsor_or_customer_id
+         where sd.source_name ilike $1
+            or ii.vendor_name ilike $1
+            or soc.name ilike $1
+         order by sd.updated_at desc nulls last
+         limit $2`,
+        [pattern, perType]
+      ).catch(() => []),
+
+      // Payments — match by sponsor name on linked invoice, or description, or reference
+      queryRows<{
+        id: string;
+        amount: string;
+        currency_code: string;
+        direction: string;
+        payment_status: string;
+        sponsor_name: string | null;
+        company_code: string | null;
+        payment_date: string | null;
+      }>(
+        `select p.id, p.amount::text, p.currency_code, p.direction::text,
+                p.payment_status::text,
+                soc.name as sponsor_name,
+                c.code::text as company_code,
+                p.payment_date::text
+         from payments p
+         left join invoices inv on inv.id = p.invoice_id
+         left join sponsors_or_customers soc on soc.id = inv.sponsor_or_customer_id
+         left join companies c on c.id = p.company_id
+         where soc.name ilike $1
+            or p.description ilike $1
+            or p.reference_number ilike $1
+         order by p.payment_date desc nulls last
+         limit $2`,
+        [pattern, perType]
+      ).catch(() => []),
+
+      // FSP sports — display_name, sport_code, league_name
+      queryRows<{
+        id: string;
+        sport_code: string;
+        display_name: string;
+        league_name: string | null;
+      }>(
+        `select id, sport_code::text, display_name, league_name
+         from fsp_sports
+         where display_name ilike $1
+            or sport_code::text ilike $1
+            or league_name ilike $1
+         order by display_name
+         limit $2`,
+        [pattern, perType]
+      ).catch(() => []),
+
+      // Race season — synthetic: if query looks like a year, return a
+      // single navigation hit that takes the user to the season-year races.
+      (async (): Promise<
+        Array<{ year: number; raceCount: number }>
+      > => {
+        if (matchedYear === null) return [];
+        const rows = await queryRows<{ c: number }>(
+          `select count(*)::int as c from race_events where season_year = $1`,
+          [matchedYear]
+        ).catch(() => [] as Array<{ c: number }>);
+        const count = rows[0]?.c ?? 0;
+        if (count === 0) return [];
+        return [{ year: matchedYear, raceCount: count }];
+      })(),
     ]);
 
   const hits: SearchHit[] = [];
@@ -194,6 +299,59 @@ export async function searchEntities(
       label: s.name,
       subtitle: [s.counterparty_type, s.company_code].filter(Boolean).join(" · "),
       href: `/commercial-goals/${s.company_code}`,
+    });
+  }
+  for (const d of documents) {
+    hits.push({
+      id: `document:${d.id}`,
+      kind: "document",
+      label: d.source_name,
+      subtitle: [
+        d.document_type.replace(/_/g, " "),
+        d.vendor_hint ?? undefined,
+        d.company_code ?? undefined,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      href: d.company_code ? `/documents/${d.company_code}` : `/documents/TBR`,
+    });
+  }
+  for (const p of payments) {
+    const fmtAmount = `${p.currency_code} ${Number(p.amount).toLocaleString("en-US", {
+      maximumFractionDigits: 0,
+    })}`;
+    hits.push({
+      id: `payment:${p.id}`,
+      kind: "payment",
+      label: p.sponsor_name
+        ? `${p.sponsor_name} — ${fmtAmount}`
+        : `Payment ${fmtAmount}`,
+      subtitle: [
+        p.direction,
+        p.payment_status.replace(/_/g, " "),
+        p.payment_date ?? undefined,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      href: p.company_code ? `/payments/${p.company_code}` : `/payments/TBR`,
+    });
+  }
+  for (const s of fspSports) {
+    hits.push({
+      id: `fsp-sport:${s.id}`,
+      kind: "fsp-sport",
+      label: s.display_name,
+      subtitle: [s.league_name ?? undefined, s.sport_code].filter(Boolean).join(" · "),
+      href: `/fsp/sports/${s.sport_code}`,
+    });
+  }
+  for (const rs of raceSeason) {
+    hits.push({
+      id: `race-season:${rs.year}`,
+      kind: "race-season",
+      label: `TBR ${rs.year} season`,
+      subtitle: `${rs.raceCount} ${rs.raceCount === 1 ? "race" : "races"}`,
+      href: `/tbr/races?year=${rs.year}`,
     });
   }
 

@@ -3626,6 +3626,165 @@ textarea {
   }
 }
 
+/* ───── Agent graph visualization (21-agent topology) ──── */
+.agent-graph-board {
+  position: relative;
+  width: 100%;
+  height: 680px;
+  min-height: 680px;
+  background:
+    radial-gradient(circle at center, rgba(31, 93, 132, 0.06) 0%, transparent 60%),
+    var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.agent-graph-node {
+  position: absolute;
+  width: 176px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  z-index: 2;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.agent-graph-node:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.06);
+  z-index: 5;
+}
+
+.agent-graph-node.core {
+  width: 200px;
+  background: var(--bg-deep);
+  color: #f0f0f5;
+  border-color: var(--accent);
+  border-left-width: 4px;
+}
+
+.agent-graph-node.core .node-name {
+  color: #ffffff;
+}
+
+.agent-graph-node.core .node-meta {
+  color: rgba(240, 240, 245, 0.72);
+}
+
+.agent-graph-node.kind-agent {
+  border-left-color: var(--brand-2);
+}
+
+.agent-graph-node.kind-hitl {
+  border-left-color: var(--warn);
+}
+
+.agent-graph-node.kind-workflow {
+  border-left-color: var(--good);
+}
+
+.agent-graph-node .node-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+.agent-graph-node .node-meta {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin-top: 3px;
+  line-height: 1.35;
+}
+
+.node-badges {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.node-badges .badge {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Kind badges */
+.badge.kind-agent {
+  background: rgba(31, 93, 132, 0.12);
+  color: var(--brand-2);
+}
+.badge.kind-hitl {
+  background: rgba(217, 119, 6, 0.14);
+  color: var(--warn);
+}
+.badge.kind-workflow {
+  background: rgba(22, 163, 74, 0.14);
+  color: var(--good);
+}
+
+/* Tier badges */
+.badge.tier-t0 {
+  background: var(--bg);
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+}
+.badge.tier-t1 {
+  background: rgba(181, 106, 61, 0.15);
+  color: var(--accent);
+}
+.badge.tier-t2 {
+  background: rgba(31, 93, 132, 0.16);
+  color: var(--brand-2);
+}
+.badge.tier-t3 {
+  background: rgba(220, 38, 38, 0.14);
+  color: var(--risk);
+}
+
+/* Edges colored by the non-orchestrator endpoint's kind */
+.agent-graph-board .network-line {
+  position: absolute;
+  height: 1px;
+  background: var(--line-strong);
+  transform-origin: 0 50%;
+  z-index: 1;
+  opacity: 0.55;
+}
+
+.agent-graph-board .network-line.edge-agent {
+  background: linear-gradient(to right, rgba(31, 93, 132, 0.5), rgba(31, 93, 132, 0.2));
+}
+.agent-graph-board .network-line.edge-hitl {
+  background: linear-gradient(to right, rgba(217, 119, 6, 0.5), rgba(217, 119, 6, 0.2));
+}
+.agent-graph-board .network-line.edge-workflow {
+  background: linear-gradient(to right, rgba(22, 163, 74, 0.45), rgba(22, 163, 74, 0.18));
+}
+
+/* Flex row helper used inside key-value-list cells */
+.flex-row-gap-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 960px) {
+  .agent-graph-board {
+    height: 900px;
+    min-height: 900px;
+    overflow: auto;
+  }
+}
+
 /* ───── Row highlight (Cmd+K deep-link flash) ──────────── */
 @keyframes row-highlight-pulse {
   0%   { background-color: rgba(181, 106, 61, 0.28); box-shadow: inset 0 0 0 2px rgba(181, 106, 61, 0.6); }

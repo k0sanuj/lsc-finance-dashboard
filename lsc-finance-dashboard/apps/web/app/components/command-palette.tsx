@@ -39,6 +39,10 @@ const HIT_KIND_GROUP: Record<string, string> = {
   deal: "Deals",
   subscription: "Subscriptions",
   sponsor: "Sponsors & Customers",
+  document: "Documents",
+  payment: "Payments",
+  "fsp-sport": "FSP Sports",
+  "race-season": "Race Seasons",
 };
 
 function loadRecent(): string[] {
@@ -287,7 +291,7 @@ export function CommandPalette({ commands }: Props) {
             ref={inputRef}
             type="text"
             className="cmdk-input"
-            placeholder="Search navigation, vendors, employees, invoices, races…"
+            placeholder="Search navigation, vendors, employees, invoices, races, documents, payments, sports…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyInInput}
