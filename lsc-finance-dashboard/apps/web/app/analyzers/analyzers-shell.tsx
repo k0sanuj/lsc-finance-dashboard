@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-type AnalyzerKey = "cash-flow" | "receivables" | "margin" | "budget" | "goal-tracker";
+type AnalyzerKey =
+  | "cash-flow"
+  | "financial-forecast"
+  | "receivables"
+  | "margin"
+  | "budget"
+  | "goal-tracker";
 
 type Analyzer = {
   key: AnalyzerKey;
@@ -20,6 +26,14 @@ const ANALYZERS: Analyzer[] = [
     description: "Liquidity, runway, upcoming-payment pressure.",
     agentId: "cash-flow-analyzer",
     skill: "analyze-cash-position",
+    tier: "T2",
+  },
+  {
+    key: "financial-forecast",
+    title: "Financial Forecast & Break-Even",
+    description: "3/6/12-month cash projection, runway, break-even timing.",
+    agentId: "cash-flow-analyzer",
+    skill: "financial-forecast",
     tier: "T2",
   },
   {
@@ -76,7 +90,141 @@ function StatusBadge({ status }: { status: RunState["status"] }) {
   return <span className={cls}>{label}</span>;
 }
 
+function fmtUsd(n: number): string {
+  return n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  });
+}
+
+function renderForecast(data: Record<string, unknown>): React.ReactNode {
+  const cash = Number(data.currentCashUsd ?? 0);
+  const burn = Number(data.monthlyBurnUsd ?? 0);
+  const runway = data.runwayMonths;
+  const breakEven = data.breakEvenAnalysis as
+    | { monthsToBreakEven?: number | null; revenueNeededMonthly?: number; pathDescription?: string }
+    | undefined;
+
+  const projections = [
+    { label: "3 months", key: "projectedIn3Months" },
+    { label: "6 months", key: "projectedIn6Months" },
+    { label: "12 months", key: "projectedIn12Months" },
+  ];
+
+  return (
+    <div className="analyzer-result">
+      <div className="forecast-metric-row">
+        <div className="forecast-metric">
+          <span className="metric-label">Current cash</span>
+          <strong>{fmtUsd(cash)}</strong>
+        </div>
+        <div className="forecast-metric">
+          <span className="metric-label">Monthly burn</span>
+          <strong>{fmtUsd(burn)}</strong>
+        </div>
+        <div className="forecast-metric">
+          <span className="metric-label">Runway</span>
+          <strong>{runway === null || runway === undefined ? "—" : `${runway} mo`}</strong>
+        </div>
+        <div className="forecast-metric">
+          <span className="metric-label">Months to break-even</span>
+          <strong>
+            {breakEven?.monthsToBreakEven === null || breakEven?.monthsToBreakEven === undefined
+              ? "Profitable / n/a"
+              : `${breakEven.monthsToBreakEven} mo`}
+          </strong>
+        </div>
+      </div>
+
+      <div className="analyzer-section">
+        <strong>Projected cash position</strong>
+        <div className="forecast-projection-grid">
+          <div className="forecast-proj-header">Horizon</div>
+          <div className="forecast-proj-header">Best case</div>
+          <div className="forecast-proj-header">Base case</div>
+          <div className="forecast-proj-header">Worst case</div>
+          {projections.map((p) => {
+            const row = data[p.key] as
+              | { bestCase?: number; baseCase?: number; worstCase?: number }
+              | undefined;
+            return (
+              <>
+                <div key={`${p.key}-label`} className="forecast-proj-label">{p.label}</div>
+                <div key={`${p.key}-best`} className="forecast-proj-cell good">
+                  {fmtUsd(Number(row?.bestCase ?? 0))}
+                </div>
+                <div key={`${p.key}-base`} className="forecast-proj-cell">
+                  {fmtUsd(Number(row?.baseCase ?? 0))}
+                </div>
+                <div key={`${p.key}-worst`} className="forecast-proj-cell risk">
+                  {fmtUsd(Number(row?.worstCase ?? 0))}
+                </div>
+              </>
+            );
+          })}
+        </div>
+      </div>
+
+      {breakEven?.pathDescription ? (
+        <div className="analyzer-section">
+          <strong>Break-even path</strong>
+          <p className="analyzer-summary">{breakEven.pathDescription}</p>
+        </div>
+      ) : null}
+
+      {Array.isArray(data.keyAssumptions) && (data.keyAssumptions as string[]).length > 0 ? (
+        <div className="analyzer-section">
+          <strong>Key assumptions</strong>
+          <ul className="analyzer-list">
+            {(data.keyAssumptions as string[]).map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {Array.isArray(data.riskFactors) && (data.riskFactors as Array<unknown>).length > 0 ? (
+        <div className="analyzer-section">
+          <strong>Risks</strong>
+          <ul className="analyzer-list">
+            {(data.riskFactors as Array<{ severity: string; description: string }>).map((r, i) => (
+              <li key={i}>
+                <span className={`pill signal-pill signal-${r.severity === "high" ? "risk" : r.severity === "medium" ? "warn" : "good"}`}>
+                  {r.severity}
+                </span>{" "}
+                {r.description}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {Array.isArray(data.recommendations) && (data.recommendations as string[]).length > 0 ? (
+        <div className="analyzer-section">
+          <strong>Recommendations</strong>
+          <ul className="analyzer-list">
+            {(data.recommendations as string[]).map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <details className="analyzer-raw">
+        <summary>Raw JSON</summary>
+        <pre>{JSON.stringify(data, null, 2)}</pre>
+      </details>
+    </div>
+  );
+}
+
 function renderAnalysis(data: Record<string, unknown>): React.ReactNode {
+  // Forecast payload has projectedIn3Months field → use forecast renderer
+  if (data.projectedIn3Months !== undefined) {
+    return renderForecast(data);
+  }
+
   return (
     <div className="analyzer-result">
       {typeof data.summary === "string" ? (

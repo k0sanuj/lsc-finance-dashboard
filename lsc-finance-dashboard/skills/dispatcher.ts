@@ -252,6 +252,14 @@ const SKILL_REGISTRY: Record<string, SkillHandler> = {
     const { analyzeCashFlow } = await import("./analyzers/cash-flow");
     return ok(await analyzeCashFlow({ companyCode: optionalString(p, "companyCode") }));
   },
+  "cash-flow-analyzer:financial-forecast": async (p) => {
+    const { runFinancialForecast } = await import("./analyzers/financial-forecast");
+    return ok(await runFinancialForecast({ companyCode: optionalString(p, "companyCode") }));
+  },
+  "cash-flow-analyzer:break-even-analysis": async (p) => {
+    const { runFinancialForecast } = await import("./analyzers/financial-forecast");
+    return ok(await runFinancialForecast({ companyCode: optionalString(p, "companyCode") }));
+  },
   "receivables-analyzer:analyze-aging": async (p) => {
     const { analyzeReceivables } = await import("./analyzers/receivables");
     return ok(await analyzeReceivables({ companyCode: optionalString(p, "companyCode") }));
