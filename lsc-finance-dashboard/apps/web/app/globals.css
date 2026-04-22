@@ -3626,6 +3626,23 @@ textarea {
   }
 }
 
+/* ───── Row highlight (Cmd+K deep-link flash) ──────────── */
+@keyframes row-highlight-pulse {
+  0%   { background-color: rgba(181, 106, 61, 0.28); box-shadow: inset 0 0 0 2px rgba(181, 106, 61, 0.6); }
+  20%  { background-color: rgba(181, 106, 61, 0.22); }
+  100% { background-color: transparent; box-shadow: inset 0 0 0 2px transparent; }
+}
+
+.row-highlight-flash {
+  animation: row-highlight-pulse 2s ease-out;
+}
+
+.row-highlight-flash td,
+.row-highlight-flash th {
+  /* Keep inner cells transparent so the tr's animated bg shows through */
+  background: transparent !important;
+}
+
 /* ───── Utility classes (replace inline styles) ─────────── */
 .mono {
   font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;

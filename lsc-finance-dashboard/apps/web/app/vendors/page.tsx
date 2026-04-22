@@ -1,6 +1,7 @@
 import { getVendorsWithBank } from "@lsc/db";
 import { requireRole } from "../../lib/auth";
 import { EmptyState } from "../components/empty-state";
+import { RowHighlight } from "../components/row-highlight";
 import { SubmitButton } from "../components/submit-button";
 import { addVendorAction, deleteVendorAction } from "./actions";
 
@@ -30,6 +31,7 @@ export default async function VendorsPage() {
 
   return (
     <div className="page-grid">
+      <RowHighlight />
       <section className="workspace-header">
         <div className="workspace-header-left">
           <span className="section-kicker">Finance operations</span>
@@ -206,7 +208,7 @@ export default async function VendorsPage() {
             </thead>
             <tbody>
               {vendorsBank.map((v) => (
-                  <tr key={v.id}>
+                  <tr key={v.id} data-row-id={v.id}>
                     <td>
                       <strong>{v.name}</strong>
                       {v.email ? <><br /><span className="muted">{v.email}</span></> : null}

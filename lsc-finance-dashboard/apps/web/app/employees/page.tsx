@@ -1,6 +1,7 @@
 import { requireRole } from "../../lib/auth";
 import { getEmployees, getFxRatesForDisplay } from "@lsc/db";
 import { EmptyState } from "../components/empty-state";
+import { RowHighlight } from "../components/row-highlight";
 import { SubmitButton } from "../components/submit-button";
 import {
   addEmployeeAction,
@@ -57,6 +58,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
 
   return (
     <div className="page-grid">
+      <RowHighlight />
       <section className="workspace-header">
         <div className="workspace-header-left">
           <span className="section-kicker">People &amp; payroll</span>
@@ -230,7 +232,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
             <tbody>
               {employees.length > 0 ? (
                 employees.map((emp) => (
-                  <tr key={emp.id}>
+                  <tr key={emp.id} data-row-id={emp.id}>
                     <td><strong>{emp.fullName}</strong></td>
                     <td className="muted">{emp.email || "—"}</td>
                     <td>{emp.designation}</td>

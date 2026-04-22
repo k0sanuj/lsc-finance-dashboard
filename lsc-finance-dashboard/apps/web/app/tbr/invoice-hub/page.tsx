@@ -18,6 +18,7 @@ import {
 import { DocumentAnalyzerPanel } from "../../components/document-analyzer-panel";
 import { DocumentAnalysisSummary } from "../../components/document-analysis-summary";
 import { ModalLauncher } from "../../components/modal-launcher";
+import { RowHighlight } from "../../components/row-highlight";
 import {
   formatDocumentWorkflowForSelection
 } from "../../lib/shared-workspace";
@@ -109,6 +110,7 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
 
   return (
     <div className="page-grid">
+      <RowHighlight />
       <section className="workspace-header">
         <div className="workspace-header-left">
           <span className="section-kicker">TBR invoice hub</span>
@@ -363,7 +365,7 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
             <tbody>
               {intakeQueue.length > 0 ? (
                 intakeQueue.map((row) => (
-                  <tr key={row.id}>
+                  <tr key={row.id} data-row-id={row.id}>
                     <td>
                       <div className="stacked-table-cell">
                         <span>{row.vendor}</span>
