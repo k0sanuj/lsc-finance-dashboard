@@ -6,7 +6,8 @@ import {
   getSportIdByCode, getSportPnlLineItems, getSportSponsorships,
   getSportLeaguePayroll, getSportTechPayroll, getSportRevenueShare,
   getSportEventConfig, getFspSports, getSportOpexItems, getSportEventProduction,
-  getFspSportBudgetVariance
+  getFspSportBudgetVariance,
+  getSportMediaRevenue, getSportInfluencerEconomics
 } from "@lsc/db";
 import { BudgetVarianceTable } from "../../../components/budget-variance-table";
 import {
@@ -15,7 +16,8 @@ import {
   updateSponsorshipAction, archiveSponsorshipAction, uploadSponsorshipContractAction,
   addLeagueRoleAction, addTechRoleAction,
   updateRevenueShareAction, updateEventConfigAction,
-  addOpexItemAction, addProductionItemAction
+  addOpexItemAction, addProductionItemAction,
+  upsertMediaRevenueAction, addInfluencerAction, deleteInfluencerAction
 } from "./actions";
 
 const TABS = [
@@ -508,86 +510,244 @@ async function SponsorshipTab({ sportId, sportCode }: { sportId: string; sportCo
 
 /* ─── Media Revenue Tab ───────────────────────────────────── */
 
-function MediaRevenueTab({ sportCode }: { sportCode: string }): React.ReactElement {
+async function MediaRevenueTab({
+  sportId,
+  sportCode,
+}: {
+  sportId: string;
+  sportCode: string;
+}): Promise<React.ReactElement> {
+  const [media, influencers] = await Promise.all([
+    getSportMediaRevenue(sportId),
+    getSportInfluencerEconomics(sportId),
+  ]);
+
+  const nonLinear = media.find((m) => m.channel === "non_linear");
+  const linear = media.find((m) => m.channel === "linear");
+
+  const totalMediaY1 = (nonLinear?.revenueY1 ?? 0) + (linear?.revenueY1 ?? 0);
+  const totalMediaY2 = (nonLinear?.revenueY2 ?? 0) + (linear?.revenueY2 ?? 0);
+  const totalMediaY3 = (nonLinear?.revenueY3 ?? 0) + (linear?.revenueY3 ?? 0);
+
+  const totalInfluencerAnnualValue = influencers.reduce(
+    (s, r) => s + r.estAnnualValue,
+    0
+  );
+
+  function renderChannel(
+    label: string,
+    channel: "non_linear" | "linear",
+    row: typeof nonLinear
+  ) {
+    return (
+      <article className="card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">CPM model</span>
+            <h3>{label}</h3>
+          </div>
+          <span className="muted text-xs">
+            Revenue = impressions / 1000 × CPM
+          </span>
+        </div>
+        <form action={upsertMediaRevenueAction}>
+          <input type="hidden" name="sport" value={sportCode} />
+          <input type="hidden" name="channel" value={channel} />
+          <div className="form-grid">
+            <label className="field">
+              <span>Avg viewership</span>
+              <input
+                name="avgViewership"
+                type="number"
+                step="1"
+                defaultValue={row?.avgViewership ?? 0}
+              />
+            </label>
+            <label className="field">
+              <span>Ad impressions Y1</span>
+              <input name="impressionsY1" type="number" step="1" defaultValue={row?.impressionsY1 ?? 0} />
+            </label>
+            <label className="field">
+              <span>Ad impressions Y2</span>
+              <input name="impressionsY2" type="number" step="1" defaultValue={row?.impressionsY2 ?? 0} />
+            </label>
+            <label className="field">
+              <span>Ad impressions Y3</span>
+              <input name="impressionsY3" type="number" step="1" defaultValue={row?.impressionsY3 ?? 0} />
+            </label>
+            <label className="field">
+              <span>CPM Y1 ($)</span>
+              <input name="cpmY1" type="number" step="0.01" defaultValue={row?.cpmY1 ?? 0} />
+            </label>
+            <label className="field">
+              <span>CPM Y2 ($)</span>
+              <input name="cpmY2" type="number" step="0.01" defaultValue={row?.cpmY2 ?? 0} />
+            </label>
+            <label className="field">
+              <span>CPM Y3 ($)</span>
+              <input name="cpmY3" type="number" step="0.01" defaultValue={row?.cpmY3 ?? 0} />
+            </label>
+            <label className="field field-span-full">
+              <span>Notes</span>
+              <input name="notes" type="text" defaultValue={row?.notes ?? ""} placeholder="Optional commentary" />
+            </label>
+            <div className="form-actions">
+              <button className="action-button primary" type="submit">Save {label}</button>
+            </div>
+          </div>
+        </form>
+
+        <div className="stats-grid compact-stats mt-md">
+          <div className="metric-card accent-good">
+            <span className="metric-label">Y1 revenue</span>
+            <span className="metric-value">{fmt(row?.revenueY1 ?? 0)}</span>
+          </div>
+          <div className="metric-card accent-good">
+            <span className="metric-label">Y2 revenue</span>
+            <span className="metric-value">{fmt(row?.revenueY2 ?? 0)}</span>
+          </div>
+          <div className="metric-card accent-good">
+            <span className="metric-label">Y3 revenue</span>
+            <span className="metric-value">{fmt(row?.revenueY3 ?? 0)}</span>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <>
       <article className="card">
         <div className="card-title-row">
-          <h3>Non-Linear (OTT / Streaming)</h3>
-        </div>
-        <p className="notice">
-          Configure OTT and streaming revenue projections. Ad impressions, viewership, and CPM
-          values drive computed media revenue for each year.
-        </p>
-        <div className="form-grid">
-          <div className="field">
-            <label>Ad Impressions Y1</label>
-            <input type="number" placeholder="e.g. 500000" disabled />
-          </div>
-          <div className="field">
-            <label>Ad Impressions Y2</label>
-            <input type="number" placeholder="e.g. 1000000" disabled />
-          </div>
-          <div className="field">
-            <label>Ad Impressions Y3</label>
-            <input type="number" placeholder="e.g. 2000000" disabled />
-          </div>
-          <div className="field">
-            <label>Avg Viewership</label>
-            <input type="number" placeholder="e.g. 50000" disabled />
-          </div>
-          <div className="field">
-            <label>CPM ($)</label>
-            <input type="number" step="0.01" placeholder="e.g. 12.50" disabled />
+          <div>
+            <span className="section-kicker">Media revenue — totals</span>
+            <h3>Combined CPM revenue ({sportCode})</h3>
           </div>
         </div>
-        <p className="muted mt-md">
-          Computed Revenue = Ad Impressions / 1000 x CPM per year
-        </p>
+        <div className="stats-grid compact-stats">
+          <div className="metric-card accent-brand">
+            <span className="metric-label">Y1</span>
+            <span className="metric-value">{fmt(totalMediaY1)}</span>
+          </div>
+          <div className="metric-card accent-brand">
+            <span className="metric-label">Y2</span>
+            <span className="metric-value">{fmt(totalMediaY2)}</span>
+          </div>
+          <div className="metric-card accent-brand">
+            <span className="metric-label">Y3</span>
+            <span className="metric-value">{fmt(totalMediaY3)}</span>
+          </div>
+          <div className="metric-card accent-warn">
+            <span className="metric-label">Influencer value / yr</span>
+            <span className="metric-value">{fmt(totalInfluencerAnnualValue)}</span>
+          </div>
+        </div>
       </article>
+
+      {renderChannel("Non-Linear (OTT / Streaming)", "non_linear", nonLinear)}
+      {renderChannel("Linear (Traditional TV)", "linear", linear)}
 
       <article className="card">
         <div className="card-title-row">
-          <h3>Linear (Traditional TV)</h3>
+          <div>
+            <span className="section-kicker">Influencer economics</span>
+            <h3>Creator tier mix</h3>
+          </div>
+          <span className="muted text-xs">
+            Value = creators × posts × cost × brand-deal split
+          </span>
         </div>
-        <p className="notice">
-          Configure linear broadcast revenue projections with ad impressions, viewership, and CPM.
-        </p>
-        <div className="form-grid">
-          <div className="field">
-            <label>Ad Impressions Y1</label>
-            <input type="number" placeholder="e.g. 200000" disabled />
+        {influencers.length === 0 ? (
+          <p className="muted">No creator tiers configured yet. Add one below.</p>
+        ) : (
+          <div className="table-wrapper clean-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tier</th>
+                  <th>Creators</th>
+                  <th>Avg followers</th>
+                  <th>Posts / yr</th>
+                  <th className="text-right">Cost / post</th>
+                  <th className="text-right">Engagement</th>
+                  <th className="text-right">Brand split</th>
+                  <th className="text-right">Annual cost</th>
+                  <th className="text-right">Est. annual value</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {influencers.map((r) => (
+                  <tr key={r.id}>
+                    <td><span className="pill">{r.creatorTier}</span></td>
+                    <td>{r.creatorsCount}</td>
+                    <td>{r.avgFollowers.toLocaleString("en-US")}</td>
+                    <td>{r.postsPerYear}</td>
+                    <td className="text-right">{fmt(r.costPerPostUsd)}</td>
+                    <td className="text-right">{r.engagementRatePct.toFixed(1)}%</td>
+                    <td className="text-right">{r.brandDealSplitPct.toFixed(0)}%</td>
+                    <td className="text-right">{fmt(r.annualCost)}</td>
+                    <td className="text-right"><strong>{fmt(r.estAnnualValue)}</strong></td>
+                    <td>
+                      <form action={deleteInfluencerAction} className="inline-actions">
+                        <input type="hidden" name="id" value={r.id} />
+                        <input type="hidden" name="sport" value={sportCode} />
+                        <button className="btn-inline" type="submit">Remove</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="field">
-            <label>Ad Impressions Y2</label>
-            <input type="number" placeholder="e.g. 500000" disabled />
-          </div>
-          <div className="field">
-            <label>Ad Impressions Y3</label>
-            <input type="number" placeholder="e.g. 1000000" disabled />
-          </div>
-          <div className="field">
-            <label>Avg Viewership</label>
-            <input type="number" placeholder="e.g. 100000" disabled />
-          </div>
-          <div className="field">
-            <label>CPM ($)</label>
-            <input type="number" step="0.01" placeholder="e.g. 18.00" disabled />
-          </div>
-        </div>
-        <p className="muted mt-md">
-          Computed Revenue = Ad Impressions / 1000 x CPM per year
-        </p>
-      </article>
+        )}
 
-      <article className="card">
-        <div className="card-title-row">
-          <h3>Broadcast Partners</h3>
-        </div>
-        <p className="notice">
-          No broadcast partners configured yet. Add broadcast partners (channel, type, region) via
-          the media revenue data seeding process to populate this table.
-        </p>
+        <form action={addInfluencerAction} className="mt-lg">
+          <input type="hidden" name="sport" value={sportCode} />
+          <div className="form-grid">
+            <label className="field">
+              <span>Creator tier</span>
+              <select name="creatorTier" defaultValue="micro">
+                <option value="nano">Nano (1K–10K)</option>
+                <option value="micro">Micro (10K–100K)</option>
+                <option value="mid">Mid (100K–500K)</option>
+                <option value="macro">Macro (500K–1M)</option>
+                <option value="mega">Mega (1M+)</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Creators count</span>
+              <input name="creatorsCount" type="number" step="1" defaultValue="5" />
+            </label>
+            <label className="field">
+              <span>Avg followers</span>
+              <input name="avgFollowers" type="number" step="1" defaultValue="50000" />
+            </label>
+            <label className="field">
+              <span>Posts / year</span>
+              <input name="postsPerYear" type="number" step="1" defaultValue="24" />
+            </label>
+            <label className="field">
+              <span>Cost / post (USD)</span>
+              <input name="costPerPostUsd" type="number" step="0.01" defaultValue="250" />
+            </label>
+            <label className="field">
+              <span>Engagement rate (%)</span>
+              <input name="engagementRatePct" type="number" step="0.1" defaultValue="3.5" />
+            </label>
+            <label className="field">
+              <span>Brand-deal split (%)</span>
+              <input name="brandDealSplitPct" type="number" step="1" defaultValue="50" />
+            </label>
+            <label className="field field-span-full">
+              <span>Notes</span>
+              <input name="notes" type="text" placeholder="Optional commentary" />
+            </label>
+            <div className="form-actions">
+              <button className="action-button primary" type="submit">Add creator tier</button>
+            </div>
+          </div>
+        </form>
       </article>
     </>
   );
@@ -1207,7 +1367,7 @@ export default async function SportDetailPage({
 
       {activeTab === "summary" && <PnlSummaryTab sportId={sportId} sportCode={sportCode} />}
       {activeTab === "sponsorship" && <SponsorshipTab sportId={sportId} sportCode={sportCode} />}
-      {activeTab === "media" && <MediaRevenueTab sportCode={sportCode} />}
+      {activeTab === "media" && <MediaRevenueTab sportId={sportId} sportCode={sportCode} />}
       {activeTab === "opex" && <OpexDetailedTab sportId={sportId} sportCode={sportCode} />}
       {activeTab === "production" && <EventProductionTab sportId={sportId} sportCode={sportCode} />}
       {activeTab === "league-payroll" && <LeaguePayrollTab sportId={sportId} sportCode={sportCode} />}

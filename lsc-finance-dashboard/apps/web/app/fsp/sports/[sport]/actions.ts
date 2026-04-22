@@ -511,3 +511,132 @@ export async function addProductionItemAction(formData: FormData) {
   revalidatePath(`/fsp/sports/${sport}`);
   redir(sport, "production", "success", `Added "${subCategory}" to ${costCategory}.`);
 }
+
+// ─── Media Revenue (CPM model) ─────────────────────────────
+
+export async function upsertMediaRevenueAction(formData: FormData) {
+  await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
+  const sport = clean(formData.get("sport"));
+  const channel = clean(formData.get("channel")); // "non_linear" | "linear"
+  const impressionsY1 = clean(formData.get("impressionsY1")) || "0";
+  const impressionsY2 = clean(formData.get("impressionsY2")) || "0";
+  const impressionsY3 = clean(formData.get("impressionsY3")) || "0";
+  const cpmY1 = clean(formData.get("cpmY1")) || "0";
+  const cpmY2 = clean(formData.get("cpmY2")) || "0";
+  const cpmY3 = clean(formData.get("cpmY3")) || "0";
+  const avgViewership = clean(formData.get("avgViewership")) || "0";
+  const notes = clean(formData.get("notes"));
+
+  if (!["non_linear", "linear"].includes(channel)) {
+    redir(sport, "media", "error", "Invalid channel.");
+  }
+
+  const sportId = await getSportId(sport);
+  if (!sportId) redir(sport, "media", "error", "Sport not found.");
+
+  await executeAdmin(
+    `insert into fsp_media_revenue
+       (sport_id, channel, impressions_y1, impressions_y2, impressions_y3,
+        cpm_y1, cpm_y2, cpm_y3, avg_viewership, notes)
+     values ($1, $2, $3::numeric, $4::numeric, $5::numeric,
+             $6::numeric, $7::numeric, $8::numeric, $9::numeric, $10)
+     on conflict (sport_id, channel) do update
+     set impressions_y1 = excluded.impressions_y1,
+         impressions_y2 = excluded.impressions_y2,
+         impressions_y3 = excluded.impressions_y3,
+         cpm_y1 = excluded.cpm_y1,
+         cpm_y2 = excluded.cpm_y2,
+         cpm_y3 = excluded.cpm_y3,
+         avg_viewership = excluded.avg_viewership,
+         notes = excluded.notes,
+         updated_at = now()`,
+    [
+      sportId, channel, impressionsY1, impressionsY2, impressionsY3,
+      cpmY1, cpmY2, cpmY3, avgViewership, notes || null,
+    ]
+  );
+
+  await cascadeUpdate({
+    trigger: "sport-pnl:updated",
+    entityType: "fsp_media_revenue",
+    entityId: sportId,
+    action: "upsert",
+    after: { sport, channel, impressionsY1, impressionsY2, impressionsY3, cpmY1, cpmY2, cpmY3 },
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
+
+  revalidatePath(`/fsp/sports/${sport}`);
+  redir(sport, "media", "success", `${channel === "non_linear" ? "Non-linear" : "Linear"} media config saved.`);
+}
+
+// ─── Influencer Economics ──────────────────────────────────
+
+export async function addInfluencerAction(formData: FormData) {
+  await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
+  const sport = clean(formData.get("sport"));
+  const creatorTier = clean(formData.get("creatorTier")); // nano/micro/mid/macro/mega
+  const creatorsCount = clean(formData.get("creatorsCount")) || "0";
+  const avgFollowers = clean(formData.get("avgFollowers")) || "0";
+  const postsPerYear = clean(formData.get("postsPerYear")) || "0";
+  const costPerPostUsd = clean(formData.get("costPerPostUsd")) || "0";
+  const engagementRatePct = clean(formData.get("engagementRatePct")) || "0";
+  const brandDealSplitPct = clean(formData.get("brandDealSplitPct")) || "50";
+  const notes = clean(formData.get("notes"));
+
+  if (!["nano", "micro", "mid", "macro", "mega"].includes(creatorTier)) {
+    redir(sport, "media", "error", "Invalid creator tier.");
+  }
+
+  const sportId = await getSportId(sport);
+  if (!sportId) redir(sport, "media", "error", "Sport not found.");
+
+  await executeAdmin(
+    `insert into fsp_influencer_economics
+       (sport_id, creator_tier, creators_count, avg_followers, posts_per_year,
+        cost_per_post_usd, engagement_rate_pct, brand_deal_split_pct, notes)
+     values ($1, $2, $3::integer, $4::integer, $5::integer,
+             $6::numeric, $7::numeric, $8::numeric, $9)`,
+    [
+      sportId, creatorTier, creatorsCount, avgFollowers, postsPerYear,
+      costPerPostUsd, engagementRatePct, brandDealSplitPct, notes || null,
+    ]
+  );
+
+  await cascadeUpdate({
+    trigger: "sport-pnl:updated",
+    entityType: "fsp_influencer_economics",
+    entityId: sportId,
+    action: "add",
+    after: { sport, creatorTier, creatorsCount, costPerPostUsd, brandDealSplitPct },
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
+
+  revalidatePath(`/fsp/sports/${sport}`);
+  redir(sport, "media", "success", `${creatorTier} creator tier added.`);
+}
+
+export async function deleteInfluencerAction(formData: FormData) {
+  await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
+  const sport = clean(formData.get("sport"));
+  const id = clean(formData.get("id"));
+  if (!id) redir(sport, "media", "error", "Missing id.");
+
+  await executeAdmin(`delete from fsp_influencer_economics where id = $1`, [id]);
+
+  await cascadeUpdate({
+    trigger: "sport-pnl:updated",
+    entityType: "fsp_influencer_economics",
+    entityId: id,
+    action: "delete",
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
+
+  revalidatePath(`/fsp/sports/${sport}`);
+  redir(sport, "media", "success", "Creator tier removed.");
+}
