@@ -11,7 +11,8 @@ import {
   XTE_RECIPIENT,
   XTE_ISSUER
 } from "@lsc/db";
-import { requireRole } from "../../lib/auth";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
+import { requireRole, requireSession } from "../../lib/auth";
 
 function redirectTo(
   status: "success" | "error",
@@ -653,6 +654,7 @@ export async function generateXtzInvoiceAction(formData: FormData): Promise<void
 
 export async function updateInvoiceStatusAction(formData: FormData): Promise<void> {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const invoiceId = clean(formData.get("invoiceId"));
   const newStatus = clean(formData.get("newStatus"));
   if (!invoiceId || !newStatus) redirectTo("error", "Missing fields.");
@@ -666,6 +668,16 @@ export async function updateInvoiceStatusAction(formData: FormData): Promise<voi
     [invoiceId, newStatus]
   );
 
+  await cascadeUpdate({
+    trigger: "invoice:status:changed",
+    entityType: "payroll_invoice",
+    entityId: invoiceId,
+    action: "status-change",
+    after: { status: newStatus },
+    performedBy: session.id,
+    agentId: "payroll-agent",
+  });
+
   revalidatePath("/payroll-invoices");
   revalidatePath(`/payroll-invoices/${invoiceId}`);
   redirectTo("success", `Status set to ${newStatus}.`, invoiceId);
@@ -673,6 +685,7 @@ export async function updateInvoiceStatusAction(formData: FormData): Promise<voi
 
 export async function deleteInvoiceAction(formData: FormData): Promise<void> {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const invoiceId = clean(formData.get("invoiceId"));
   if (!invoiceId) redirectTo("error", "Missing id.");
   // Free the staging rows
@@ -697,6 +710,15 @@ export async function deleteInvoiceAction(formData: FormData): Promise<void> {
     [invoiceId]
   );
   await executeAdmin(`delete from payroll_invoices where id = $1`, [invoiceId]);
+
+  await cascadeUpdate({
+    trigger: "payroll-invoice:deleted",
+    entityType: "payroll_invoice",
+    entityId: invoiceId,
+    action: "delete",
+    performedBy: session.id,
+    agentId: "payroll-agent",
+  });
 
   revalidatePath("/payroll-invoices");
   redirectTo("success", "Invoice deleted.", undefined, getMonth(formData));

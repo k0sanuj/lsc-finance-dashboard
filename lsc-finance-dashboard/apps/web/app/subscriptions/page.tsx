@@ -5,6 +5,7 @@ import {
   getSubscriptionSummary
 } from "@lsc/db";
 import { requireRole } from "../../lib/auth";
+import { SubmitButton } from "../components/submit-button";
 import {
   generateSubscriptionAlertsAction,
   dismissAlertAction,
@@ -87,9 +88,7 @@ export default async function SubscriptionsPage({ searchParams }: SubscriptionsP
         </div>
         <div>
           <form action={generateSubscriptionAlertsAction}>
-            <button className="action-button primary" type="submit">
-              Generate alerts
-            </button>
+            <SubmitButton pendingLabel="Generating…">Generate alerts</SubmitButton>
           </form>
         </div>
       </section>
@@ -308,9 +307,7 @@ export default async function SubscriptionsPage({ searchParams }: SubscriptionsP
               <input type="text" name="notes" />
             </label>
             <div className="form-actions">
-              <button className="action-button primary" type="submit">
-                Add subscription
-              </button>
+              <SubmitButton pendingLabel="Adding…">Add subscription</SubmitButton>
             </div>
           </div>
         </form>

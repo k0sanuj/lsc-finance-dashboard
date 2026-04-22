@@ -4,7 +4,8 @@ import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
-import { requireRole } from "../../lib/auth";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
+import { requireRole, requireSession } from "../../lib/auth";
 
 function clean(v: unknown): string {
   return String(v ?? "").replace(/\s+/g, " ").trim();
@@ -27,6 +28,7 @@ async function getSportIdByCode(sportCode: string): Promise<string> {
 
 export async function createEventAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const sportCode = clean(formData.get("sportCode"));
   const eventName = clean(formData.get("eventName"));
@@ -52,6 +54,17 @@ export async function createEventAction(formData: FormData) {
   );
 
   const eventId = rows[0]?.id ?? "";
+  if (eventId) {
+    await cascadeUpdate({
+      trigger: "sport-event:config:changed",
+      entityType: "fsp_event",
+      entityId: eventId,
+      action: "create",
+      after: { eventName, sportCode, city, venueName, eventDate, totalBudget },
+      performedBy: session.id,
+      agentId: "sports-module-agent",
+    });
+  }
   revalidatePath("/event-budgets");
   redir(eventId, "success", `Event "${eventName}" created.`);
 }

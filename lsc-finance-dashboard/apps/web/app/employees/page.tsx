@@ -1,5 +1,6 @@
 import { requireRole } from "../../lib/auth";
 import { getEmployees, getFxRatesForDisplay } from "@lsc/db";
+import { SubmitButton } from "../components/submit-button";
 import {
   addEmployeeAction,
   updateEmployeeStatusAction,
@@ -191,7 +192,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
               </select>
             </div>
             <div className="form-actions">
-              <button className="action-button primary" type="submit">Add employee</button>
+              <SubmitButton pendingLabel="Adding…">Add employee</SubmitButton>
             </div>
           </div>
         </form>

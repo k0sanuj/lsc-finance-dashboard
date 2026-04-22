@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { Route } from "next";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
 import { requireRole, requireSession } from "../../lib/auth";
 
 function norm(v: string) { return v.replace(/\s+/g, " ").trim(); }
@@ -66,6 +67,16 @@ export async function submitExpenseAction(formData: FormData) {
     [submissionId, merchantName || null, expenseDate || null, currency, amount, description || null]
   );
 
+  await cascadeUpdate({
+    trigger: "expense-submission:approved",
+    entityType: "expense_submission",
+    entityId: submissionId as string,
+    action: "submit",
+    after: { title, billingEntityCode, reimbursingEntityCode, amount, currency, merchantName },
+    performedBy: session.id,
+    agentId: "expense-agent",
+  });
+
   revalidatePath("/xtz-expenses");
   redir("submit", "success", `Expense "${title}" submitted for review.`);
 }
@@ -92,6 +103,22 @@ export async function reviewExpenseAction(formData: FormData) {
      where id = $1`,
     [submissionId, newStatus, session.id, reviewNote || null]
   );
+
+  const trigger =
+    newStatus === "approved"
+      ? "expense-submission:approved"
+      : newStatus === "rejected"
+        ? "expense-submission:rejected"
+        : "expense-submission:posted";
+  await cascadeUpdate({
+    trigger,
+    entityType: "expense_submission",
+    entityId: submissionId,
+    action: newStatus,
+    after: { status: newStatus, reviewNote: reviewNote || undefined },
+    performedBy: session.id,
+    agentId: "expense-agent",
+  });
 
   revalidatePath("/xtz-expenses");
   redir("review", "success", `Expense ${newStatus.replace(/_/g, " ")}.`);
