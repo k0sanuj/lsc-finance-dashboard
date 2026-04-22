@@ -30,3 +30,4 @@ export * from "./ai-ingestion";
 export * from "./treasury";
 export * from "./sport-infrastructure";
 export * from "./xtz-invoices";
+export * from "./search";

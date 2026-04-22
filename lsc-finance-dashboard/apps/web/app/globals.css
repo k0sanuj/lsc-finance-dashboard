@@ -3495,6 +3495,13 @@ textarea {
   font-family: inherit;
 }
 
+.cmdk-searching {
+  flex-shrink: 0;
+  color: var(--ink-soft);
+  display: inline-flex;
+  align-items: center;
+}
+
 .cmdk-list {
   flex: 1;
   overflow-y: auto;

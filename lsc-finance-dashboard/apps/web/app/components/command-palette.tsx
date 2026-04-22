@@ -14,6 +14,14 @@ type Command = {
   keywords?: string; // extra searchable text
 };
 
+type ServerHit = {
+  id: string;
+  kind: string;
+  label: string;
+  subtitle?: string;
+  href: string;
+};
+
 type Props = {
   /** Commands supplied by the shell — typically every nav link + quick actions. */
   commands: Command[];
@@ -21,6 +29,17 @@ type Props = {
 
 const RECENT_KEY = "lsc:cmdk:recent";
 const RECENT_MAX = 5;
+
+const HIT_KIND_GROUP: Record<string, string> = {
+  vendor: "Vendors",
+  employee: "Employees",
+  race: "Races",
+  "invoice-intake": "Invoice Intake",
+  "payroll-invoice": "Payroll Invoices",
+  deal: "Deals",
+  subscription: "Subscriptions",
+  sponsor: "Sponsors & Customers",
+};
 
 function loadRecent(): string[] {
   if (typeof window === "undefined") return [];
@@ -84,8 +103,11 @@ export function CommandPalette({ commands }: Props) {
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState(0);
   const [recentIds, setRecentIds] = useState<string[]>([]);
+  const [serverHits, setServerHits] = useState<ServerHit[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Open/close
   useEffect(() => {
@@ -111,11 +133,57 @@ export function CommandPalette({ commands }: Props) {
     setQuery("");
     setHighlighted(0);
     setRecentIds(loadRecent());
+    setServerHits([]);
+    setIsSearching(false);
     // Focus after render
     setTimeout(() => inputRef.current?.focus(), 0);
   }, [open]);
 
-  // Build filtered command list
+  // Debounced server-side entity search (fires when query has >=2 chars)
+  useEffect(() => {
+    if (!open) return;
+    const trimmed = query.trim();
+
+    // Cancel any in-flight request
+    abortRef.current?.abort();
+    abortRef.current = null;
+
+    if (trimmed.length < 2) {
+      setServerHits([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timeout = setTimeout(async () => {
+      const controller = new AbortController();
+      abortRef.current = controller;
+      try {
+        const response = await fetch(
+          `/api/search?q=${encodeURIComponent(trimmed)}`,
+          { signal: controller.signal }
+        );
+        if (!response.ok) {
+          setServerHits([]);
+        } else {
+          const body = (await response.json()) as { hits?: ServerHit[] };
+          setServerHits(Array.isArray(body.hits) ? body.hits : []);
+        }
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          setServerHits([]);
+        }
+      } finally {
+        if (abortRef.current === controller) setIsSearching(false);
+      }
+    }, 200);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [query, open]);
+
+  // Build filtered command list (static nav + server entity hits merged)
   const filtered = useMemo(() => {
     if (!query.trim()) {
       // Recent first, then all commands grouped
@@ -126,12 +194,25 @@ export function CommandPalette({ commands }: Props) {
       const otherCmds = commands.filter((c) => !recentIds.includes(c.id));
       return [...recentCmds, ...otherCmds];
     }
+
+    // Nav / quick-action hits (scored client-side)
     const ranked = commands
       .map((c) => ({ cmd: c, s: score(c, query.trim()) }))
       .filter((x) => x.s > 0)
-      .sort((a, b) => b.s - a.s);
-    return ranked.map((x) => x.cmd);
-  }, [query, commands, recentIds]);
+      .sort((a, b) => b.s - a.s)
+      .map((x) => x.cmd);
+
+    // Server entity hits — already filtered by the backend, add as-is
+    const entityCmds: Command[] = serverHits.map((h) => ({
+      id: h.id,
+      label: h.label,
+      group: HIT_KIND_GROUP[h.kind] ?? h.kind,
+      href: h.href,
+      hint: h.subtitle,
+    }));
+
+    return [...ranked, ...entityCmds];
+  }, [query, commands, recentIds, serverHits]);
 
   // Reset highlight when filter changes
   useEffect(() => {
@@ -206,13 +287,18 @@ export function CommandPalette({ commands }: Props) {
             ref={inputRef}
             type="text"
             className="cmdk-input"
-            placeholder="Search navigation, analyzers, actions…"
+            placeholder="Search navigation, vendors, employees, invoices, races…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyInInput}
             aria-label="Command search"
             autoFocus
           />
+          {isSearching ? (
+            <span className="cmdk-searching" aria-label="Searching">
+              <span className="spinner" />
+            </span>
+          ) : null}
           <kbd className="cmdk-esc">esc</kbd>
         </div>
         <div className="cmdk-list" ref={listRef}>
