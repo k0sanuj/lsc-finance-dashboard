@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState, useCallback, useEffect, Suspense } from "react";
 import type { AppUserRole } from "../lib/auth";
+import { ToastNotice } from "./components/toast-notice";
 
 type NavLink = {
   href: Route;
@@ -635,6 +636,7 @@ function SessionShellInner({ children, user }: SessionShellProps) {
       </aside>
 
       <main className="main" id="main-content">
+        <ToastNotice />
         <div className="workspace-topbar">
           <div className="workspace-title-block">
             {breadcrumbs.length > 0 && (

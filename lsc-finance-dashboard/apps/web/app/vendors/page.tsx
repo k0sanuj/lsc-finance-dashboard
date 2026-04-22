@@ -1,6 +1,7 @@
-import { getVendors, getVenueAgreements, getVendorsWithBank } from "@lsc/db";
+import { getVendorsWithBank } from "@lsc/db";
 import { requireRole } from "../../lib/auth";
-import { addVendorAction, updateVendorAction, deleteVendorAction } from "./actions";
+import { SubmitButton } from "../components/submit-button";
+import { addVendorAction, deleteVendorAction } from "./actions";
 
 const VENDOR_TYPES = [
   "production_partner", "venue", "saas", "service_provider",
@@ -18,21 +19,10 @@ function statusSignal(status: string): string {
   }
 }
 
-type VendorsPageProps = {
-  searchParams?: Promise<{ status?: string; message?: string }>;
-};
-
-export default async function VendorsPage({ searchParams }: VendorsPageProps) {
+export default async function VendorsPage() {
   await requireRole(["super_admin", "finance_admin", "viewer"]);
-  const params = searchParams ? await searchParams : undefined;
-  const status = params?.status ?? null;
-  const message = params?.message ?? null;
 
-  const [vendors, vendorsBank, venues] = await Promise.all([
-    getVendors(),
-    getVendorsWithBank(),
-    getVenueAgreements()
-  ]);
+  const vendorsBank = await getVendorsWithBank();
 
   const activeCount = vendorsBank.filter((v) => v.status === "active").length;
   const withBankCount = vendorsBank.filter((v) => v.bankAccountNumber).length;
@@ -50,13 +40,6 @@ export default async function VendorsPage({ searchParams }: VendorsPageProps) {
         </div>
       </section>
 
-      {message ? (
-        <section className={`notice ${status ?? "info"}`}>
-          <strong>{status === "error" ? "Error" : "Saved"}</strong>
-          <span>{message}</span>
-        </section>
-      ) : null}
-
       <section className="stats-grid compact-stats">
         <article className="metric-card accent-brand">
           <div className="metric-topline"><span className="metric-label">Total vendors</span></div>
@@ -73,14 +56,16 @@ export default async function VendorsPage({ searchParams }: VendorsPageProps) {
         </article>
       </section>
 
-      {/* ── Add vendor form ─────────────────────────────────── */}
-      <section className="card">
-        <div className="card-title-row">
-          <div>
-            <span className="section-kicker">Add</span>
-            <h3>New vendor / beneficiary</h3>
-          </div>
-        </div>
+      {/* ── Add vendor form (collapsed by default) ────────── */}
+      <section className="card collapsible-card">
+        <details>
+          <summary className="card-title-row collapsible-summary">
+            <div>
+              <span className="section-kicker">Add</span>
+              <h3>New vendor / beneficiary</h3>
+            </div>
+            <span className="collapsible-indicator" aria-hidden="true">+</span>
+          </summary>
         <form action={addVendorAction}>
           <div className="form-grid">
             <label className="field">
@@ -182,9 +167,10 @@ export default async function VendorsPage({ searchParams }: VendorsPageProps) {
           </label>
 
           <div className="form-actions" style={{ marginTop: 12 }}>
-            <button className="action-button primary" type="submit">Add vendor</button>
+            <SubmitButton pendingLabel="Adding vendor…">Add vendor</SubmitButton>
           </div>
         </form>
+        </details>
       </section>
 
       {/* ── Vendor directory with bank details ────────────── */}
@@ -243,9 +229,13 @@ export default async function VendorsPage({ searchParams }: VendorsPageProps) {
                     <td>
                       <form action={deleteVendorAction}>
                         <input type="hidden" name="id" value={v.id} />
-                        <button className="action-button secondary" type="submit">
+                        <SubmitButton
+                          variant="secondary"
+                          pendingLabel="Deleting…"
+                          confirmMessage={`Delete vendor "${v.name}"? This cannot be undone.`}
+                        >
                           Delete
-                        </button>
+                        </SubmitButton>
                       </form>
                     </td>
                   </tr>

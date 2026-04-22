@@ -3195,3 +3195,202 @@ textarea {
 .copilot-input:disabled {
   opacity: 0.5;
 }
+
+/* ───── Toast notifications (dismissible) ──────────────── */
+.toast-notice {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 320px;
+  max-width: 460px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
+  animation: toast-slide-in 180ms ease-out;
+}
+
+@keyframes toast-slide-in {
+  from { transform: translateX(16px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+.toast-success { border-left-color: var(--good); }
+.toast-error   { border-left-color: var(--risk); }
+.toast-info    { border-left-color: var(--brand-2); }
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #ffffff;
+}
+
+.toast-success .toast-icon { background: var(--good); }
+.toast-error   .toast-icon { background: var(--risk); }
+.toast-info    .toast-icon { background: var(--brand-2); }
+
+.toast-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toast-body strong {
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+
+.toast-body span {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.toast-dismiss {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.toast-dismiss:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* ───── Loading spinner (used in SubmitButton) ─────────── */
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.action-button[aria-busy="true"] {
+  opacity: 0.75;
+  cursor: wait;
+}
+
+/* ───── Form polish: smaller radius aligns with design tokens ──── */
+.field input,
+.field textarea,
+.field select {
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 0.92rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.field input:hover:not(:disabled):not(:focus),
+.field textarea:hover:not(:disabled):not(:focus),
+.field select:hover:not(:disabled):not(:focus) {
+  border-color: var(--line-strong);
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible,
+.field select:focus-visible {
+  border-color: var(--brand-2);
+  box-shadow: 0 0 0 3px rgba(31, 93, 132, 0.15);
+  outline: none;
+}
+
+.field span,
+.field label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* ───── Sticky table headers for long lists ────────────── */
+.clean-table thead th,
+.table-wrapper thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+
+/* ───── Hide legacy URL-param notices (replaced by toast) ──── */
+.notice {
+  display: none;
+}
+
+/* ───── Collapsible "Add new" card ────────────────────── */
+.collapsible-card details > summary {
+  cursor: pointer;
+  list-style: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.collapsible-card details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsible-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.collapsible-indicator {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--ink-soft);
+  font-size: 1.1rem;
+  font-weight: 300;
+  line-height: 1;
+  transition: transform 180ms ease, background 0.15s, color 0.15s;
+}
+
+.collapsible-card details[open] .collapsible-indicator {
+  transform: rotate(45deg);
+  background: var(--brand-2);
+  color: #ffffff;
+}
+
+.collapsible-card details > summary:hover .collapsible-indicator {
+  background: var(--brand-2);
+  color: #ffffff;
+}
