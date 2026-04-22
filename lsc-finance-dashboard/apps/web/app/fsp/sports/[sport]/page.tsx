@@ -107,9 +107,9 @@ async function PnlSummaryTab({ sportId, sportCode }: { sportId: string; sportCod
                   <thead>
                     <tr>
                       <th>Line Item</th>
-                      <th style={{ textAlign: "right" }}>Y1 Budget</th>
-                      <th style={{ textAlign: "right" }}>Y2 Budget</th>
-                      <th style={{ textAlign: "right" }}>Y3 Budget</th>
+                      <th className="text-right">Y1 Budget</th>
+                      <th className="text-right">Y2 Budget</th>
+                      <th className="text-right">Y3 Budget</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -117,13 +117,13 @@ async function PnlSummaryTab({ sportId, sportCode }: { sportId: string; sportCod
                     {rows.map((row) => (
                       <tr key={row.id}>
                         <td>{row.subCategory || row.category}</td>
-                        <td style={{ textAlign: "right" }} colSpan={3}>
+                        <td className="text-right" colSpan={3}>
                           <form action={updatePnlLineItemAction} className="inline-actions">
                             <input type="hidden" name="itemId" value={row.id} />
                             <input type="hidden" name="sport" value={sportCode} />
-                            <input name="y1Budget" type="number" defaultValue={row.y1Budget} step="0.01" style={{ width: "110px", textAlign: "right" }} />
-                            <input name="y2Budget" type="number" defaultValue={row.y2Budget} step="0.01" style={{ width: "110px", textAlign: "right" }} />
-                            <input name="y3Budget" type="number" defaultValue={row.y3Budget} step="0.01" style={{ width: "110px", textAlign: "right" }} />
+                            <input name="y1Budget" type="number" defaultValue={row.y1Budget} step="0.01" className="input-budget" />
+                            <input name="y2Budget" type="number" defaultValue={row.y2Budget} step="0.01" className="input-budget" />
+                            <input name="y3Budget" type="number" defaultValue={row.y3Budget} step="0.01" className="input-budget" />
                             <button className="action-button secondary" type="submit">Save</button>
                           </form>
                         </td>
@@ -136,11 +136,11 @@ async function PnlSummaryTab({ sportId, sportCode }: { sportId: string; sportCod
                         </td>
                       </tr>
                     ))}
-                    <tr style={{ fontWeight: 700 }}>
+                    <tr className="row-total">
                       <td>Total {title}</td>
-                      <td style={{ textAlign: "right" }}>{fmt(total.y1)}</td>
-                      <td style={{ textAlign: "right" }}>{fmt(total.y2)}</td>
-                      <td style={{ textAlign: "right" }}>{fmt(total.y3)}</td>
+                      <td className="text-right">{fmt(total.y1)}</td>
+                      <td className="text-right">{fmt(total.y2)}</td>
+                      <td className="text-right">{fmt(total.y3)}</td>
                       <td />
                     </tr>
                   </tbody>
@@ -242,9 +242,9 @@ async function SponsorshipTab({ sportId, sportCode }: { sportId: string; sportCo
                   <th>Sponsor</th>
                   <th>Tier</th>
                   <th>Status</th>
-                  <th style={{ textAlign: "right" }}>Y1</th>
-                  <th style={{ textAlign: "right" }}>Y2</th>
-                  <th style={{ textAlign: "right" }}>Y3</th>
+                  <th className="text-right">Y1</th>
+                  <th className="text-right">Y2</th>
+                  <th className="text-right">Y3</th>
                   <th>Contract</th>
                   <th>Payment</th>
                   <th>Actions</th>
@@ -257,9 +257,9 @@ async function SponsorshipTab({ sportId, sportCode }: { sportId: string; sportCo
                     <td>{r.sponsorName || <span className="muted">TBD</span>}</td>
                     <td><span className="pill">{r.tier}</span></td>
                     <td><span className={statusPill(r.contractStatus)}>{r.contractStatus}</span></td>
-                    <td style={{ textAlign: "right" }}>{r.y1Value}</td>
-                    <td style={{ textAlign: "right" }}>{r.y2Value}</td>
-                    <td style={{ textAlign: "right" }}>{r.y3Value}</td>
+                    <td className="text-right">{r.y1Value}</td>
+                    <td className="text-right">{r.y2Value}</td>
+                    <td className="text-right">{r.y3Value}</td>
                     <td>
                       {r.contractStart && r.contractEnd
                         ? `${r.contractStart} - ${r.contractEnd}`
@@ -281,11 +281,11 @@ async function SponsorshipTab({ sportId, sportCode }: { sportId: string; sportCo
                     </td>
                   </tr>
                 ))}
-                <tr style={{ fontWeight: 700 }}>
+                <tr className="row-total">
                   <td colSpan={4}>Total Sponsorship Revenue</td>
-                  <td style={{ textAlign: "right" }}>{fmt(totalY1)}</td>
-                  <td style={{ textAlign: "right" }}>{fmt(totalY2)}</td>
-                  <td style={{ textAlign: "right" }}>{fmt(totalY3)}</td>
+                  <td className="text-right">{fmt(totalY1)}</td>
+                  <td className="text-right">{fmt(totalY2)}</td>
+                  <td className="text-right">{fmt(totalY3)}</td>
                   <td colSpan={3} />
                 </tr>
               </tbody>
@@ -352,7 +352,7 @@ async function SponsorshipTab({ sportId, sportCode }: { sportId: string; sportCo
               <label>Payment Schedule</label>
               <input name="paymentSchedule" type="text" placeholder="e.g. Quarterly" />
             </div>
-            <div className="field" style={{ gridColumn: "1 / -1" }}>
+            <div className="field field-span-full">
               <label>Deliverables</label>
               <textarea name="deliverables" rows={2} placeholder="Sponsorship deliverables summary" />
             </div>
@@ -401,7 +401,7 @@ function MediaRevenueTab({ sportCode }: { sportCode: string }): React.ReactEleme
             <input type="number" step="0.01" placeholder="e.g. 12.50" disabled />
           </div>
         </div>
-        <p className="muted" style={{ marginTop: "0.75rem" }}>
+        <p className="muted mt-md">
           Computed Revenue = Ad Impressions / 1000 x CPM per year
         </p>
       </article>
@@ -435,7 +435,7 @@ function MediaRevenueTab({ sportCode }: { sportCode: string }): React.ReactEleme
             <input type="number" step="0.01" placeholder="e.g. 18.00" disabled />
           </div>
         </div>
-        <p className="muted" style={{ marginTop: "0.75rem" }}>
+        <p className="muted mt-md">
           Computed Revenue = Ad Impressions / 1000 x CPM per year
         </p>
       </article>
@@ -495,25 +495,25 @@ async function OpexDetailedTab({ sportId, sportCode }: { sportId: string; sportC
                   <thead>
                     <tr>
                       <th>Sub-Category</th>
-                      <th style={{ textAlign: "right" }}>Y1</th>
-                      <th style={{ textAlign: "right" }}>Y2</th>
-                      <th style={{ textAlign: "right" }}>Y3</th>
+                      <th className="text-right">Y1</th>
+                      <th className="text-right">Y2</th>
+                      <th className="text-right">Y3</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((r) => (
                       <tr key={r.id}>
                         <td>{r.subCategory}</td>
-                        <td style={{ textAlign: "right" }}>{fmt(r.y1Budget)}</td>
-                        <td style={{ textAlign: "right" }}>{fmt(r.y2Budget)}</td>
-                        <td style={{ textAlign: "right" }}>{fmt(r.y3Budget)}</td>
+                        <td className="text-right">{fmt(r.y1Budget)}</td>
+                        <td className="text-right">{fmt(r.y2Budget)}</td>
+                        <td className="text-right">{fmt(r.y3Budget)}</td>
                       </tr>
                     ))}
-                    <tr style={{ fontWeight: 700 }}>
+                    <tr className="row-total">
                       <td>{cat} Sub-Total</td>
-                      <td style={{ textAlign: "right" }}>{fmt(catY1)}</td>
-                      <td style={{ textAlign: "right" }}>{fmt(catY2)}</td>
-                      <td style={{ textAlign: "right" }}>{fmt(catY3)}</td>
+                      <td className="text-right">{fmt(catY1)}</td>
+                      <td className="text-right">{fmt(catY2)}</td>
+                      <td className="text-right">{fmt(catY3)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -634,9 +634,9 @@ async function EventProductionTab({ sportId, sportCode }: { sportId: string; spo
                 <tr>
                   <th>Category</th>
                   <th>Item</th>
-                  <th style={{ textAlign: "right" }}>Unit Cost</th>
-                  <th style={{ textAlign: "right" }}>Qty</th>
-                  <th style={{ textAlign: "right" }}>Line Total</th>
+                  <th className="text-right">Unit Cost</th>
+                  <th className="text-right">Qty</th>
+                  <th className="text-right">Line Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -644,9 +644,9 @@ async function EventProductionTab({ sportId, sportCode }: { sportId: string; spo
                   <tr key={r.id}>
                     <td><span className="subtle-pill">{r.costCategory}</span></td>
                     <td>{r.subCategory}</td>
-                    <td style={{ textAlign: "right" }}>{fmt(r.unitCost)}</td>
-                    <td style={{ textAlign: "right" }}>{r.quantity}</td>
-                    <td style={{ textAlign: "right" }}>{fmt(r.lineTotal)}</td>
+                    <td className="text-right">{fmt(r.unitCost)}</td>
+                    <td className="text-right">{r.quantity}</td>
+                    <td className="text-right">{fmt(r.lineTotal)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -655,7 +655,7 @@ async function EventProductionTab({ sportId, sportCode }: { sportId: string; spo
         )}
 
         {prodItems.length > 0 && (
-          <div className="stats-grid compact-stats" style={{ marginTop: "1rem" }}>
+          <div className="stats-grid compact-stats mt-lg">
             <div className="metric-card accent-brand">
               <span className="metric-label">Per-Segment Total</span>
               <span className="metric-value">{fmt(perSegmentTotal)}</span>
@@ -736,10 +736,10 @@ async function LeaguePayrollTab({ sportId, sportCode }: { sportId: string; sport
                   <th>Role</th>
                   <th>Department</th>
                   <th>Type</th>
-                  <th style={{ textAlign: "right" }}>Y1 Salary</th>
-                  <th style={{ textAlign: "right" }}>Y2 Salary</th>
-                  <th style={{ textAlign: "right" }}>Y3 Salary</th>
-                  <th style={{ textAlign: "right" }}>Raise %</th>
+                  <th className="text-right">Y1 Salary</th>
+                  <th className="text-right">Y2 Salary</th>
+                  <th className="text-right">Y3 Salary</th>
+                  <th className="text-right">Raise %</th>
                 </tr>
               </thead>
               <tbody>
@@ -748,18 +748,18 @@ async function LeaguePayrollTab({ sportId, sportCode }: { sportId: string; sport
                     <td>{r.roleTitle}</td>
                     <td>{r.department || <span className="muted">--</span>}</td>
                     <td><span className="subtle-pill">{r.employmentType}</span></td>
-                    <td style={{ textAlign: "right" }}>{r.y1Salary}</td>
-                    <td style={{ textAlign: "right" }}>{r.y2Salary}</td>
-                    <td style={{ textAlign: "right" }}>{r.y3Salary}</td>
-                    <td style={{ textAlign: "right" }}>{fmtPct(r.annualRaisePct)}</td>
+                    <td className="text-right">{r.y1Salary}</td>
+                    <td className="text-right">{r.y2Salary}</td>
+                    <td className="text-right">{r.y3Salary}</td>
+                    <td className="text-right">{fmtPct(r.annualRaisePct)}</td>
                   </tr>
                 ))}
-                <tr style={{ fontWeight: 700 }}>
+                <tr className="row-total">
                   <td>Total ({rows.length} roles)</td>
                   <td colSpan={2} />
-                  <td style={{ textAlign: "right" }}>{fmt(totalY1)}</td>
-                  <td style={{ textAlign: "right" }}>{fmt(totalY2)}</td>
-                  <td style={{ textAlign: "right" }}>{fmt(totalY3)}</td>
+                  <td className="text-right">{fmt(totalY1)}</td>
+                  <td className="text-right">{fmt(totalY2)}</td>
+                  <td className="text-right">{fmt(totalY3)}</td>
                   <td />
                 </tr>
               </tbody>
@@ -852,30 +852,30 @@ async function TechServicesTab({ sportId, sportCode }: { sportId: string; sportC
               <thead>
                 <tr>
                   <th>Role</th>
-                  <th style={{ textAlign: "right" }}>Alloc %</th>
-                  <th style={{ textAlign: "right" }}>Y1 (Allocated)</th>
-                  <th style={{ textAlign: "right" }}>Y2 (Allocated)</th>
-                  <th style={{ textAlign: "right" }}>Y3 (Allocated)</th>
-                  <th style={{ textAlign: "right" }}>Raise %</th>
+                  <th className="text-right">Alloc %</th>
+                  <th className="text-right">Y1 (Allocated)</th>
+                  <th className="text-right">Y2 (Allocated)</th>
+                  <th className="text-right">Y3 (Allocated)</th>
+                  <th className="text-right">Raise %</th>
                 </tr>
               </thead>
               <tbody>
                 {allocatedRows.map((r) => (
                   <tr key={r.id}>
                     <td>{r.roleTitle}</td>
-                    <td style={{ textAlign: "right" }}>{fmtPct(r.allocationPct)}</td>
-                    <td style={{ textAlign: "right" }}>{fmt(r.y1Allocated)}</td>
-                    <td style={{ textAlign: "right" }}>{fmt(r.y2Allocated)}</td>
-                    <td style={{ textAlign: "right" }}>{fmt(r.y3Allocated)}</td>
-                    <td style={{ textAlign: "right" }}>{fmtPct(r.annualRaisePct)}</td>
+                    <td className="text-right">{fmtPct(r.allocationPct)}</td>
+                    <td className="text-right">{fmt(r.y1Allocated)}</td>
+                    <td className="text-right">{fmt(r.y2Allocated)}</td>
+                    <td className="text-right">{fmt(r.y3Allocated)}</td>
+                    <td className="text-right">{fmtPct(r.annualRaisePct)}</td>
                   </tr>
                 ))}
-                <tr style={{ fontWeight: 700 }}>
+                <tr className="row-total">
                   <td>Total ({rows.length} roles)</td>
                   <td />
-                  <td style={{ textAlign: "right" }}>{fmt(totalY1)}</td>
-                  <td style={{ textAlign: "right" }}>{fmt(totalY2)}</td>
-                  <td style={{ textAlign: "right" }}>{fmt(totalY3)}</td>
+                  <td className="text-right">{fmt(totalY1)}</td>
+                  <td className="text-right">{fmt(totalY2)}</td>
+                  <td className="text-right">{fmt(totalY3)}</td>
                   <td />
                 </tr>
               </tbody>
@@ -987,7 +987,7 @@ async function RevenueShareTab({ sportId, sportCode }: { sportId: string; sportC
             </form>
 
             {r && (
-              <div className="stats-grid compact-stats" style={{ marginTop: "1rem" }}>
+              <div className="stats-grid compact-stats mt-lg">
                 <div className="metric-card accent-brand">
                   <span className="metric-label">Total Franchise Revenue</span>
                   <span className="metric-value">{fmt(totalFranchise)}</span>

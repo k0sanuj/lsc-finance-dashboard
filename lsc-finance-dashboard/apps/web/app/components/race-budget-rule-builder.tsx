@@ -147,7 +147,7 @@ export function RaceBudgetRuleBuilder({ raceEventId, raceLabel, categories, retu
                   <th>Unit</th>
                   <th>Amount (USD)</th>
                   <th>Threshold</th>
-                  <th></th>
+                  <th><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>

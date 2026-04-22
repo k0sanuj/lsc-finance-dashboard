@@ -95,7 +95,7 @@ export default async function DispatcherStatusPage() {
                       <span className="muted"> ({pct}%)</span>
                     </td>
                     <td>{stats.total}</td>
-                    <td style={{ fontSize: "0.78rem" }}>
+                    <td className="text-xs">
                       {stats.missing.length === 0 ? (
                         <span className="muted">—</span>
                       ) : (
@@ -117,7 +117,7 @@ export default async function DispatcherStatusPage() {
             <h3>All {registered.length} skills currently dispatchable</h3>
           </div>
         </div>
-        <div style={{ fontSize: "0.8rem", fontFamily: "monospace", lineHeight: "1.8" }}>
+        <div className="handler-list">
           {registered.map((key) => (
             <div key={key}>{key}</div>
           ))}

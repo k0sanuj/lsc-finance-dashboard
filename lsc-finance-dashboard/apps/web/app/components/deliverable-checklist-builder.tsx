@@ -158,7 +158,7 @@ export function DeliverableChecklistBuilder({ contracts, owners, returnPath }: P
                 <th>Owner</th>
                 <th>Due date</th>
                 <th>Revenue (USD)</th>
-                <th></th>
+                <th><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>

@@ -3410,6 +3410,125 @@ textarea {
   display: none;
 }
 
+/* ───── Utility classes (replace inline styles) ─────────── */
+.mono {
+  font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  letter-spacing: -0.01em;
+}
+
+.mono-sm {
+  font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.76rem;
+}
+
+.text-sm {
+  font-size: 0.82rem;
+}
+
+.text-xs {
+  font-size: 0.76rem;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.mt-sm { margin-top: 8px; }
+.mt-md { margin-top: 12px; }
+.mt-lg { margin-top: 16px; }
+.mb-sm { margin-bottom: 8px; }
+.mb-md { margin-bottom: 12px; }
+.mb-lg { margin-bottom: 16px; }
+
+.flex-1 { flex: 1; }
+.nowrap { white-space: nowrap; }
+
+/* Grid span — for fields that occupy the full form-grid row */
+.field-span-2 { grid-column: span 2; }
+.field-span-full { grid-column: 1 / -1; }
+
+/* Form to display inline (e.g. action buttons next to status pills) */
+.form-inline { display: inline; }
+
+/* Small block-level subtitle (e.g. sport vertical under deal name) */
+.subtitle-xs {
+  display: block;
+  font-size: 0.8em;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+/* Inline row-action buttons + selects (tables with per-row actions) */
+.inline-select {
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  margin-right: 4px;
+}
+
+.inline-select:focus-visible {
+  outline: none;
+  border-color: var(--brand-2);
+  box-shadow: 0 0 0 3px rgba(31, 93, 132, 0.15);
+}
+
+.btn-inline {
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.btn-inline:hover:not(:disabled) {
+  border-color: var(--brand-2);
+  background: var(--bg);
+}
+
+.btn-inline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Numeric input — right-aligned amount field */
+.input-amount {
+  text-align: right;
+  font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Budget-row inline numeric input (table cells in FSP sport P&L) */
+.input-budget {
+  width: 110px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bold-row emphasis used in totals rows */
+.row-total td {
+  font-weight: 700;
+  background: var(--bg);
+}
+
+/* Monospace handler list (dispatcher status page) */
+.handler-list {
+  font-size: 0.8rem;
+  font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  line-height: 1.8;
+  color: var(--ink-soft);
+}
+
 /* ───── Reusable empty-state block ─────────────────────── */
 .empty-state {
   display: flex;

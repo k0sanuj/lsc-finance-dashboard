@@ -304,7 +304,7 @@ export default async function SubscriptionsPage({ searchParams }: SubscriptionsP
               <span>Next billing date</span>
               <input type="date" name="nextBillingDate" />
             </label>
-            <label className="field" style={{ gridColumn: "span 2" }}>
+            <label className="field field-span-2">
               <span>Notes</span>
               <input type="text" name="notes" />
             </label>

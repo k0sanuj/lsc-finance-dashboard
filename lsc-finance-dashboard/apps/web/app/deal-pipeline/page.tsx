@@ -277,9 +277,7 @@ export default async function DealPipelinePage({ searchParams }: DealPipelinePag
                     <td>
                       <strong>{deal.dealName}</strong>
                       {deal.sportVertical && (
-                        <span className="muted" style={{ display: "block", fontSize: "0.8em" }}>
-                          {deal.sportVertical}
-                        </span>
+                        <span className="subtitle-xs">{deal.sportVertical}</span>
                       )}
                     </td>
                     <td>{deal.dealType}</td>
@@ -303,9 +301,14 @@ export default async function DealPipelinePage({ searchParams }: DealPipelinePag
                     <td>{deal.expectedCloseDate}</td>
                     <td>{deal.nextAction || <span className="muted">None</span>}</td>
                     <td>
-                      <form action={updateDealStageAction} style={{ display: "inline" }}>
+                      <form action={updateDealStageAction} className="form-inline">
                         <input type="hidden" name="dealId" value={deal.id} />
-                        <select name="newStage" defaultValue={deal.stage} className="inline-select">
+                        <select
+                          name="newStage"
+                          defaultValue={deal.stage}
+                          className="inline-select"
+                          aria-label={`Update stage for ${deal.dealName}`}
+                        >
                           {STAGES.filter((s) => s !== "All").map((s) => (
                             <option key={s} value={s}>
                               {s.charAt(0).toUpperCase() + s.slice(1)}
@@ -316,9 +319,14 @@ export default async function DealPipelinePage({ searchParams }: DealPipelinePag
                       </form>
                     </td>
                     <td>
-                      <form action={updateDealRiskAction} style={{ display: "inline" }}>
+                      <form action={updateDealRiskAction} className="form-inline">
                         <input type="hidden" name="dealId" value={deal.id} />
-                        <select name="riskLevel" defaultValue={deal.riskLevel} className="inline-select">
+                        <select
+                          name="riskLevel"
+                          defaultValue={deal.riskLevel}
+                          className="inline-select"
+                          aria-label={`Update risk for ${deal.dealName}`}
+                        >
                           {RISK_LEVELS.map((r) => (
                             <option key={r} value={r}>
                               {r.charAt(0).toUpperCase() + r.slice(1)}

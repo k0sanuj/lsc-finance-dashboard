@@ -470,7 +470,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                         <form action={deleteMdgFeeAction}>
                           <input type="hidden" name="id" value={f.id} />
                           <input type="hidden" name="month" value={selectedMonth} />
-                          <button className="action-button secondary" type="submit">Remove</button>
+                          <SubmitButton variant="secondary" pendingLabel="Removing…">Remove</SubmitButton>
                         </form>
                       ) : (
                         <span className="muted">locked</span>
@@ -604,7 +604,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                         <form action={deleteReimbursementAction}>
                           <input type="hidden" name="id" value={r.id} />
                           <input type="hidden" name="month" value={selectedMonth} />
-                          <button className="action-button secondary" type="submit">Remove</button>
+                          <SubmitButton variant="secondary" pendingLabel="Removing…">Remove</SubmitButton>
                         </form>
                       ) : (
                         <span className="muted">locked</span>
@@ -748,7 +748,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                         <form action={deleteProvisionAction} style={{ marginTop: p.notes ? 4 : 0 }}>
                           <input type="hidden" name="id" value={p.id} />
                           <input type="hidden" name="month" value={selectedMonth} />
-                          <button className="action-button secondary" type="submit">Remove</button>
+                          <SubmitButton variant="secondary" pendingLabel="Removing…">Remove</SubmitButton>
                         </form>
                       ) : (
                         <span className="muted">locked</span>

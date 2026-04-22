@@ -245,7 +245,7 @@ function CopilotResult({
         <div className="copilot-plan-meta">
           <span className="subtle-pill">{result.plan.intent}</span>
           {duration !== null && (
-            <span className="muted" style={{ fontSize: "0.78rem" }}>
+            <span className="muted text-xs">
               {duration}ms
               {result.classifyDurationMs != null
                 ? ` • classify ${result.classifyDurationMs}ms`
@@ -279,13 +279,11 @@ function CopilotResult({
               >
                 {step.status}
               </span>
-              <span style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>
+              <span className="mono">
                 {step.agentId}:{step.skill}
               </span>
               {step.status === "error" && (
-                <span className="muted" style={{ fontSize: "0.78rem" }}>
-                  {step.error}
-                </span>
+                <span className="muted text-xs">{step.error}</span>
               )}
             </summary>
             <div className="copilot-step-body">
@@ -303,7 +301,7 @@ function CopilotResult({
 
       {hasHitl ? (
         <div className="copilot-hitl-actions">
-          <div className="muted" style={{ fontSize: "0.82rem", marginBottom: "0.5rem" }}>
+          <div className="muted text-sm mb-sm">
             This plan has human-in-the-loop steps (document analysis, audit). They were skipped by default.
           </div>
           <button type="button" className="action-button secondary" onClick={onRetryWithHitl}>

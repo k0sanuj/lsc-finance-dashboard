@@ -128,9 +128,9 @@ export default async function VendorsPage() {
             </label>
           </div>
 
-          <details style={{ marginTop: 16, marginBottom: 16 }}>
+          <details className="mt-lg mb-lg">
             <summary><strong>Bank / payment details</strong></summary>
-            <div className="form-grid" style={{ marginTop: 12 }}>
+            <div className="form-grid mt-md">
               <label className="field">
                 <span>Bank name</span>
                 <input type="text" name="bankName" placeholder="HDFC Bank" />
@@ -167,7 +167,7 @@ export default async function VendorsPage() {
             <input type="text" name="notes" />
           </label>
 
-          <div className="form-actions" style={{ marginTop: 12 }}>
+          <div className="form-actions mt-md">
             <SubmitButton pendingLabel="Adding vendor…">Add vendor</SubmitButton>
           </div>
         </form>
@@ -216,9 +216,7 @@ export default async function VendorsPage() {
                     <td>{v.bankName || <span className="muted">—</span>}</td>
                     <td>
                       {v.bankAccountNumber ? (
-                        <span style={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
-                          {v.bankAccountNumber}
-                        </span>
+                        <span className="mono">{v.bankAccountNumber}</span>
                       ) : (
                         <span className="muted">—</span>
                       )}
