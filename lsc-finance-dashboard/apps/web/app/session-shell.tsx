@@ -230,6 +230,7 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/audit-log")) return "Audit Log";
   if (pathname.startsWith("/project-checklist")) return "Project Checklist";
   if (pathname.startsWith("/copilot")) return "Finance Copilot";
+  if (pathname.startsWith("/analyzers")) return "AI Analyzers";
   if (pathname.startsWith("/documents")) return "Documents";
   if (pathname.startsWith("/ai-analysis")) return "AI Analysis";
   if (pathname.startsWith("/agent-graph")) return "Agent Graph";
@@ -319,6 +320,8 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "Project Checklist" });
   } else if (pathname.startsWith("/copilot")) {
     crumbs.push({ label: "Portfolio" }, { label: "Finance Copilot" });
+  } else if (pathname.startsWith("/analyzers")) {
+    crumbs.push({ label: "Portfolio" }, { label: "AI Analyzers" });
   } else if (pathname.startsWith("/ai-analysis")) {
     crumbs.push({ label: "TBR", href: "/tbr" }, { label: "AI Analysis" });
   }
@@ -523,6 +526,11 @@ function SessionShellInner({ children, user }: SessionShellProps) {
               <li className="nav-item">
                 <Link className={isActive("/copilot") ? "active" : ""} href={"/copilot" as Route}>
                   Finance Copilot
+                </Link>
+              </li>
+              <li className="nav-item">
+                <Link className={isActive("/analyzers") ? "active" : ""} href={"/analyzers" as Route}>
+                  AI Analyzers
                 </Link>
               </li>
             </ul>

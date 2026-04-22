@@ -3349,6 +3349,116 @@ textarea {
   display: none;
 }
 
+/* ───── HITL Analyzer cards ────────────────────────────── */
+.analyzer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 16px;
+}
+
+.analyzer-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.analyzer-empty,
+.analyzer-error {
+  padding: 24px;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+}
+
+.analyzer-error {
+  border-color: rgba(220, 38, 38, 0.35);
+  background: var(--risk-soft);
+  color: var(--ink);
+}
+
+.analyzer-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.analyzer-summary {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--ink);
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--bg);
+  border-left: 3px solid var(--brand);
+  border-radius: 4px;
+}
+
+.analyzer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.analyzer-section > strong {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.analyzer-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.88rem;
+  color: var(--ink);
+  line-height: 1.55;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.analyzer-list li .pill {
+  margin-right: 4px;
+}
+
+.analyzer-raw {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  font-size: 0.8rem;
+}
+
+.analyzer-raw summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+  padding: 4px 0;
+}
+
+.analyzer-raw pre {
+  background: #0f2438;
+  color: #d8e4ef;
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  max-height: 300px;
+  overflow: auto;
+  margin-top: 8px;
+}
+
+.analyzer-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
 /* ───── Collapsible "Add new" card ────────────────────── */
 .collapsible-card details > summary {
   cursor: pointer;

@@ -242,6 +242,50 @@ const SKILL_REGISTRY: Record<string, SkillHandler> = {
     const userId = optionalString(p, "appUserId");
     return ok(await queries.getDocumentAnalysisDetail(analysisRunId, userId));
   },
+
+  // ── HITL analyzers (T1/T2 — narrative reasoning, read-only) ──
+  "cash-flow-analyzer:analyze-cash-position": async (p) => {
+    const { analyzeCashFlow } = await import("./analyzers/cash-flow");
+    return ok(await analyzeCashFlow({ companyCode: optionalString(p, "companyCode") }));
+  },
+  "cash-flow-analyzer:forecast-liquidity": async (p) => {
+    const { analyzeCashFlow } = await import("./analyzers/cash-flow");
+    return ok(await analyzeCashFlow({ companyCode: optionalString(p, "companyCode") }));
+  },
+  "receivables-analyzer:analyze-aging": async (p) => {
+    const { analyzeReceivables } = await import("./analyzers/receivables");
+    return ok(await analyzeReceivables({ companyCode: optionalString(p, "companyCode") }));
+  },
+  "receivables-analyzer:assess-collection-risk": async (p) => {
+    const { analyzeReceivables } = await import("./analyzers/receivables");
+    return ok(await analyzeReceivables({ companyCode: optionalString(p, "companyCode") }));
+  },
+  "margin-analyzer:analyze-race-margin": async (p) => {
+    const { analyzeMargins } = await import("./analyzers/margin");
+    const seasonYear = (p.seasonYear as number) ?? undefined;
+    return ok(await analyzeMargins({ seasonYear }));
+  },
+  "margin-analyzer:explain-margin-variance": async (p) => {
+    const { analyzeMargins } = await import("./analyzers/margin");
+    const seasonYear = (p.seasonYear as number) ?? undefined;
+    return ok(await analyzeMargins({ seasonYear }));
+  },
+  "budget-analyzer:analyze-budget-utilization": async () => {
+    const { analyzeBudget } = await import("./analyzers/budget");
+    return ok(await analyzeBudget());
+  },
+  "budget-analyzer:detect-overspend": async () => {
+    const { analyzeBudget } = await import("./analyzers/budget");
+    return ok(await analyzeBudget());
+  },
+  "goal-tracker:track-goal-progress": async () => {
+    const { analyzeGoals } = await import("./analyzers/goal-tracker");
+    return ok(await analyzeGoals());
+  },
+  "goal-tracker:project-closure-rate": async () => {
+    const { analyzeGoals } = await import("./analyzers/goal-tracker");
+    return ok(await analyzeGoals());
+  },
 };
 
 // ─── Introspection ─────────────────────────────────────────
