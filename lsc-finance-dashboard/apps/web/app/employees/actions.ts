@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
-import { requireRole } from "../../lib/auth";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
+import { requireRole, requireSession } from "../../lib/auth";
 import type { Route } from "next";
 
 function normalizeWhitespace(value: string) {
@@ -22,6 +23,7 @@ function redirectToEmployees(
 
 export async function addEmployeeAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const companyCode = normalizeWhitespace(String(formData.get("companyCode") ?? ""));
   const fullName = normalizeWhitespace(String(formData.get("fullName") ?? ""));
@@ -47,11 +49,25 @@ export async function addEmployeeAction(formData: FormData) {
     redirectToEmployees("error", `Company "${companyCode}" not found.`, companyCode);
   }
 
-  await executeAdmin(
+  const inserted = await queryRowsAdmin<{ id: string }>(
     `insert into employees (company_id, full_name, email, designation, department, region, employment_type, base_salary, salary_currency, status, start_date)
-     values ($1, $2, $3, $4, $5, $6, $7::employment_type, $8::numeric, $9, 'active', current_date)`,
+     values ($1, $2, $3, $4, $5, $6, $7::employment_type, $8::numeric, $9, 'active', current_date)
+     returning id`,
     [companyId, fullName, email || null, designation, department || null, region || null, employmentType, baseSalary, salaryCurrency]
   );
+
+  const employeeId = inserted[0]?.id;
+  if (employeeId) {
+    await cascadeUpdate({
+      trigger: "employee:created",
+      entityType: "employee",
+      entityId: employeeId,
+      action: "create",
+      after: { fullName, companyCode, designation, employmentType, baseSalary, salaryCurrency },
+      performedBy: session.id,
+      agentId: "payroll-agent",
+    });
+  }
 
   revalidatePath("/employees");
   redirectToEmployees("success", `Employee "${fullName}" added.`, companyCode);
@@ -59,6 +75,7 @@ export async function addEmployeeAction(formData: FormData) {
 
 export async function updateEmployeeAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const employeeId = normalizeWhitespace(String(formData.get("employeeId") ?? ""));
   const company = normalizeWhitespace(String(formData.get("company") ?? ""));
@@ -106,12 +123,23 @@ export async function updateEmployeeAction(formData: FormData) {
     values
   );
 
+  await cascadeUpdate({
+    trigger: "employee:updated",
+    entityType: "employee",
+    entityId: employeeId,
+    action: "update",
+    after: { fields: updates },
+    performedBy: session.id,
+    agentId: "payroll-agent",
+  });
+
   revalidatePath("/employees");
   redirectToEmployees("success", "Employee updated.", company);
 }
 
 export async function updateEmployeeStatusAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const employeeId = normalizeWhitespace(String(formData.get("employeeId") ?? ""));
   const newStatus = normalizeWhitespace(String(formData.get("newStatus") ?? ""));
@@ -126,12 +154,23 @@ export async function updateEmployeeStatusAction(formData: FormData) {
     [employeeId, newStatus]
   );
 
+  await cascadeUpdate({
+    trigger: "employee:status:changed",
+    entityType: "employee",
+    entityId: employeeId,
+    action: "status-change",
+    after: { newStatus },
+    performedBy: session.id,
+    agentId: "payroll-agent",
+  });
+
   revalidatePath("/employees");
   redirectToEmployees("success", `Status updated to "${newStatus.replace(/_/g, " ")}".`, company);
 }
 
 export async function updateSalaryAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const employeeId = normalizeWhitespace(String(formData.get("employeeId") ?? ""));
   const baseSalary = normalizeWhitespace(String(formData.get("baseSalary") ?? ""));
@@ -142,6 +181,11 @@ export async function updateSalaryAction(formData: FormData) {
     redirectToEmployees("error", "Employee and salary required.", company);
   }
 
+  const before = await queryRowsAdmin<{ base_salary: string; salary_currency: string }>(
+    `select base_salary::text, salary_currency from employees where id = $1`,
+    [employeeId]
+  );
+
   const setCurrency = salaryCurrency ? ", salary_currency = $3" : "";
   const params: string[] = [employeeId, baseSalary];
   if (salaryCurrency) params.push(salaryCurrency);
@@ -150,6 +194,17 @@ export async function updateSalaryAction(formData: FormData) {
     `update employees set base_salary = $2::numeric${setCurrency}, updated_at = now() where id = $1`,
     params
   );
+
+  await cascadeUpdate({
+    trigger: "employee:salary:changed",
+    entityType: "employee",
+    entityId: employeeId,
+    action: "salary-change",
+    before: before[0] ? { baseSalary: before[0].base_salary, salaryCurrency: before[0].salary_currency } : undefined,
+    after: { baseSalary, salaryCurrency: salaryCurrency || undefined },
+    performedBy: session.id,
+    agentId: "payroll-agent",
+  });
 
   revalidatePath("/employees");
   redirectToEmployees("success", "Salary updated.", company);

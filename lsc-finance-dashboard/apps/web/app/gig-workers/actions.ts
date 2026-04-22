@@ -4,7 +4,8 @@ import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
-import { requireRole } from "../../lib/auth";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
+import { requireRole, requireSession } from "../../lib/auth";
 
 function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -91,6 +92,7 @@ export async function generatePayoutsAction(formData: FormData) {
 
 export async function processPayoutAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const payoutId = normalizeWhitespace(String(formData.get("payoutId") ?? ""));
   if (!payoutId) {
@@ -104,17 +106,33 @@ export async function processPayoutAction(formData: FormData) {
     [payoutId]
   );
 
+  await cascadeUpdate({
+    trigger: "gig-payout:processed",
+    entityType: "gig_worker_payout",
+    entityId: payoutId,
+    action: "process",
+    after: { status: "processing" },
+    performedBy: session.id,
+    agentId: "gig-worker-agent",
+  });
+
   revalidatePath("/gig-workers");
   redirect(`/gig-workers?view=payouts&status=success&message=${encodeURIComponent("Payout marked as processing.")}` as Route);
 }
 
 export async function confirmPayoutAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const payoutId = normalizeWhitespace(String(formData.get("payoutId") ?? ""));
   if (!payoutId) {
     return redirect("/gig-workers?status=error&message=Missing+payout+ID" as Route);
   }
+
+  const before = await queryRowsAdmin<{ status: string; amount: string; currency_code: string }>(
+    `select status, amount::text, currency_code from gig_worker_payouts where id = $1`,
+    [payoutId]
+  );
 
   await executeAdmin(
     `update gig_worker_payouts
@@ -122,6 +140,19 @@ export async function confirmPayoutAction(formData: FormData) {
      where id = $1 and status in ('pending', 'processing')`,
     [payoutId]
   );
+
+  await cascadeUpdate({
+    trigger: "gig-payout:confirmed",
+    entityType: "gig_worker_payout",
+    entityId: payoutId,
+    action: "confirm-paid",
+    before: before[0] ? { status: before[0].status } : undefined,
+    after: before[0]
+      ? { status: "paid", amount: before[0].amount, currencyCode: before[0].currency_code }
+      : { status: "paid" },
+    performedBy: session.id,
+    agentId: "gig-worker-agent",
+  });
 
   revalidatePath("/gig-workers");
   redirect(`/gig-workers?view=payouts&status=success&message=${encodeURIComponent("Payout confirmed as paid.")}` as Route);

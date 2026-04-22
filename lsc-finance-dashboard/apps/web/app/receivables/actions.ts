@@ -4,6 +4,7 @@ import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
 import { requireRole, requireSession } from "../../lib/auth";
 
 function normalizeWhitespace(value: string) {
@@ -212,6 +213,7 @@ export async function generateTrancheInvoiceAction(formData: FormData) {
 
 export async function markTrancheCollectedAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const trancheId = normalizeWhitespace(String(formData.get("trancheId") ?? ""));
   const returnPath = normalizeWhitespace(String(formData.get("returnPath") ?? "")) || "/receivables/TBR?view=schedule";
@@ -220,8 +222,8 @@ export async function markTrancheCollectedAction(formData: FormData) {
     return redirect(`${returnPath}&status=error&message=${encodeURIComponent("Missing tranche ID.")}` as Route);
   }
 
-  const trancheRows = await queryRowsAdmin<{ tranche_status: string }>(
-    `select tranche_status from contract_tranches where id = $1`,
+  const trancheRows = await queryRowsAdmin<{ tranche_status: string; tranche_label: string; amount: string }>(
+    `select tranche_status, tranche_label, amount::text from contract_tranches where id = $1`,
     [trancheId]
   );
 
@@ -235,6 +237,17 @@ export async function markTrancheCollectedAction(formData: FormData) {
      where id = $1 and tranche_status = 'invoiced'`,
     [trancheId]
   );
+
+  await cascadeUpdate({
+    trigger: "tranche:collected",
+    entityType: "contract_tranche",
+    entityId: trancheId,
+    action: "collect",
+    before: { status: "invoiced" },
+    after: { status: "collected", trancheLabel: trancheRows[0].tranche_label, amount: trancheRows[0].amount },
+    performedBy: session.id,
+    agentId: "finance-agent",
+  });
 
   revalidatePath("/receivables");
   revalidatePath("/payments");

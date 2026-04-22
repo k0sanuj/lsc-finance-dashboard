@@ -17,6 +17,7 @@ export type CascadeTrigger =
   | "payment:cancelled"
   | "invoice:status:changed"
   | "invoice:created"
+  | "invoice:deleted"
   | "expense:approved"
   | "expense:rejected"
   | "expense:paid"
@@ -32,7 +33,44 @@ export type CascadeTrigger =
   | "race-budget-rule:deleted"
   | "commercial-target:changed"
   | "document:analyzed"
-  | "document:approved";
+  | "document:approved"
+  // Vendor / supplier ops
+  | "vendor:created"
+  | "vendor:updated"
+  | "vendor:deleted"
+  // Subscription management
+  | "subscription:created"
+  | "subscription:updated"
+  | "subscription:cancelled"
+  // Employee & payroll
+  | "employee:created"
+  | "employee:updated"
+  | "employee:salary:changed"
+  | "employee:status:changed"
+  | "payroll-invoice:generated"
+  | "payroll-invoice:deleted"
+  // Gig worker ops
+  | "gig-payout:generated"
+  | "gig-payout:processed"
+  | "gig-payout:confirmed"
+  // Tranches & receivables
+  | "tranche:created"
+  | "tranche:activated"
+  | "tranche:invoiced"
+  | "tranche:collected"
+  // Deal pipeline (commercial agents)
+  | "deal:created"
+  | "deal:stage:changed"
+  | "deal:risk:changed"
+  // Treasury forecasting
+  | "treasury-projection:added"
+  // FSP sport module mutations
+  | "sport-pnl:created"
+  | "sport-pnl:updated"
+  | "sport-pnl:deleted"
+  | "sport-sponsorship:created"
+  | "sport-sponsorship:status:changed"
+  | "sport-event:config:changed";
 
 export type CascadeActionType =
   | "refresh-company-metrics"

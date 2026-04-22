@@ -4,7 +4,8 @@ import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
-import { requireRole } from "../../lib/auth";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
+import { requireRole, requireSession } from "../../lib/auth";
 
 function clean(v: FormDataEntryValue | null): string {
   return String(v ?? "").trim();
@@ -18,6 +19,7 @@ function redirectToVendors(status: "success" | "error", message: string): never 
 
 export async function addVendorAction(formData: FormData): Promise<void> {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const name = clean(formData.get("name"));
   const vendorType = clean(formData.get("vendorType")) || "service_provider";
@@ -79,6 +81,18 @@ export async function addVendorAction(formData: FormData): Promise<void> {
     }
   }
 
+  if (vendorId) {
+    await cascadeUpdate({
+      trigger: "vendor:created",
+      entityType: "vendor",
+      entityId: vendorId,
+      action: "create",
+      after: { name, vendorType, companyCode, email, currencyCode },
+      performedBy: session.id,
+      agentId: "vendor-agent",
+    });
+  }
+
   revalidatePath("/vendors");
   revalidatePath("/payroll-invoices");
   redirectToVendors("success", `Vendor "${name}" added.`);
@@ -86,6 +100,7 @@ export async function addVendorAction(formData: FormData): Promise<void> {
 
 export async function updateVendorAction(formData: FormData): Promise<void> {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
 
   const id = clean(formData.get("id"));
   if (!id) redirectToVendors("error", "Missing vendor id.");
@@ -134,6 +149,16 @@ export async function updateVendorAction(formData: FormData): Promise<void> {
 
   await executeAdmin(`update vendors set ${sets.join(", ")} where id = $1`, vals);
 
+  await cascadeUpdate({
+    trigger: "vendor:updated",
+    entityType: "vendor",
+    entityId: id,
+    action: "update",
+    after: fields,
+    performedBy: session.id,
+    agentId: "vendor-agent",
+  });
+
   revalidatePath("/vendors");
   revalidatePath("/payroll-invoices");
   redirectToVendors("success", "Vendor updated.");
@@ -141,10 +166,28 @@ export async function updateVendorAction(formData: FormData): Promise<void> {
 
 export async function deleteVendorAction(formData: FormData): Promise<void> {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const id = clean(formData.get("id"));
   if (!id) redirectToVendors("error", "Missing id.");
+
+  const before = await queryRowsAdmin<{ name: string }>(
+    `select name from vendors where id = $1`,
+    [id]
+  );
+
   await executeAdmin(`delete from vendor_entity_links where vendor_id = $1`, [id]);
   await executeAdmin(`delete from vendors where id = $1`, [id]);
+
+  await cascadeUpdate({
+    trigger: "vendor:deleted",
+    entityType: "vendor",
+    entityId: id,
+    action: "delete",
+    before: before[0] ? { name: before[0].name } : undefined,
+    performedBy: session.id,
+    agentId: "vendor-agent",
+  });
+
   revalidatePath("/vendors");
   revalidatePath("/payroll-invoices");
   redirectToVendors("success", "Vendor deleted.");

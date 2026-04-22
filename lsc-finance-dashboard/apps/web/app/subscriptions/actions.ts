@@ -4,7 +4,8 @@ import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
-import { requireRole } from "../../lib/auth";
+import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
+import { requireRole, requireSession } from "../../lib/auth";
 
 function clean(value: FormDataEntryValue | null): string {
   return String(value ?? "").trim();
@@ -23,6 +24,7 @@ function redirectToSubs(status: "success" | "error", message: string): never {
 
 export async function addSubscriptionAction(formData: FormData): Promise<void> {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const name = clean(formData.get("name"));
   const provider = clean(formData.get("provider"));
   const companyCode = clean(formData.get("companyCode"));
@@ -49,7 +51,7 @@ export async function addSubscriptionAction(formData: FormData): Promise<void> {
   const annualCost =
     billingCycle === "annual" ? monthlyCost : monthlyCost * 12;
 
-  await executeAdmin(
+  const inserted = await queryRowsAdmin<{ id: string }>(
     `insert into subscriptions
        (name, provider, company_id, is_shared, monthly_cost, annual_cost,
         currency_code, billing_cycle, category, status, auto_renew,
@@ -57,7 +59,8 @@ export async function addSubscriptionAction(formData: FormData): Promise<void> {
      values ($1, $2, $3, false, $4, $5, $6,
              $7::billing_cycle, $8::subscription_category,
              'active'::subscription_status, true,
-             nullif($9, '')::date, $10)`,
+             nullif($9, '')::date, $10)
+     returning id`,
     [
       name,
       provider,
@@ -72,12 +75,26 @@ export async function addSubscriptionAction(formData: FormData): Promise<void> {
     ]
   );
 
+  const subscriptionId = inserted[0]?.id;
+  if (subscriptionId) {
+    await cascadeUpdate({
+      trigger: "subscription:created",
+      entityType: "subscription",
+      entityId: subscriptionId,
+      action: "create",
+      after: { name, provider, companyCode, monthlyCost, annualCost, currency, billingCycle, category },
+      performedBy: session.id,
+      agentId: "subscription-agent",
+    });
+  }
+
   revalidatePath("/subscriptions");
   redirectToSubs("success", `${name} added.`);
 }
 
 export async function updateSubscriptionAction(formData: FormData): Promise<void> {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const id = clean(formData.get("id"));
   const monthlyCost = num(formData.get("monthlyCost"));
   const status = clean(formData.get("status"));
@@ -101,15 +118,44 @@ export async function updateSubscriptionAction(formData: FormData): Promise<void
     );
   }
 
+  const trigger = status === "cancelled" ? "subscription:cancelled" : "subscription:updated";
+  await cascadeUpdate({
+    trigger,
+    entityType: "subscription",
+    entityId: id,
+    action: status === "cancelled" ? "cancel" : "update",
+    after: { monthlyCost: monthlyCost || undefined, status: status || undefined },
+    performedBy: session.id,
+    agentId: "subscription-agent",
+  });
+
   revalidatePath("/subscriptions");
   redirectToSubs("success", "Subscription updated.");
 }
 
 export async function deleteSubscriptionAction(formData: FormData): Promise<void> {
   await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
   const id = clean(formData.get("id"));
   if (!id) redirectToSubs("error", "Missing id.");
+
+  const before = await queryRowsAdmin<{ name: string }>(
+    `select name from subscriptions where id = $1`,
+    [id]
+  );
+
   await executeAdmin(`delete from subscriptions where id = $1`, [id]);
+
+  await cascadeUpdate({
+    trigger: "subscription:cancelled",
+    entityType: "subscription",
+    entityId: id,
+    action: "delete",
+    before: before[0] ? { name: before[0].name } : undefined,
+    performedBy: session.id,
+    agentId: "subscription-agent",
+  });
+
   revalidatePath("/subscriptions");
   redirectToSubs("success", "Subscription removed.");
 }
