@@ -31,3 +31,4 @@ export * from "./treasury";
 export * from "./sport-infrastructure";
 export * from "./xtz-invoices";
 export * from "./search";
+export * from "./budget-variance";

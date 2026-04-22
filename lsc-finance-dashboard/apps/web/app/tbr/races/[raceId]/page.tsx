@@ -2,9 +2,11 @@ import Link from "next/link";
 import {
   getDocumentAnalysisQueue,
   getMyExpenseSubmissions,
-  getTbrRaceCardById
+  getTbrRaceCardById,
+  getTbrBudgetVariance
 } from "@lsc/db";
 import { requireRole, requireSession } from "../../../../lib/auth";
+import { BudgetVarianceTable } from "../../../components/budget-variance-table";
 import { DocumentAnalyzerPanel } from "../../../components/document-analyzer-panel";
 import { ModalLauncher } from "../../../components/modal-launcher";
 import { RaceExpenseReportBuilder } from "../../../components/race-expense-report-builder";
@@ -54,11 +56,21 @@ export default async function TbrRaceDetailPage({ params, searchParams }: RaceDe
     );
   }
 
-  const [rawBillQueue, mySubmissions] = await Promise.all([
+  const [rawBillQueue, mySubmissions, variance] = await Promise.all([
     getDocumentAnalysisQueue(session.id, workflowContextPrefix),
-    getMyExpenseSubmissions(session.id, raceId)
+    getMyExpenseSubmissions(session.id, raceId),
+    getTbrBudgetVariance({ raceEventId: raceId })
   ]);
   const billQueue = rawBillQueue as RaceBillRow[];
+  const varianceRows = variance.map((v) => ({
+    label: v.categoryName,
+    sublabel: v.signal === "over" ? `${Math.abs(v.variancePct).toFixed(1)}% over approved` : undefined,
+    approved: v.approvedUsd,
+    actual: v.actualUsd,
+    variance: v.variance,
+    variancePct: v.variancePct,
+    signal: v.signal,
+  }));
 
   return (
     <div className="page-grid">
@@ -82,6 +94,20 @@ export default async function TbrRaceDetailPage({ params, searchParams }: RaceDe
           <span>{query.message}</span>
         </section>
       ) : null}
+
+      <section className="card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">Budget vs Actual</span>
+            <h3>Category spend vs approved rules</h3>
+          </div>
+        </div>
+        <BudgetVarianceTable
+          rows={varianceRows}
+          labelHeader="Cost category"
+          emptyMessage="No budget rules defined for this race. Set them under TBR → Expense Review to enable variance tracking."
+        />
+      </section>
 
       <section className="card compact-section-card">
         <div className="card-title-row">

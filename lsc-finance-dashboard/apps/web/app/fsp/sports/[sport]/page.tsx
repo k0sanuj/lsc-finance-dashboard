@@ -5,8 +5,10 @@ import { requireRole } from "../../../../lib/auth";
 import {
   getSportIdByCode, getSportPnlLineItems, getSportSponsorships,
   getSportLeaguePayroll, getSportTechPayroll, getSportRevenueShare,
-  getSportEventConfig, getFspSports, getSportOpexItems, getSportEventProduction
+  getSportEventConfig, getFspSports, getSportOpexItems, getSportEventProduction,
+  getFspSportBudgetVariance
 } from "@lsc/db";
+import { BudgetVarianceTable } from "../../../components/budget-variance-table";
 import {
   addPnlLineItemAction, updatePnlLineItemAction, deletePnlLineItemAction,
   addSponsorshipAction, updateSponsorshipStatusAction,
@@ -48,7 +50,20 @@ function parseNum(v: string): number {
 /* ─── P&L Summary Tab ──────────────────────────────────────── */
 
 async function PnlSummaryTab({ sportId, sportCode }: { sportId: string; sportCode: string }): Promise<React.ReactElement> {
-  const items = await getSportPnlLineItems(sportId, "base");
+  const [items, variance] = await Promise.all([
+    getSportPnlLineItems(sportId, "base"),
+    getFspSportBudgetVariance(sportId),
+  ]);
+
+  const varianceRows = variance.map((v) => ({
+    label: v.category,
+    sublabel: `${v.section}`,
+    approved: v.y1Budget,
+    actual: v.y1Actual,
+    variance: v.y1Variance,
+    variancePct: v.y1VariancePct,
+    signal: v.signal,
+  }));
 
   const grouped: Record<string, typeof items> = {};
   for (const item of items) {
@@ -206,6 +221,21 @@ async function PnlSummaryTab({ sportId, sportCode }: { sportId: string; sportCod
             <span className="metric-subvalue">Margin: {fmtPct(margin.y3)}</span>
           </div>
         </div>
+      </article>
+
+      {/* Budget vs Actual (Y1) */}
+      <article className="card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">Budget vs Actual — Y1</span>
+            <h3>Line-item variance</h3>
+          </div>
+        </div>
+        <BudgetVarianceTable
+          rows={varianceRows}
+          labelHeader="Line item"
+          emptyMessage="No Y1 actuals posted yet — variance tracking activates once actuals begin."
+        />
       </article>
     </>
   );

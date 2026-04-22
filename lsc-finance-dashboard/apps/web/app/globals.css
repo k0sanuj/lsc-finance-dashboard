@@ -3970,6 +3970,23 @@ textarea {
   margin-top: 8px;
 }
 
+/* ───── Budget vs Actual variance tints ────────────────── */
+.variance-under td {
+  background: linear-gradient(90deg, var(--good-soft) 0%, transparent 30%);
+}
+
+.variance-approaching td {
+  background: linear-gradient(90deg, var(--warn-soft) 0%, transparent 30%);
+}
+
+.variance-over td {
+  background: linear-gradient(90deg, var(--risk-soft) 0%, transparent 30%);
+}
+
+.variance-on-track td {
+  /* neutral background, no tint */
+}
+
 /* ───── Sponsorship inline edit (FSP sport page) ───────── */
 .sponsorship-edit > summary {
   cursor: pointer;
