@@ -210,14 +210,16 @@ export default async function SubscriptionsPage({ searchParams }: SubscriptionsP
         </article>
       </section>
 
-      {/* Add new subscription form */}
-      <section className="card">
-        <div className="card-title-row">
-          <div>
-            <span className="section-kicker">Add</span>
-            <h3>New software / subscription</h3>
-          </div>
-        </div>
+      {/* Add new subscription form (collapsed by default) */}
+      <section className="card collapsible-card">
+        <details>
+          <summary className="card-title-row collapsible-summary">
+            <div>
+              <span className="section-kicker">Add</span>
+              <h3>New software / subscription</h3>
+            </div>
+            <span className="collapsible-indicator" aria-hidden="true">+</span>
+          </summary>
         <BillUploader
           formId="add-subscription-form"
           fieldMap={{
@@ -311,6 +313,7 @@ export default async function SubscriptionsPage({ searchParams }: SubscriptionsP
             </div>
           </div>
         </form>
+        </details>
       </section>
 
       {/* Per-entity software list */}
@@ -397,9 +400,13 @@ export default async function SubscriptionsPage({ searchParams }: SubscriptionsP
                     <td>
                       <form action={deleteSubscriptionAction}>
                         <input type="hidden" name="id" value={sub.id} />
-                        <button className="action-button secondary" type="submit">
+                        <SubmitButton
+                          variant="secondary"
+                          pendingLabel="Removing…"
+                          confirmMessage={`Remove subscription "${sub.name}"? This cannot be undone.`}
+                        >
                           Delete
-                        </button>
+                        </SubmitButton>
                       </form>
                     </td>
                   </tr>

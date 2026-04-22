@@ -1,5 +1,6 @@
 import { requireRole } from "../../lib/auth";
 import { getEmployees, getFxRatesForDisplay } from "@lsc/db";
+import { EmptyState } from "../components/empty-state";
 import { SubmitButton } from "../components/submit-button";
 import {
   addEmployeeAction,
@@ -130,14 +131,16 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
         </section>
       ) : null}
 
-      {/* Add employee form */}
-      <article className="card">
-        <div className="card-title-row">
-          <div>
-            <span className="section-kicker">New hire</span>
-            <h3>Add employee</h3>
-          </div>
-        </div>
+      {/* Add employee form (collapsed by default) */}
+      <article className="card collapsible-card">
+        <details>
+          <summary className="card-title-row collapsible-summary">
+            <div>
+              <span className="section-kicker">New hire</span>
+              <h3>Add employee</h3>
+            </div>
+            <span className="collapsible-indicator" aria-hidden="true">+</span>
+          </summary>
         <form action={addEmployeeAction}>
           <input type="hidden" name="companyCode" value={company} />
           <div className="form-grid">
@@ -196,6 +199,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
             </div>
           </div>
         </form>
+        </details>
       </article>
 
       {/* Employee table */}
@@ -280,8 +284,11 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
                 ))
               ) : (
                 <tr>
-                  <td className="muted" colSpan={10}>
-                    No employees found for {company}. Add one above.
+                  <td colSpan={10} style={{ padding: 0 }}>
+                    <EmptyState
+                      title={`No employees for ${company}`}
+                      description="Open the 'Add employee' section above to register a new hire. Employees sync to the payroll generator automatically."
+                    />
                   </td>
                 </tr>
               )}

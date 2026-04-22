@@ -1,5 +1,6 @@
 import { getDeals, getDealPipelineSummary, formatCurrency } from "@lsc/db";
 import { requireRole } from "../../lib/auth";
+import { SubmitButton } from "../components/submit-button";
 import { addDealAction, updateDealStageAction, updateDealRiskAction } from "./actions";
 
 const DEPARTMENTS = [
@@ -373,14 +374,16 @@ export default async function DealPipelinePage({ searchParams }: DealPipelinePag
         </section>
       )}
 
-      {/* Add deal form */}
-      <section className="card">
-        <div className="card-title-row">
-          <div>
-            <span className="section-kicker">New deal</span>
-            <h3>Add Deal</h3>
-          </div>
-        </div>
+      {/* Add deal form (collapsed by default) */}
+      <section className="card collapsible-card">
+        <details>
+          <summary className="card-title-row collapsible-summary">
+            <div>
+              <span className="section-kicker">New deal</span>
+              <h3>Add Deal</h3>
+            </div>
+            <span className="collapsible-indicator" aria-hidden="true">+</span>
+          </summary>
         <form action={addDealAction}>
           <div className="form-grid">
             <label className="field">
@@ -477,9 +480,10 @@ export default async function DealPipelinePage({ searchParams }: DealPipelinePag
           </div>
 
           <div className="form-actions">
-            <button type="submit" className="btn btn-primary">Add Deal</button>
+            <SubmitButton pendingLabel="Adding…">Add Deal</SubmitButton>
           </div>
         </form>
+        </details>
       </section>
     </div>
   );

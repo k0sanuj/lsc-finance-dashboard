@@ -360,6 +360,12 @@ textarea {
   gap: 16px;
   align-items: center;
   margin-bottom: 18px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 12px 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
 }
 
 .workspace-title-block {
@@ -1803,6 +1809,34 @@ textarea {
   .modal-card {
     padding: 18px;
   }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-wrapper,
+  .clean-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .stats-grid,
+  .compact-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .workspace-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .toast-notice {
+    left: 16px;
+    right: 16px;
+    min-width: 0;
+    max-width: none;
+  }
 }
 
 /* ─── Minimal enhancements (added by Claude Code) ─────── */
@@ -3196,6 +3230,33 @@ textarea {
   opacity: 0.5;
 }
 
+/* ───── Copilot responsive ─────────────────────────────── */
+@media (max-width: 720px) {
+  .copilot-input-row {
+    flex-wrap: wrap;
+  }
+  .copilot-input {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+  .copilot-input-row .action-button {
+    flex: 1 1 100%;
+  }
+  .copilot-examples {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .copilot-example-chip {
+    text-align: left;
+  }
+  .copilot-data {
+    font-size: 0.72rem;
+  }
+  .copilot-plan-meta {
+    flex-wrap: wrap;
+  }
+}
+
 /* ───── Toast notifications (dismissible) ──────────────── */
 .toast-notice {
   position: fixed;
@@ -3347,6 +3408,55 @@ textarea {
 /* ───── Hide legacy URL-param notices (replaced by toast) ──── */
 .notice {
   display: none;
+}
+
+/* ───── Reusable empty-state block ─────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 40px 24px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.empty-state-muted {
+  border-style: solid;
+  background: transparent;
+}
+
+.empty-state-icon {
+  width: 56px;
+  height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink-soft);
+  box-shadow: var(--shadow-card);
+  margin-bottom: 4px;
+}
+
+.empty-state-title {
+  font-size: 0.98rem;
+  color: var(--ink);
+}
+
+.empty-state-desc {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  max-width: 480px;
+  line-height: 1.55;
+}
+
+.empty-state .action-button {
+  margin-top: 8px;
 }
 
 /* ───── HITL Analyzer cards ────────────────────────────── */

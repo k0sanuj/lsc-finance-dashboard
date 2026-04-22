@@ -30,6 +30,7 @@ import { BillUploader } from "../components/bill-uploader";
 import { VendorSelector } from "../components/vendor-selector";
 import { MonthPicker } from "../components/month-picker";
 import { AutoFormSelect } from "../components/auto-form-select";
+import { SubmitButton } from "../components/submit-button";
 
 const fmtUsd = (n: number): string =>
   n.toLocaleString("en-US", {
@@ -949,9 +950,13 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                     </option>
                   ))}
                 </select>
-                <button className="action-button secondary" type="submit">
+                <SubmitButton
+                  variant="secondary"
+                  pendingLabel="Deleting invoice…"
+                  confirmMessage="Delete this invoice and unlock its staged items? This cannot be undone."
+                >
                   Delete invoice (unlocks staged items)
-                </button>
+                </SubmitButton>
               </form>
             </div>
           </details>

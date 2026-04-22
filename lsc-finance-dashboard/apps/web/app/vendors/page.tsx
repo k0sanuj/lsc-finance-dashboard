@@ -1,5 +1,6 @@
 import { getVendorsWithBank } from "@lsc/db";
 import { requireRole } from "../../lib/auth";
+import { EmptyState } from "../components/empty-state";
 import { SubmitButton } from "../components/submit-button";
 import { addVendorAction, deleteVendorAction } from "./actions";
 
@@ -182,6 +183,12 @@ export default async function VendorsPage() {
           </div>
           <span className="badge">{vendorsBank.length} vendors</span>
         </div>
+        {vendorsBank.length === 0 ? (
+          <EmptyState
+            title="No vendors yet"
+            description="Add your first vendor to auto-fill recipient banking info when creating invoices. Vendors with bank details appear in the VendorSelector on the XTZ invoice generator."
+          />
+        ) : (
         <div className="table-wrapper clean-table">
           <table>
             <thead>
@@ -198,8 +205,7 @@ export default async function VendorsPage() {
               </tr>
             </thead>
             <tbody>
-              {vendorsBank.length > 0 ? (
-                vendorsBank.map((v) => (
+              {vendorsBank.map((v) => (
                   <tr key={v.id}>
                     <td>
                       <strong>{v.name}</strong>
@@ -239,18 +245,11 @@ export default async function VendorsPage() {
                       </form>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td className="muted" colSpan={9}>
-                    No vendors yet. Add one above — vendors with bank details can be selected
-                    when creating invoices.
-                  </td>
-                </tr>
-              )}
+              ))}
             </tbody>
           </table>
         </div>
+        )}
       </article>
     </div>
   );
