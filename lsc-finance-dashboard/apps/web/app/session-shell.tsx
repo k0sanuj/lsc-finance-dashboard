@@ -228,6 +228,7 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/audit-reports")) return "Audit Reports";
   if (pathname.startsWith("/audit-log")) return "Audit Log";
   if (pathname.startsWith("/project-checklist")) return "Project Checklist";
+  if (pathname.startsWith("/copilot")) return "Finance Copilot";
   if (pathname.startsWith("/documents")) return "Documents";
   if (pathname.startsWith("/ai-analysis")) return "AI Analysis";
   if (pathname.startsWith("/agent-graph")) return "Agent Graph";
@@ -315,6 +316,8 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "System" }, { label: "Audit Log" });
   } else if (pathname.startsWith("/project-checklist")) {
     crumbs.push({ label: "Project Checklist" });
+  } else if (pathname.startsWith("/copilot")) {
+    crumbs.push({ label: "Portfolio" }, { label: "Finance Copilot" });
   } else if (pathname.startsWith("/ai-analysis")) {
     crumbs.push({ label: "TBR", href: "/tbr" }, { label: "AI Analysis" });
   }
@@ -516,6 +519,11 @@ function SessionShellInner({ children, user }: SessionShellProps) {
                   Project Checklist
                 </Link>
               </li>
+              <li className="nav-item">
+                <Link className={isActive("/copilot") ? "active" : ""} href={"/copilot" as Route}>
+                  Finance Copilot
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -530,7 +538,7 @@ function SessionShellInner({ children, user }: SessionShellProps) {
                   className={`nav-company-toggle ${active ? "active" : ""} ${expanded ? "expanded" : ""}`}
                   onClick={() => toggleCompany(company.label)}
                   type="button"
-                  aria-expanded={expanded}
+                  aria-expanded={expanded ? "true" : "false"}
                 >
                   <span className="nav-company-indicator">{expanded ? "\u25BC" : "\u25B6"}</span>
                   <span className="nav-company-name">{company.label}</span>

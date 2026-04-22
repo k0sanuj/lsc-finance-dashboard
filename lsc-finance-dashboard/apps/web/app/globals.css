@@ -3018,3 +3018,180 @@ textarea {
     margin: 10mm 10mm;
   }
 }
+
+/* ───── Finance Copilot ───────────────────────────────── */
+.copilot-root {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.copilot-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.copilot-example-chip {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.copilot-example-chip:hover:not(:disabled) {
+  border-color: var(--brand);
+  background: var(--bg);
+}
+
+.copilot-example-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.copilot-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.copilot-exchange {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.copilot-question {
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.copilot-status {
+  font-size: 0.85rem;
+}
+
+.copilot-plan {
+  background: var(--bg);
+  border-left: 3px solid var(--brand);
+  padding: 0.6rem 0.8rem;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.copilot-plan-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.copilot-reasoning {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.copilot-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.copilot-step {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.copilot-step-summary {
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.copilot-step-summary::-webkit-details-marker {
+  display: none;
+}
+
+.copilot-step-summary::before {
+  content: "▸";
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  transition: transform 0.15s;
+}
+
+.copilot-step[open] .copilot-step-summary::before {
+  transform: rotate(90deg);
+}
+
+.copilot-step-body {
+  padding: 0 0.75rem 0.75rem 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.copilot-data {
+  background: #0f2438;
+  color: #d8e4ef;
+  padding: 0.75rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  overflow-x: auto;
+  max-height: 420px;
+  margin: 0.5rem 0 0 0;
+}
+
+.copilot-hitl-actions {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.copilot-summary {
+  font-size: 0.82rem;
+  padding-top: 0.25rem;
+}
+
+.copilot-input-row {
+  position: sticky;
+  bottom: 0;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.copilot-input {
+  flex: 1;
+  border: 1px solid transparent;
+  background: var(--bg);
+  padding: 0.6rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  color: var(--ink);
+  outline: none;
+}
+
+.copilot-input:focus {
+  border-color: var(--brand);
+  background: #ffffff;
+}
+
+.copilot-input:disabled {
+  opacity: 0.5;
+}
