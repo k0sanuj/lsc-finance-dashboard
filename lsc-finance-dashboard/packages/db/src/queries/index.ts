@@ -33,3 +33,4 @@ export * from "./xtz-invoices";
 export * from "./search";
 export * from "./budget-variance";
 export * from "./media-revenue";
+export * from "./fsp-dashboard";

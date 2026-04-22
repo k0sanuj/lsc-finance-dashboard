@@ -3970,6 +3970,56 @@ textarea {
   margin-top: 8px;
 }
 
+/* ───── EBITDA waterfall (sports-dashboard) ────────────── */
+.ebitda-waterfall {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.waterfall-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 150px;
+  align-items: center;
+  gap: 12px;
+}
+
+.waterfall-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.waterfall-bar-container {
+  background: var(--bg);
+  border-radius: 4px;
+  height: 26px;
+  overflow: hidden;
+}
+
+.waterfall-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 180ms ease-out;
+}
+
+.waterfall-bar.good {
+  background: linear-gradient(90deg, var(--good) 0%, rgba(22, 163, 74, 0.7) 100%);
+}
+
+.waterfall-bar.risk {
+  background: linear-gradient(90deg, var(--risk) 0%, rgba(220, 38, 38, 0.65) 100%);
+}
+
+.waterfall-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.waterfall-value.good { color: var(--good); }
+.waterfall-value.risk { color: var(--risk); }
+
 /* ───── Budget vs Actual variance tints ────────────────── */
 .variance-under td {
   background: linear-gradient(90deg, var(--good-soft) 0%, transparent 30%);
