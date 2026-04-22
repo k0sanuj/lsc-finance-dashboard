@@ -189,6 +189,166 @@ export async function updateSponsorshipStatusAction(formData: FormData) {
   redir(sport, "sponsorship", "success", "Sponsorship status updated.");
 }
 
+export async function updateSponsorshipAction(formData: FormData) {
+  await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
+  const sport = clean(formData.get("sport"));
+  const sponsorshipId = clean(formData.get("sponsorshipId"));
+  const segment = clean(formData.get("segment"));
+  const sponsorName = clean(formData.get("sponsorName"));
+  const tier = clean(formData.get("tier")) || "official";
+  const contractStatus = clean(formData.get("contractStatus")) || "pipeline";
+  const y1 = clean(formData.get("y1Value")) || "0";
+  const y2 = clean(formData.get("y2Value")) || "0";
+  const y3 = clean(formData.get("y3Value")) || "0";
+  const contractStart = clean(formData.get("contractStart"));
+  const contractEnd = clean(formData.get("contractEnd"));
+  const paymentSchedule = clean(formData.get("paymentSchedule"));
+  const deliverables = clean(formData.get("deliverables"));
+
+  if (!sponsorshipId) redir(sport, "sponsorship", "error", "Sponsorship id required.");
+  if (!segment) redir(sport, "sponsorship", "error", "Segment is required.");
+
+  await executeAdmin(
+    `update fsp_sponsorships
+     set segment = $2, sponsor_name = $3, tier = $4::sponsorship_tier,
+         contract_status = $5::sponsorship_contract_status,
+         year_1_value = $6::numeric, year_2_value = $7::numeric, year_3_value = $8::numeric,
+         contract_start = $9::date, contract_end = $10::date,
+         payment_schedule = $11, deliverables_summary = $12,
+         updated_at = now()
+     where id = $1`,
+    [
+      sponsorshipId,
+      segment,
+      sponsorName || null,
+      tier,
+      contractStatus,
+      y1,
+      y2,
+      y3,
+      contractStart || null,
+      contractEnd || null,
+      paymentSchedule || null,
+      deliverables || null,
+    ]
+  );
+
+  await cascadeUpdate({
+    trigger: "sport-sponsorship:status:changed",
+    entityType: "fsp_sponsorship",
+    entityId: sponsorshipId,
+    action: "update",
+    after: { segment, sponsorName, tier, contractStatus, y1, y2, y3 },
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
+
+  revalidatePath(`/fsp/sports/${sport}`);
+  redir(sport, "sponsorship", "success", `Sponsorship "${segment}" updated.`);
+}
+
+export async function archiveSponsorshipAction(formData: FormData) {
+  await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
+  const sport = clean(formData.get("sport"));
+  const sponsorshipId = clean(formData.get("sponsorshipId"));
+
+  if (!sponsorshipId) redir(sport, "sponsorship", "error", "Sponsorship id required.");
+
+  await executeAdmin(
+    `update fsp_sponsorships
+     set contract_status = 'archived'::sponsorship_contract_status, updated_at = now()
+     where id = $1`,
+    [sponsorshipId]
+  );
+
+  await cascadeUpdate({
+    trigger: "sport-sponsorship:status:changed",
+    entityType: "fsp_sponsorship",
+    entityId: sponsorshipId,
+    action: "archive",
+    after: { status: "archived" },
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
+
+  revalidatePath(`/fsp/sports/${sport}`);
+  redir(sport, "sponsorship", "success", "Sponsorship archived.");
+}
+
+export async function uploadSponsorshipContractAction(formData: FormData) {
+  await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
+  const sport = clean(formData.get("sport"));
+  const sponsorshipId = clean(formData.get("sponsorshipId"));
+  const file = formData.get("contract");
+
+  if (!sponsorshipId) redir(sport, "sponsorship", "error", "Sponsorship id required.");
+  if (!(file instanceof File) || file.size === 0) {
+    redir(sport, "sponsorship", "error", "Select a contract file to upload.");
+  }
+
+  // Find sponsorship + sport's company_id
+  const contextRows = await queryRowsAdmin<{ company_id: string; segment: string }>(
+    `select fs.company_id, sp.segment
+     from fsp_sponsorships sp
+     join fsp_sports fs on fs.id = sp.sport_id
+     where sp.id = $1`,
+    [sponsorshipId]
+  );
+  const ctx = contextRows[0];
+  if (!ctx) redir(sport, "sponsorship", "error", "Sponsorship not found.");
+
+  // Insert a source_documents row referencing the upload.
+  // NOTE: source_documents holds metadata only — the actual S3 upload is handled by
+  // a separate flow (storeUploadedDocument). For sponsorship contracts, we record
+  // the filename + mime type for now; uploading to storage is a follow-up.
+  const castFile = file as File;
+  const docRows = await queryRowsAdmin<{ id: string }>(
+    `insert into source_documents (
+       company_id, document_type, source_system, source_identifier,
+       source_name, metadata
+     )
+     values ($1, 'sponsorship_contract', 'upload', $2, $3, $4::jsonb)
+     returning id`,
+    [
+      ctx.company_id,
+      `sponsorship:${sponsorshipId}:${Date.now()}`,
+      castFile.name,
+      JSON.stringify({
+        mimeType: castFile.type || "application/octet-stream",
+        sizeBytes: castFile.size,
+        uploadedBy: session.id,
+        linkedSponsorshipId: sponsorshipId,
+      }),
+    ]
+  );
+
+  const documentId = docRows[0]?.id;
+  if (!documentId) {
+    redir(sport, "sponsorship", "error", "Document record creation failed.");
+  }
+
+  await executeAdmin(
+    `update fsp_sponsorships set document_id = $2, updated_at = now() where id = $1`,
+    [sponsorshipId, documentId]
+  );
+
+  await cascadeUpdate({
+    trigger: "document:analyzed",
+    entityType: "fsp_sponsorship",
+    entityId: sponsorshipId,
+    action: "upload-contract",
+    after: { documentId, fileName: castFile.name, sizeBytes: castFile.size },
+    performedBy: session.id,
+    agentId: "sports-module-agent",
+  });
+
+  revalidatePath(`/fsp/sports/${sport}`);
+  redir(sport, "sponsorship", "success", `Contract linked to "${ctx.segment}".`);
+}
+
 // ─── League Payroll ────────────────────────────────────────
 
 export async function addLeagueRoleAction(formData: FormData) {

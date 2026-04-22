@@ -41,6 +41,8 @@ export type SponsorshipRow = {
   y1Value: string; y2Value: string; y3Value: string;
   contractStart: string; contractEnd: string;
   paymentSchedule: string;
+  deliverablesSummary: string | null;
+  documentId: string | null;
 };
 
 export type LeaguePayrollRow = {
@@ -149,10 +151,12 @@ export async function getSportSponsorships(sportId: string): Promise<Sponsorship
     id: string; segment: string; sponsor_name: string | null; tier: string;
     contract_status: string; year_1_value: string; year_2_value: string; year_3_value: string;
     contract_start: string | null; contract_end: string | null; payment_schedule: string | null;
+    deliverables_summary: string | null; document_id: string | null;
   }>(
     `select id, segment, sponsor_name, tier, contract_status,
             year_1_value, year_2_value, year_3_value,
-            contract_start::text, contract_end::text, payment_schedule
+            contract_start::text, contract_end::text, payment_schedule,
+            deliverables_summary, document_id::text
      from fsp_sponsorships where sport_id = $1 order by tier, segment`,
     [sportId]
   );
@@ -163,7 +167,9 @@ export async function getSportSponsorships(sportId: string): Promise<Sponsorship
     y1Value: formatCurrency(r.year_1_value), y2Value: formatCurrency(r.year_2_value),
     y3Value: formatCurrency(r.year_3_value),
     contractStart: r.contract_start ?? "", contractEnd: r.contract_end ?? "",
-    paymentSchedule: r.payment_schedule ?? ""
+    paymentSchedule: r.payment_schedule ?? "",
+    deliverablesSummary: r.deliverables_summary,
+    documentId: r.document_id,
   }));
 }
 

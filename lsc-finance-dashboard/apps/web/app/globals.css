@@ -3970,6 +3970,35 @@ textarea {
   margin-top: 8px;
 }
 
+/* ───── Sponsorship inline edit (FSP sport page) ───────── */
+.sponsorship-edit > summary {
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  list-style: none;
+}
+
+.sponsorship-edit > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sponsorship-edit-body {
+  margin-top: 10px;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 540px;
+  max-width: 720px;
+}
+
+.row-archived {
+  opacity: 0.55;
+}
+
 /* ───── Financial forecast grid (analyzer card) ────────── */
 .forecast-metric-row {
   display: grid;

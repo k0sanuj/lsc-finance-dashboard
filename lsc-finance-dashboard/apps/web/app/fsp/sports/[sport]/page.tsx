@@ -10,6 +10,7 @@ import {
 import {
   addPnlLineItemAction, updatePnlLineItemAction, deletePnlLineItemAction,
   addSponsorshipAction, updateSponsorshipStatusAction,
+  updateSponsorshipAction, archiveSponsorshipAction, uploadSponsorshipContractAction,
   addLeagueRoleAction, addTechRoleAction,
   updateRevenueShareAction, updateEventConfigAction,
   addOpexItemAction, addProductionItemAction
@@ -251,8 +252,11 @@ async function SponsorshipTab({ sportId, sportCode }: { sportId: string; sportCo
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
+                {rows.map((r) => {
+                  const statusLower = r.contractStatus.replace(/ /g, "_").toLowerCase();
+                  const isArchived = statusLower === "archived";
+                  return (
+                  <tr key={r.id} className={isArchived ? "row-archived" : undefined}>
                     <td>{r.segment}</td>
                     <td>{r.sponsorName || <span className="muted">TBD</span>}</td>
                     <td><span className="pill">{r.tier}</span></td>
@@ -267,20 +271,126 @@ async function SponsorshipTab({ sportId, sportCode }: { sportId: string; sportCo
                     </td>
                     <td>{r.paymentSchedule || <span className="muted">--</span>}</td>
                     <td>
-                      <form action={updateSponsorshipStatusAction} className="inline-actions">
-                        <input type="hidden" name="sponsorshipId" value={r.id} />
-                        <input type="hidden" name="sport" value={sportCode} />
-                        <select name="newStatus" defaultValue={r.contractStatus.replace(/ /g, "_")}>
-                          <option value="pipeline">Pipeline</option>
-                          <option value="in_negotiation">In Negotiation</option>
-                          <option value="signed">Signed</option>
-                          <option value="lost">Lost</option>
-                        </select>
-                        <button className="action-button secondary" type="submit">Update</button>
-                      </form>
+                      <details className="sponsorship-edit">
+                        <summary className="btn-inline">Manage</summary>
+                        <div className="sponsorship-edit-body">
+                          <form action={updateSponsorshipStatusAction} className="inline-actions mb-sm">
+                            <input type="hidden" name="sponsorshipId" value={r.id} />
+                            <input type="hidden" name="sport" value={sportCode} />
+                            <select
+                              name="newStatus"
+                              defaultValue={statusLower}
+                              aria-label={`Update status for ${r.segment}`}
+                              className="inline-select"
+                            >
+                              <option value="pipeline">Pipeline</option>
+                              <option value="loi">LOI</option>
+                              <option value="signed">Signed</option>
+                              <option value="active">Active</option>
+                              <option value="expired">Expired</option>
+                              <option value="archived">Archived</option>
+                            </select>
+                            <button className="btn-inline" type="submit">Save status</button>
+                          </form>
+
+                          <form action={updateSponsorshipAction} className="form-grid mt-sm">
+                            <input type="hidden" name="sponsorshipId" value={r.id} />
+                            <input type="hidden" name="sport" value={sportCode} />
+                            <label className="field">
+                              <span>Segment</span>
+                              <input name="segment" type="text" defaultValue={r.segment} required />
+                            </label>
+                            <label className="field">
+                              <span>Sponsor name</span>
+                              <input name="sponsorName" type="text" defaultValue={r.sponsorName ?? ""} />
+                            </label>
+                            <label className="field">
+                              <span>Tier</span>
+                              <select name="tier" defaultValue={r.tier}>
+                                <option value="title">Title</option>
+                                <option value="presenting">Presenting</option>
+                                <option value="official">Official</option>
+                                <option value="associate">Associate</option>
+                              </select>
+                            </label>
+                            <label className="field">
+                              <span>Status</span>
+                              <select name="contractStatus" defaultValue={statusLower}>
+                                <option value="pipeline">Pipeline</option>
+                                <option value="loi">LOI</option>
+                                <option value="signed">Signed</option>
+                                <option value="active">Active</option>
+                                <option value="expired">Expired</option>
+                                <option value="archived">Archived</option>
+                              </select>
+                            </label>
+                            <label className="field">
+                              <span>Y1 value</span>
+                              <input name="y1Value" type="number" step="0.01" defaultValue={r.y1Value} />
+                            </label>
+                            <label className="field">
+                              <span>Y2 value</span>
+                              <input name="y2Value" type="number" step="0.01" defaultValue={r.y2Value} />
+                            </label>
+                            <label className="field">
+                              <span>Y3 value</span>
+                              <input name="y3Value" type="number" step="0.01" defaultValue={r.y3Value} />
+                            </label>
+                            <label className="field">
+                              <span>Contract start</span>
+                              <input name="contractStart" type="date" defaultValue={r.contractStart ?? ""} />
+                            </label>
+                            <label className="field">
+                              <span>Contract end</span>
+                              <input name="contractEnd" type="date" defaultValue={r.contractEnd ?? ""} />
+                            </label>
+                            <label className="field field-span-2">
+                              <span>Payment schedule</span>
+                              <input name="paymentSchedule" type="text" defaultValue={r.paymentSchedule ?? ""} placeholder="e.g. Quarterly" />
+                            </label>
+                            <label className="field field-span-full">
+                              <span>Deliverables</span>
+                              <textarea name="deliverables" rows={2} defaultValue={r.deliverablesSummary ?? ""} />
+                            </label>
+                            <div className="form-actions">
+                              <button className="action-button primary" type="submit">Save changes</button>
+                            </div>
+                          </form>
+
+                          <form
+                            action={uploadSponsorshipContractAction}
+                            className="mt-md"
+                            encType="multipart/form-data"
+                          >
+                            <input type="hidden" name="sponsorshipId" value={r.id} />
+                            <input type="hidden" name="sport" value={sportCode} />
+                            <label className="field">
+                              <span>Upload / replace contract</span>
+                              <input name="contract" type="file" accept="application/pdf,image/*,.doc,.docx" />
+                            </label>
+                            <div className="form-actions mt-sm">
+                              <button className="btn-inline" type="submit">Link contract</button>
+                              {r.documentId ? (
+                                <span className="muted text-xs">contract on file</span>
+                              ) : null}
+                            </div>
+                          </form>
+
+                          {!isArchived ? (
+                            <form action={archiveSponsorshipAction} className="mt-md">
+                              <input type="hidden" name="sponsorshipId" value={r.id} />
+                              <input type="hidden" name="sport" value={sportCode} />
+                              <button className="action-button secondary" type="submit">
+                                Archive sponsorship
+                              </button>
+                            </form>
+                          ) : null}
+                        </div>
+                      </details>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
                 <tr className="row-total">
                   <td colSpan={4}>Total Sponsorship Revenue</td>
                   <td className="text-right">{fmt(totalY1)}</td>
