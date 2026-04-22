@@ -123,10 +123,10 @@ async function callAnthropicOnce<T>(
     );
   }
 
-  const body = {
+  // Opus 4.7 no longer accepts `temperature` — omit for T3.
+  const body: Record<string, unknown> = {
     model: cfg.model,
     max_tokens: input.maxOutputTokens ?? cfg.maxTokens,
-    temperature: cfg.temperature,
     system: systemParts.length > 0 ? systemParts.join("\n\n") : undefined,
     messages: [
       {
@@ -135,6 +135,9 @@ async function callAnthropicOnce<T>(
       },
     ],
   };
+  if (input.tier !== "T3") {
+    body.temperature = cfg.temperature;
+  }
 
   const controller = new AbortController();
   const timeoutHandle = setTimeout(
