@@ -1252,6 +1252,45 @@ textarea {
   margin-bottom: 12px;
 }
 
+/* AI extract panel — sits above Add forms on sport modules */
+.ai-extract-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px dashed var(--line-strong, var(--line));
+  border-radius: var(--radius-md);
+  background: rgba(15, 53, 84, 0.03);
+  margin-bottom: 14px;
+}
+
+.ai-extract-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-extract-header strong {
+  font-size: 0.95rem;
+}
+
+.ai-extract-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.ai-extract-controls input[type="file"] {
+  flex: 1 1 260px;
+  max-width: 420px;
+}
+
+.ai-extract-panel .notice {
+  padding: 10px 12px;
+  font-size: 0.88rem;
+}
+
 /* Audit trail timeline for expense submission detail */
 .audit-timeline {
   display: flex;

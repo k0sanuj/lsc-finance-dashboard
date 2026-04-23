@@ -10,6 +10,7 @@ import {
   getSportMediaRevenue, getSportInfluencerEconomics
 } from "@lsc/db";
 import { BudgetVarianceTable } from "../../../components/budget-variance-table";
+import AIExtractPanel from "../../../components/ai-extract-panel";
 import {
   addPnlLineItemAction, updatePnlLineItemAction, deletePnlLineItemAction,
   addSponsorshipAction, updateSponsorshipStatusAction,
@@ -440,7 +441,14 @@ async function SponsorshipTab({ sportId, sportCode }: { sportId: string; sportCo
         <div className="card-title-row">
           <h3>Add Sponsorship</h3>
         </div>
-        <form action={addSponsorshipAction}>
+        <AIExtractPanel
+          endpoint="/api/analyze/sponsorship"
+          targetForm="add-sponsorship"
+          label="Extract from sponsorship contract"
+          hint="Upload a signed or draft sponsorship contract PDF — Gemini extracts sponsor name, tier, 3-year values, dates, deliverables."
+        />
+
+        <form action={addSponsorshipAction} data-ai-target="add-sponsorship">
           <input type="hidden" name="sport" value={sportCode} />
           <div className="form-grid">
             <div className="field">
@@ -463,11 +471,12 @@ async function SponsorshipTab({ sportId, sportCode }: { sportId: string; sportCo
             </div>
             <div className="field">
               <label>Status</label>
-              <select name="contractStatus">
+              <select name="contractStatus" defaultValue="pipeline">
                 <option value="pipeline">Pipeline</option>
-                <option value="in_negotiation">In Negotiation</option>
+                <option value="loi">Letter of intent</option>
                 <option value="signed">Signed</option>
-                <option value="lost">Lost</option>
+                <option value="active">Active</option>
+                <option value="expired">Expired</option>
               </select>
             </div>
             <div className="field">
@@ -550,7 +559,10 @@ async function MediaRevenueTab({
             Revenue = impressions / 1000 × CPM
           </span>
         </div>
-        <form action={upsertMediaRevenueAction}>
+        <form
+          action={upsertMediaRevenueAction}
+          data-ai-target={`media-${channel}`}
+        >
           <input type="hidden" name="sport" value={sportCode} />
           <input type="hidden" name="channel" value={channel} />
           <div className="form-grid">
@@ -643,6 +655,16 @@ async function MediaRevenueTab({
           </div>
         </div>
       </article>
+
+      <AIExtractPanel
+        endpoint="/api/analyze/media-kit"
+        targetFormByKey={{
+          nonLinear: "media-non_linear",
+          linear: "media-linear",
+        }}
+        label="Extract from media kit / rate card"
+        hint="Upload a media kit, broadcast proposal, or rate card — Gemini extracts CPMs, impressions, and avg viewership for both non-linear and linear channels."
+      />
 
       {renderChannel("Non-Linear (OTT / Streaming)", "non_linear", nonLinear)}
       {renderChannel("Linear (Traditional TV)", "linear", linear)}

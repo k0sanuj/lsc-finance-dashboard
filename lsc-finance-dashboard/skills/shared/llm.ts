@@ -85,6 +85,8 @@ const PURPOSE_PROVIDER: Record<string, LlmProvider> = {
   "document-analyze": "gemini",
   "document-analyze-compact-retry": "gemini",
   "race-budget-extraction": "gemini",
+  "sponsorship-contract-extract": "gemini",
+  "media-kit-extract": "gemini",
 
   // Analyzers (narrative reasoning) — Anthropic Sonnet
   "cash-flow-analyze": "anthropic",
