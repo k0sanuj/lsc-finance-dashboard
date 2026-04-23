@@ -40,7 +40,7 @@ export async function getSportMediaRevenue(sportId: string): Promise<MediaRevenu
     `select id::text, channel, impressions_y1::text, impressions_y2::text, impressions_y3::text,
             cpm_y1::text, cpm_y2::text, cpm_y3::text,
             avg_viewership::text, notes
-     from fsp_media_revenue
+     from fsp_media_revenue_cpm
      where sport_id = $1
      order by channel`,
     [sportId]

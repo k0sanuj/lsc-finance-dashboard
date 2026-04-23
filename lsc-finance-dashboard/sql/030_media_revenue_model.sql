@@ -2,8 +2,10 @@
 -- Per-sport media revenue configuration: non-linear (OTT/streaming) and
 -- linear (traditional TV) projections, plus influencer economics.
 -- Single-row-per-sport-channel; revenue is computed on the fly.
+-- NOTE: Named _cpm to avoid collision with legacy fsp_media_revenue
+-- (EAV-style metric_name/year_N_value table) from migration 023.
 
-create table if not exists fsp_media_revenue (
+create table if not exists fsp_media_revenue_cpm (
   id uuid primary key default gen_random_uuid(),
   sport_id uuid not null references fsp_sports(id) on delete cascade,
   channel text not null check (channel in ('non_linear', 'linear')),
@@ -36,5 +38,5 @@ create table if not exists fsp_influencer_economics (
   updated_at timestamptz not null default now()
 );
 
-create index if not exists idx_fsp_media_revenue_sport on fsp_media_revenue(sport_id);
+create index if not exists idx_fsp_media_revenue_cpm_sport on fsp_media_revenue_cpm(sport_id);
 create index if not exists idx_fsp_influencer_economics_sport on fsp_influencer_economics(sport_id);

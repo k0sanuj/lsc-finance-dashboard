@@ -152,7 +152,7 @@ export async function getMediaRevenueAcrossSports(): Promise<SportMediaTotals[]>
                fie.creators_count * fie.posts_per_year * fie.cost_per_post_usd * (fie.brand_deal_split_pct / 100.0)
              ), 0) from fsp_influencer_economics fie where fie.sport_id = fs.id)::text as inf_value
      from fsp_sports fs
-     left join fsp_media_revenue fmr on fmr.sport_id = fs.id
+     left join fsp_media_revenue_cpm fmr on fmr.sport_id = fs.id
      group by fs.sport_code, fs.display_name, fs.id
      order by fs.display_name`
   );

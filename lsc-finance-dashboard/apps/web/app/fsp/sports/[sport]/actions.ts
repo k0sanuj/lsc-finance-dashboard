@@ -536,7 +536,7 @@ export async function upsertMediaRevenueAction(formData: FormData) {
   if (!sportId) redir(sport, "media", "error", "Sport not found.");
 
   await executeAdmin(
-    `insert into fsp_media_revenue
+    `insert into fsp_media_revenue_cpm
        (sport_id, channel, impressions_y1, impressions_y2, impressions_y3,
         cpm_y1, cpm_y2, cpm_y3, avg_viewership, notes)
      values ($1, $2, $3::numeric, $4::numeric, $5::numeric,
@@ -559,7 +559,7 @@ export async function upsertMediaRevenueAction(formData: FormData) {
 
   await cascadeUpdate({
     trigger: "sport-pnl:updated",
-    entityType: "fsp_media_revenue",
+    entityType: "fsp_media_revenue_cpm",
     entityId: sportId,
     action: "upsert",
     after: { sport, channel, impressionsY1, impressionsY2, impressionsY3, cpmY1, cpmY2, cpmY3 },
