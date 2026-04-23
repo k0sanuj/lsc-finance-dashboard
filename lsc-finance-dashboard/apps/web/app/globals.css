@@ -1197,6 +1197,130 @@ textarea {
   border-color: rgba(181, 106, 61, 0.28);
 }
 
+.notice.warning {
+  border-color: rgba(181, 106, 61, 0.35);
+  background: rgba(181, 106, 61, 0.08);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.notice.warning strong {
+  color: var(--accent);
+}
+
+.action-button.risk {
+  background: var(--risk, #b34141);
+  color: white;
+  border-color: transparent;
+}
+
+.action-button.risk:hover {
+  filter: brightness(0.92);
+}
+
+.field-inline {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-inline input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.reject-disclosure {
+  margin-top: 12px;
+  border-top: 1px dashed var(--line);
+  padding-top: 12px;
+}
+
+.reject-disclosure > summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.reject-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.reject-disclosure[open] > summary {
+  margin-bottom: 12px;
+}
+
+/* Audit trail timeline for expense submission detail */
+.audit-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 8px;
+}
+
+.audit-timeline-entry {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 12px;
+  padding: 10px 0;
+  position: relative;
+}
+
+.audit-timeline-entry:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 22px;
+  bottom: -6px;
+  width: 2px;
+  background: var(--line);
+}
+
+.audit-timeline-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-top: 6px;
+  background: var(--brand);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 2px var(--line);
+}
+
+.audit-timeline-dot.good {
+  background: var(--good);
+}
+
+.audit-timeline-dot.risk {
+  background: var(--risk, #b34141);
+}
+
+.audit-timeline-dot.accent {
+  background: var(--accent);
+}
+
+.audit-timeline-body strong {
+  display: block;
+  font-size: 0.92rem;
+}
+
+.audit-timeline-body .audit-timeline-meta {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+.audit-timeline-body .audit-timeline-note {
+  display: block;
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: var(--surface-muted);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.85rem;
+}
+
 .status-active {
   color: var(--good);
 }

@@ -462,17 +462,54 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
   );
 }
 
+const REJECT_REASON_LABELS: Record<string, string> = {
+  missing_receipts: "Missing receipts",
+  over_budget: "Over budget",
+  policy_violation: "Policy violation",
+  needs_team_split: "Needs team split",
+  duplicate: "Duplicate submission",
+  other: "Other",
+};
+
 export async function updateExpenseSubmissionStatusAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
   const session = await requireSession();
   const submissionId = normalizeWhitespace(String(formData.get("submissionId") ?? ""));
   const nextStatus = normalizeWhitespace(String(formData.get("nextStatus") ?? ""));
-  const reviewNote = normalizeWhitespace(String(formData.get("reviewNote") ?? "")) || null;
+  let reviewNote = normalizeWhitespace(String(formData.get("reviewNote") ?? "")) || null;
+  const rejectReasonCode = normalizeWhitespace(String(formData.get("rejectReasonCode") ?? ""));
+  const rejectReasonDetail =
+    normalizeWhitespace(String(formData.get("rejectReasonDetail") ?? "")) || null;
   const returnPath =
     normalizeWhitespace(String(formData.get("returnPath") ?? "")) || "/tbr/expense-management";
 
   if (!submissionId || !["in_review", "rejected", "needs_clarification"].includes(nextStatus)) {
     redirectToExpenseWorkflow("error", "Invalid submission status update.", returnPath);
+  }
+
+  // Rejection requires a structured reason + explanation. Prepend the reason
+  // label to the review_note so it is persisted without a schema change.
+  let structuredReason: { code: string; label: string } | null = null;
+  if (nextStatus === "rejected") {
+    if (!rejectReasonCode || !REJECT_REASON_LABELS[rejectReasonCode]) {
+      redirectToExpenseWorkflow(
+        "error",
+        "Pick a rejection reason before rejecting a submission.",
+        returnPath
+      );
+    }
+    if (!rejectReasonDetail) {
+      redirectToExpenseWorkflow(
+        "error",
+        "Add an explanation for the rejection so the submitter knows what to fix.",
+        returnPath
+      );
+    }
+    const label = REJECT_REASON_LABELS[rejectReasonCode];
+    structuredReason = { code: rejectReasonCode, label };
+    reviewNote = `[${label}] ${rejectReasonDetail}`;
+  } else if (nextStatus === "needs_clarification" && rejectReasonDetail) {
+    reviewNote = rejectReasonDetail;
   }
 
   await executeAdmin(
@@ -494,7 +531,11 @@ export async function updateExpenseSubmissionStatusAction(formData: FormData) {
     entityType: "expense_submission",
     entityId: submissionId,
     action: nextStatus === "rejected" ? "reject" : `set-${nextStatus}`,
-    after: { status: nextStatus, reviewNote },
+    after: {
+      status: nextStatus,
+      reviewNote,
+      ...(structuredReason ? { rejectReason: structuredReason } : {}),
+    },
     performedBy: session.id,
     agentId: "expense-agent",
   });
@@ -518,11 +559,45 @@ export async function approveExpenseSubmissionAction(formData: FormData) {
   const session = await requireSession();
   const submissionId = normalizeWhitespace(String(formData.get("submissionId") ?? ""));
   const reviewNote = normalizeWhitespace(String(formData.get("reviewNote") ?? "")) || null;
+  const budgetOverride =
+    normalizeWhitespace(String(formData.get("budgetOverride") ?? "")) === "true";
   const returnPath =
     normalizeWhitespace(String(formData.get("returnPath") ?? "")) || "/tbr/expense-management";
 
   if (!submissionId) {
     redirectToExpenseWorkflow("error", "Missing submission id.", returnPath);
+  }
+
+  // Above-budget override guardrail: if any item is over its race-budget rule,
+  // finance must explicitly override with a reason in the review note.
+  const aboveBudgetRows = await queryRowsAdmin<{ id: string }>(
+    `select esi.id::text
+     from expense_submission_items esi
+     left join race_budget_rules rbr
+       on rbr.race_event_id = (
+         select race_event_id from expense_submissions where id = $1
+       )
+       and rbr.cost_category = esi.category
+       and rbr.rule_status = 'approved'
+     where esi.expense_submission_id = $1
+       and rbr.approved_amount_usd is not null
+       and esi.amount > rbr.approved_amount_usd`,
+    [submissionId]
+  );
+
+  if (aboveBudgetRows.length > 0 && !budgetOverride) {
+    redirectToExpenseWorkflow(
+      "error",
+      `${aboveBudgetRows.length} item(s) are over the approved race budget. Tick "Override budget" and add a reason to approve anyway.`,
+      returnPath
+    );
+  }
+  if (aboveBudgetRows.length > 0 && budgetOverride && !reviewNote) {
+    redirectToExpenseWorkflow(
+      "error",
+      "Budget override requires a finance review note explaining the exception.",
+      returnPath
+    );
   }
 
   await executeAdmin(
@@ -541,7 +616,12 @@ export async function approveExpenseSubmissionAction(formData: FormData) {
     entityType: "expense_submission",
     entityId: submissionId,
     action: "approve-invoice-ready",
-    after: { status: "approved", reviewNote },
+    after: {
+      status: "approved",
+      reviewNote,
+      budgetOverride: aboveBudgetRows.length > 0 ? true : false,
+      aboveBudgetItemCount: aboveBudgetRows.length,
+    },
     performedBy: session.id,
     agentId: "expense-agent",
   });
@@ -553,7 +633,9 @@ export async function approveExpenseSubmissionAction(formData: FormData) {
   revalidatePath(returnPath);
   redirectToExpenseWorkflow(
     "success",
-    "Submission approved and marked invoice ready.",
+    aboveBudgetRows.length > 0
+      ? "Submission approved with budget override."
+      : "Submission approved and marked invoice ready.",
     returnPath
   );
 }
@@ -1026,6 +1108,7 @@ export async function createReimbursementInvoiceAction(formData: FormData) {
 
 export async function generateEqualSplitsAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin", "team_member"]);
+  const session = await requireSession();
   const itemId = normalizeWhitespace(String(formData.get("itemId") ?? ""));
   const submissionId = normalizeWhitespace(String(formData.get("submissionId") ?? ""));
   const returnPath =
@@ -1070,12 +1153,23 @@ export async function generateEqualSplitsAction(formData: FormData) {
     );
   }
 
+  await cascadeUpdate({
+    trigger: "expense-submission:approved",
+    entityType: "expense_item_split",
+    entityId: itemId,
+    action: "regenerate-equal-splits",
+    after: { submissionId, itemId, splitCount, splitAmount, splitPercentage },
+    performedBy: session.id,
+    agentId: "expense-agent",
+  });
+
   revalidatePath(`/tbr/expense-management/${submissionId}`);
   redirectToExpenseWorkflow("success", "Equal split allocations regenerated.", returnPath);
 }
 
 export async function addExpenseSplitAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin", "team_member"]);
+  const session = await requireSession();
   const itemId = normalizeWhitespace(String(formData.get("itemId") ?? ""));
   const submissionId = normalizeWhitespace(String(formData.get("submissionId") ?? ""));
   const returnPath =
@@ -1101,6 +1195,16 @@ export async function addExpenseSplitAction(formData: FormData) {
      values ($1, $2, $3, $4, $5)`,
     [itemId, participantId, splitLabel, splitPercentage, splitAmount]
   );
+
+  await cascadeUpdate({
+    trigger: "expense-submission:approved",
+    entityType: "expense_item_split",
+    entityId: itemId,
+    action: "add-split",
+    after: { submissionId, itemId, participantId, splitLabel, splitPercentage, splitAmount },
+    performedBy: session.id,
+    agentId: "expense-agent",
+  });
 
   revalidatePath(`/tbr/expense-management/${submissionId}`);
   redirectToExpenseWorkflow("success", "Split allocation added.", returnPath);

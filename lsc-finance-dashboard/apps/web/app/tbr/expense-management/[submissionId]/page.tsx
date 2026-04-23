@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  getAuditLog,
   getExpenseSubmissionDetail,
   getExpenseSubmissionItems,
   getRaceBudgetRules,
@@ -12,6 +13,38 @@ import {
   generateEqualSplitsAction,
   updateExpenseSubmissionStatusAction
 } from "../actions";
+
+function formatTimestamp(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+const TIMELINE_ACTION_META: Record<
+  string,
+  { label: string; tone: "good" | "risk" | "accent" | "default" }
+> = {
+  create: { label: "Submitted", tone: "default" },
+  "set-in_review": { label: "Moved into review", tone: "accent" },
+  "set-needs_clarification": { label: "Clarification requested", tone: "accent" },
+  "approve-invoice-ready": { label: "Approved · invoice ready", tone: "good" },
+  reject: { label: "Rejected", tone: "risk" },
+  "regenerate-equal-splits": { label: "Splits regenerated", tone: "default" },
+  "add-split": { label: "Split added", tone: "default" },
+};
+
+function timelineLabel(action: string): { label: string; tone: "good" | "risk" | "accent" | "default" } {
+  return TIMELINE_ACTION_META[action] ?? { label: action, tone: "default" };
+}
 
 type ExpenseSubmissionDetailPageProps = {
   params: Promise<{
@@ -29,14 +62,29 @@ export default async function ExpenseSubmissionDetailPage({
 }: ExpenseSubmissionDetailPageProps) {
   await requireRole(["super_admin", "finance_admin"]);
   const { submissionId } = await params;
-  const [submission, items, users] = await Promise.all([
+  const [submission, items, users, submissionAudit] = await Promise.all([
     getExpenseSubmissionDetail(submissionId),
     getExpenseSubmissionItems(submissionId),
-    getUserOptions()
+    getUserOptions(),
+    getAuditLog({ entityType: "expense_submission", entityId: submissionId, limit: 50 }),
   ]);
   const raceBudgetRules = submission?.raceEventId
     ? await getRaceBudgetRules(submission.raceEventId)
     : [];
+
+  const itemAudit = items.length > 0
+    ? (await Promise.all(
+        items.map((it) =>
+          getAuditLog({ entityType: "expense_item_split", entityId: it.id, limit: 25 })
+        )
+      )).flat()
+    : [];
+
+  const auditEntries = [...submissionAudit, ...itemAudit].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+
+  const userNameById = new Map(users.map((u) => [u.id, u.name]));
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const status = resolvedSearchParams?.status ?? null;
   const message = resolvedSearchParams?.message ?? null;
@@ -150,56 +198,181 @@ export default async function ExpenseSubmissionDetailPage({
             </div>
             <span className="pill subtle-pill">{submission.status}</span>
           </div>
-          <form action={approveExpenseSubmissionAction} className="stack-form">
-            <input name="submissionId" type="hidden" value={submission.id} />
-            <input
-              name="returnPath"
-              type="hidden"
-              value={`/tbr/expense-management/${submission.id}`}
-            />
-            <label className="field">
-              <span>Finance review note</span>
-              <textarea
-                name="reviewNote"
-                placeholder="What finance approved, rejected, or needs clarified."
-                rows={3}
+          {(() => {
+            const aboveBudgetCount = items.filter(
+              (it) => it.budgetStatusKey === "above_budget"
+            ).length;
+            return (
+              <form action={approveExpenseSubmissionAction} className="stack-form">
+                <input name="submissionId" type="hidden" value={submission.id} />
+                <input
+                  name="returnPath"
+                  type="hidden"
+                  value={`/tbr/expense-management/${submission.id}`}
+                />
+                {aboveBudgetCount > 0 ? (
+                  <div className="notice warning" role="alert">
+                    <strong>
+                      {aboveBudgetCount} item
+                      {aboveBudgetCount === 1 ? "" : "s"} over approved race
+                      budget
+                    </strong>
+                    <span>
+                      Tick the override below and add a finance review note to
+                      approve anyway. The override is recorded in the audit log.
+                    </span>
+                  </div>
+                ) : null}
+                <label className="field">
+                  <span>
+                    Finance review note
+                    {aboveBudgetCount > 0 ? " (required for override)" : ""}
+                  </span>
+                  <textarea
+                    name="reviewNote"
+                    placeholder="What finance approved, rejected, or needs clarified."
+                    rows={3}
+                  />
+                </label>
+                {aboveBudgetCount > 0 ? (
+                  <label className="field field-inline">
+                    <input
+                      name="budgetOverride"
+                      type="checkbox"
+                      value="true"
+                    />
+                    <span>
+                      Override race-budget limit and approve{" "}
+                      {aboveBudgetCount} over-budget item
+                      {aboveBudgetCount === 1 ? "" : "s"}
+                    </span>
+                  </label>
+                ) : null}
+                <div className="actions-row">
+                  {submission.statusKey === "submitted" ? (
+                    <button
+                      className="action-button secondary"
+                      formAction={updateExpenseSubmissionStatusAction}
+                      name="nextStatus"
+                      type="submit"
+                      value="in_review"
+                    >
+                      Start review
+                    </button>
+                  ) : null}
+                  <button className="action-button primary" type="submit">
+                    Approve as invoice ready
+                  </button>
+                  <button
+                    className="action-button secondary"
+                    formAction={updateExpenseSubmissionStatusAction}
+                    name="nextStatus"
+                    type="submit"
+                    value="needs_clarification"
+                  >
+                    Request clarification
+                  </button>
+                </div>
+              </form>
+            );
+          })()}
+
+          <details className="reject-disclosure">
+            <summary className="action-button secondary">Reject with reason…</summary>
+            <form action={updateExpenseSubmissionStatusAction} className="stack-form">
+              <input name="submissionId" type="hidden" value={submission.id} />
+              <input name="nextStatus" type="hidden" value="rejected" />
+              <input
+                name="returnPath"
+                type="hidden"
+                value={`/tbr/expense-management/${submission.id}`}
               />
-            </label>
-            <div className="actions-row">
-              {submission.statusKey === "submitted" ? (
-                <button
-                  className="action-button secondary"
-                  formAction={updateExpenseSubmissionStatusAction}
-                  name="nextStatus"
-                  type="submit"
-                  value="in_review"
-                >
-                  Start review
+              <label className="field">
+                <span>Rejection reason (required)</span>
+                <select name="rejectReasonCode" defaultValue="" required>
+                  <option value="" disabled>
+                    Pick a reason…
+                  </option>
+                  <option value="missing_receipts">Missing receipts</option>
+                  <option value="over_budget">Over budget</option>
+                  <option value="policy_violation">Policy violation</option>
+                  <option value="needs_team_split">Needs team split</option>
+                  <option value="duplicate">Duplicate submission</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Explanation for submitter (required)</span>
+                <textarea
+                  name="rejectReasonDetail"
+                  placeholder="Tell the submitter exactly what to fix before resubmitting."
+                  rows={3}
+                  required
+                />
+              </label>
+              <div className="actions-row">
+                <button className="action-button risk" type="submit">
+                  Reject submission
                 </button>
-              ) : null}
-              <button className="action-button primary" type="submit">
-                Approve as invoice ready
-              </button>
-              <button
-                className="action-button secondary"
-                formAction={updateExpenseSubmissionStatusAction}
-                name="nextStatus"
-                type="submit"
-                value="needs_clarification"
-              >
-                Request clarification
-              </button>
-              <button
-                className="action-button secondary"
-                formAction={updateExpenseSubmissionStatusAction}
-                name="nextStatus"
-                type="submit"
-                value="rejected"
-              >
-                Reject
-              </button>
+              </div>
+            </form>
+          </details>
+        </article>
+      </section>
+
+      <section>
+        <article className="card">
+          <div className="card-title-row">
+            <div>
+              <span className="section-kicker">History</span>
+              <h3>Audit trail</h3>
             </div>
-          </form>
+            <span className="pill subtle-pill">
+              {auditEntries.length} event
+              {auditEntries.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          {auditEntries.length === 0 ? (
+            <p className="muted">
+              No recorded events yet. Status transitions and split changes will
+              appear here.
+            </p>
+          ) : (
+            <div className="audit-timeline">
+              {auditEntries.map((entry) => {
+                const meta = timelineLabel(entry.action);
+                const actor = entry.performedBy
+                  ? userNameById.get(entry.performedBy) ?? "Unknown user"
+                  : entry.agentId ?? "System";
+                const rawNote = entry.afterState
+                  ? (entry.afterState as Record<string, unknown>)["reviewNote"]
+                  : null;
+                const note = typeof rawNote === "string" ? rawNote : null;
+                const override = entry.afterState
+                  ? (entry.afterState as Record<string, unknown>)[
+                      "budgetOverride"
+                    ] === true
+                  : false;
+                return (
+                  <div className="audit-timeline-entry" key={entry.id}>
+                    <div className={`audit-timeline-dot ${meta.tone}`} />
+                    <div className="audit-timeline-body">
+                      <strong>
+                        {meta.label}
+                        {override ? " (budget override)" : ""}
+                      </strong>
+                      <span className="audit-timeline-meta">
+                        {actor} · {formatTimestamp(entry.createdAt)}
+                      </span>
+                      {note ? (
+                        <span className="audit-timeline-note">{note}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </article>
       </section>
 
