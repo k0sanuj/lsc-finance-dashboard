@@ -10,10 +10,20 @@ import { CommandPalette } from "./components/command-palette";
 import { PALETTE_COMMANDS } from "./components/command-list";
 import { CmdKTrigger } from "./components/cmdk-trigger";
 
+type NavSubLink = {
+  href: Route;
+  label: string;
+};
+
 type NavLink = {
   href: Route;
   label: string;
   roles: AppUserRole[];
+  /**
+   * Optional sub-links shown only when the parent link's path is the
+   * current pathname (exact or prefix). Used for per-sport tab shortcuts.
+   */
+  subLinks?: NavSubLink[];
 };
 
 type NavSection = {
@@ -119,6 +129,22 @@ function getTbrNav(): CompanyNav {
   };
 }
 
+/**
+ * Shared sub-tabs rendered under each sport link in the FSP sidebar when
+ * the user is on that sport's page. Keep short — too many sub-links
+ * clutters the sidebar.
+ */
+function sportSubLinks(sportCode: string): NavSubLink[] {
+  return [
+    { href: `/fsp/sports/${sportCode}?tab=overview` as Route, label: "Overview" },
+    { href: `/fsp/sports/${sportCode}?tab=summary` as Route, label: "P&L" },
+    { href: `/fsp/sports/${sportCode}?tab=sponsorship` as Route, label: "Sponsorship" },
+    { href: `/fsp/sports/${sportCode}?tab=media` as Route, label: "Media" },
+    { href: `/fsp/sports/${sportCode}?tab=opex` as Route, label: "OPEX" },
+    { href: `/fsp/sports/${sportCode}?tab=league-payroll` as Route, label: "Payroll" },
+  ];
+}
+
 function getFspNav(): CompanyNav {
   return {
     href: "/fsp",
@@ -130,11 +156,36 @@ function getFspNav(): CompanyNav {
         links: [
           { href: "/fsp/sports" as Route, label: "All Sports", roles: ALL_ADMIN },
           { href: "/fsp/consolidated" as Route, label: "Consolidated P&L", roles: ALL_ADMIN },
-          { href: "/fsp/sports/squash" as Route, label: "Squash (WPS)", roles: ALL_ADMIN },
-          { href: "/fsp/sports/bowling" as Route, label: "Bowling (WBL)", roles: ALL_ADMIN },
-          { href: "/fsp/sports/basketball" as Route, label: "Basketball", roles: ALL_ADMIN },
-          { href: "/fsp/sports/world_pong" as Route, label: "World Pong", roles: ALL_ADMIN },
-          { href: "/fsp/sports/foundation" as Route, label: "Foundation", roles: ALL_ADMIN },
+          {
+            href: "/fsp/sports/squash" as Route,
+            label: "Squash (WPS)",
+            roles: ALL_ADMIN,
+            subLinks: sportSubLinks("squash"),
+          },
+          {
+            href: "/fsp/sports/bowling" as Route,
+            label: "Bowling (WBL)",
+            roles: ALL_ADMIN,
+            subLinks: sportSubLinks("bowling"),
+          },
+          {
+            href: "/fsp/sports/basketball" as Route,
+            label: "Basketball",
+            roles: ALL_ADMIN,
+            subLinks: sportSubLinks("basketball"),
+          },
+          {
+            href: "/fsp/sports/world_pong" as Route,
+            label: "World Pong",
+            roles: ALL_ADMIN,
+            subLinks: sportSubLinks("world_pong"),
+          },
+          {
+            href: "/fsp/sports/foundation" as Route,
+            label: "Foundation",
+            roles: ALL_ADMIN,
+            subLinks: sportSubLinks("foundation"),
+          },
         ],
       },
       {
@@ -578,13 +629,38 @@ function SessionShellInner({ children, user }: SessionShellProps) {
                         <div className="nav-subsection" key={section.label}>
                           <span className="nav-sublabel">{section.label}</span>
                           <ul className="nav-sublist">
-                            {section.links.map((link) => (
-                              <li key={link.href}>
-                                <Link className={isActive(link.href) ? "active" : ""} href={link.href}>
-                                  {link.label}
-                                </Link>
-                              </li>
-                            ))}
+                            {section.links.map((link) => {
+                              const [linkPath] = link.href.split("?");
+                              const parentOnPath =
+                                pathname === linkPath ||
+                                pathname.startsWith(`${linkPath}/`);
+                              const showSubLinks =
+                                link.subLinks && link.subLinks.length > 0 && parentOnPath;
+                              return (
+                                <li key={link.href}>
+                                  <Link
+                                    className={isActive(link.href) ? "active" : ""}
+                                    href={link.href}
+                                  >
+                                    {link.label}
+                                  </Link>
+                                  {showSubLinks ? (
+                                    <ul className="nav-subsublist">
+                                      {link.subLinks!.map((sub) => (
+                                        <li key={sub.href}>
+                                          <Link
+                                            className={isActive(sub.href) ? "active" : ""}
+                                            href={sub.href}
+                                          >
+                                            {sub.label}
+                                          </Link>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
                           </ul>
                         </div>
                       ))}

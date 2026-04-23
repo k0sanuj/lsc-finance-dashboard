@@ -322,3 +322,103 @@ export async function getSportIdByCode(sportCode: string): Promise<string | null
 
   return rows[0]?.id ?? null;
 }
+
+// ─── Module completeness (used by the Sport Overview tab) ────────────
+
+export type SportModuleCompleteness = {
+  pnlLineItems: number;
+  sponsorships: number;
+  sponsorshipsSigned: number;
+  mediaChannelsConfigured: number; // 0, 1, or 2 (non_linear + linear)
+  influencerTiers: number;
+  opexItems: number;
+  productionItems: number;
+  leagueRoles: number;
+  techRoles: number;
+  revenueShareRows: number;
+  hasEventConfig: boolean;
+  hasAnyData: boolean;
+};
+
+export async function getSportModuleCompleteness(
+  sportId: string
+): Promise<SportModuleCompleteness> {
+  if (getBackend() !== "database") {
+    return {
+      pnlLineItems: 0,
+      sponsorships: 0,
+      sponsorshipsSigned: 0,
+      mediaChannelsConfigured: 0,
+      influencerTiers: 0,
+      opexItems: 0,
+      productionItems: 0,
+      leagueRoles: 0,
+      techRoles: 0,
+      revenueShareRows: 0,
+      hasEventConfig: false,
+      hasAnyData: false,
+    };
+  }
+
+  const rows = await queryRows<{
+    pnl: string;
+    sponsorships: string;
+    sponsorships_signed: string;
+    media_channels: string;
+    influencer_tiers: string;
+    opex_items: string;
+    production_items: string;
+    league_roles: string;
+    tech_roles: string;
+    revenue_share: string;
+    has_event_config: boolean;
+  }>(
+    `select
+       (select count(*) from fsp_pnl_line_items where sport_id = $1)::text as pnl,
+       (select count(*) from fsp_sponsorships where sport_id = $1)::text as sponsorships,
+       (select count(*) from fsp_sponsorships
+          where sport_id = $1
+            and contract_status in ('signed', 'active'))::text as sponsorships_signed,
+       (select count(*) from fsp_media_revenue_cpm where sport_id = $1)::text as media_channels,
+       (select count(*) from fsp_influencer_economics where sport_id = $1)::text as influencer_tiers,
+       (select count(*) from fsp_opex_items where sport_id = $1)::text as opex_items,
+       (select count(*) from fsp_event_production where sport_id = $1)::text as production_items,
+       (select count(*) from fsp_league_payroll where sport_id = $1)::text as league_roles,
+       (select count(*) from fsp_tech_payroll where sport_id = $1)::text as tech_roles,
+       (select count(*) from fsp_revenue_share where sport_id = $1)::text as revenue_share,
+       exists(select 1 from fsp_event_config where sport_id = $1) as has_event_config`,
+    [sportId]
+  );
+
+  const row = rows[0];
+  const toNum = (v: string | undefined) => Number(v ?? 0) || 0;
+
+  const completeness: SportModuleCompleteness = {
+    pnlLineItems: toNum(row?.pnl),
+    sponsorships: toNum(row?.sponsorships),
+    sponsorshipsSigned: toNum(row?.sponsorships_signed),
+    mediaChannelsConfigured: toNum(row?.media_channels),
+    influencerTiers: toNum(row?.influencer_tiers),
+    opexItems: toNum(row?.opex_items),
+    productionItems: toNum(row?.production_items),
+    leagueRoles: toNum(row?.league_roles),
+    techRoles: toNum(row?.tech_roles),
+    revenueShareRows: toNum(row?.revenue_share),
+    hasEventConfig: row?.has_event_config === true,
+    hasAnyData: false,
+  };
+
+  completeness.hasAnyData =
+    completeness.pnlLineItems > 0 ||
+    completeness.sponsorships > 0 ||
+    completeness.mediaChannelsConfigured > 0 ||
+    completeness.influencerTiers > 0 ||
+    completeness.opexItems > 0 ||
+    completeness.productionItems > 0 ||
+    completeness.leagueRoles > 0 ||
+    completeness.techRoles > 0 ||
+    completeness.revenueShareRows > 0 ||
+    completeness.hasEventConfig;
+
+  return completeness;
+}

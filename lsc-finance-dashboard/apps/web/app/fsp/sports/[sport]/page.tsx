@@ -7,10 +7,13 @@ import {
   getSportLeaguePayroll, getSportTechPayroll, getSportRevenueShare,
   getSportEventConfig, getFspSports, getSportOpexItems, getSportEventProduction,
   getFspSportBudgetVariance,
-  getSportMediaRevenue, getSportInfluencerEconomics
+  getSportMediaRevenue, getSportInfluencerEconomics,
+  getSportModuleCompleteness, getFspPnlSummaries,
+  type SportModuleCompleteness,
 } from "@lsc/db";
 import { BudgetVarianceTable } from "../../../components/budget-variance-table";
 import AIExtractPanel from "../../../components/ai-extract-panel";
+import { EmptyState } from "../../../components/empty-state";
 import {
   addPnlLineItemAction, updatePnlLineItemAction, deletePnlLineItemAction,
   addSponsorshipAction, updateSponsorshipStatusAction,
@@ -22,6 +25,7 @@ import {
 } from "./actions";
 
 const TABS = [
+  { key: "overview", label: "Overview" },
   { key: "summary", label: "P&L Summary" },
   { key: "sponsorship", label: "Sponsorship" },
   { key: "media", label: "Media Revenue" },
@@ -48,6 +52,304 @@ function fmtPct(value: number): string {
 
 function parseNum(v: string): number {
   return Number(String(v).replace(/[^0-9.\-]/g, "")) || 0;
+}
+
+/* ─── Overview Tab ─────────────────────────────────────────── */
+
+type ModuleTileState = "complete" | "partial" | "empty";
+
+type ModuleTileDef = {
+  label: string;
+  tab: TabKey;
+  state: ModuleTileState;
+  statusLabel: string;
+  hint: string;
+};
+
+function stateTone(state: ModuleTileState): string {
+  if (state === "complete") return "signal-good";
+  if (state === "partial") return "signal-warn";
+  return "signal-risk";
+}
+
+function buildModuleTiles(c: SportModuleCompleteness): ModuleTileDef[] {
+  return [
+    {
+      label: "P&L Summary",
+      tab: "summary",
+      state: c.pnlLineItems > 0 ? "complete" : "empty",
+      statusLabel:
+        c.pnlLineItems > 0
+          ? `${c.pnlLineItems} line item${c.pnlLineItems === 1 ? "" : "s"}`
+          : "No line items yet",
+      hint:
+        c.pnlLineItems > 0
+          ? "Edit revenue, COGS, and OPEX line items with 3-year budgets."
+          : "Add Revenue, COGS, and OPEX line items to power the P&L.",
+    },
+    {
+      label: "Sponsorship",
+      tab: "sponsorship",
+      state:
+        c.sponsorships === 0
+          ? "empty"
+          : c.sponsorshipsSigned === 0
+            ? "partial"
+            : "complete",
+      statusLabel:
+        c.sponsorships === 0
+          ? "No sponsorship deals"
+          : `${c.sponsorships} deal${c.sponsorships === 1 ? "" : "s"} · ${c.sponsorshipsSigned} signed/active`,
+      hint:
+        c.sponsorships === 0
+          ? "Upload a contract PDF — the AI ingest panel prefills the Add Sponsorship form."
+          : "Manage the sponsorship pipeline, upload new contracts, archive expired deals.",
+    },
+    {
+      label: "Media Revenue",
+      tab: "media",
+      state:
+        c.mediaChannelsConfigured === 0
+          ? "empty"
+          : c.mediaChannelsConfigured === 1
+            ? "partial"
+            : "complete",
+      statusLabel:
+        c.mediaChannelsConfigured === 0
+          ? "No CPM model configured"
+          : `${c.mediaChannelsConfigured}/2 channel${c.mediaChannelsConfigured === 1 ? "" : "s"} · ${c.influencerTiers} creator tier${c.influencerTiers === 1 ? "" : "s"}`,
+      hint:
+        c.mediaChannelsConfigured === 0
+          ? "Upload a media kit to auto-fill non-linear and linear CPM models."
+          : c.mediaChannelsConfigured === 1
+            ? "Only one channel configured — add the other to complete the model."
+            : "Edit impressions, CPMs, and influencer economics.",
+    },
+    {
+      label: "OPEX Detailed",
+      tab: "opex",
+      state: c.opexItems > 0 ? "complete" : "empty",
+      statusLabel:
+        c.opexItems > 0
+          ? `${c.opexItems} OPEX item${c.opexItems === 1 ? "" : "s"}`
+          : "No OPEX items yet",
+      hint:
+        c.opexItems > 0
+          ? "Break down OPEX by category: social, PR, legal, insurance, etc."
+          : "Add OPEX line items by category for a fuller operating picture.",
+    },
+    {
+      label: "Event Production",
+      tab: "production",
+      state:
+        !c.hasEventConfig && c.productionItems === 0
+          ? "empty"
+          : c.productionItems > 0 && c.hasEventConfig
+            ? "complete"
+            : "partial",
+      statusLabel:
+        c.productionItems === 0 && !c.hasEventConfig
+          ? "No production config yet"
+          : `${c.productionItems} production item${c.productionItems === 1 ? "" : "s"}${c.hasEventConfig ? " · config set" : ""}`,
+      hint:
+        c.productionItems === 0 && !c.hasEventConfig
+          ? "Set event config and add per-event production cost items."
+          : "Adjust production cost lines and event scale assumptions.",
+    },
+    {
+      label: "League Payroll",
+      tab: "league-payroll",
+      state: c.leagueRoles > 0 ? "complete" : "empty",
+      statusLabel:
+        c.leagueRoles > 0
+          ? `${c.leagueRoles} role${c.leagueRoles === 1 ? "" : "s"}`
+          : "No roles yet",
+      hint:
+        c.leagueRoles > 0
+          ? "Manage league-dedicated headcount and salaries."
+          : "Add league-dedicated roles (commissioner, ops, PR, etc.).",
+    },
+    {
+      label: "Tech Services",
+      tab: "tech",
+      state: c.techRoles > 0 ? "complete" : "empty",
+      statusLabel:
+        c.techRoles > 0
+          ? `${c.techRoles} shared role${c.techRoles === 1 ? "" : "s"}`
+          : "No shared tech roles yet",
+      hint:
+        c.techRoles > 0
+          ? "Allocate shared tech/platform headcount across sports."
+          : "Allocate shared platform, data, and tooling headcount.",
+    },
+    {
+      label: "Revenue Share",
+      tab: "revenue-share",
+      state: c.revenueShareRows > 0 ? "complete" : "empty",
+      statusLabel:
+        c.revenueShareRows > 0
+          ? `${c.revenueShareRows} split rule${c.revenueShareRows === 1 ? "" : "s"}`
+          : "No splits set",
+      hint:
+        c.revenueShareRows > 0
+          ? "Edit revenue-share splits with broadcast partners and league."
+          : "Define revenue-share splits with broadcast partners and league.",
+    },
+  ];
+}
+
+async function OverviewTab({
+  sportId,
+  sportCode,
+  sportName,
+}: {
+  sportId: string;
+  sportCode: string;
+  sportName: string;
+}): Promise<React.ReactElement> {
+  const [completeness, pnlSummaries] = await Promise.all([
+    getSportModuleCompleteness(sportId),
+    getFspPnlSummaries("base"),
+  ]);
+
+  const pnl = pnlSummaries.find((s) => s.sportId === sportId);
+  const revenueY1 = pnl?.revenueY1 ?? 0;
+  const revenueY3 = pnl?.revenueY3 ?? 0;
+  const ebitdaY1 = pnl?.ebitdaY1 ?? 0;
+  const ebitdaY3 = pnl?.ebitdaY3 ?? 0;
+  const ebitdaMarginY1 = pnl?.ebitdaMarginY1 ?? 0;
+
+  const tiles = buildModuleTiles(completeness);
+  const completeCount = tiles.filter((t) => t.state === "complete").length;
+  const emptyCount = tiles.filter((t) => t.state === "empty").length;
+
+  return (
+    <>
+      <section className="stats-grid compact-stats">
+        <article className="metric-card accent-brand">
+          <div className="metric-topline">
+            <span className="metric-label">Module completeness</span>
+          </div>
+          <div className="metric-value">
+            {completeCount}/{tiles.length}
+          </div>
+          <span className="metric-subvalue">
+            {emptyCount > 0 ? `${emptyCount} module${emptyCount === 1 ? "" : "s"} need setup` : "All modules populated"}
+          </span>
+        </article>
+        {revenueY1 > 0 && (
+          <article className="metric-card accent-good">
+            <div className="metric-topline">
+              <span className="metric-label">Y1 revenue</span>
+            </div>
+            <div className="metric-value">{fmt(revenueY1)}</div>
+          </article>
+        )}
+        {(revenueY1 > 0 || ebitdaY1 !== 0) && (
+          <article
+            className={`metric-card ${ebitdaY1 >= 0 ? "accent-good" : "accent-risk"}`}
+          >
+            <div className="metric-topline">
+              <span className="metric-label">Y1 EBITDA</span>
+            </div>
+            <div className="metric-value">{fmt(ebitdaY1)}</div>
+            <span className="metric-subvalue">
+              Margin: {ebitdaMarginY1.toFixed(1)}%
+            </span>
+          </article>
+        )}
+        {revenueY3 > 0 && (
+          <article className="metric-card accent-good">
+            <div className="metric-topline">
+              <span className="metric-label">Y3 revenue</span>
+            </div>
+            <div className="metric-value">{fmt(revenueY3)}</div>
+          </article>
+        )}
+        {(revenueY3 > 0 || ebitdaY3 !== 0) && (
+          <article
+            className={`metric-card ${ebitdaY3 >= 0 ? "accent-good" : "accent-risk"}`}
+          >
+            <div className="metric-topline">
+              <span className="metric-label">Y3 EBITDA</span>
+            </div>
+            <div className="metric-value">{fmt(ebitdaY3)}</div>
+          </article>
+        )}
+      </section>
+
+      {!completeness.hasAnyData && (
+        <article className="card">
+          <div className="card-title-row">
+            <div>
+              <span className="section-kicker">Getting started</span>
+              <h3>Welcome to the {sportName} module</h3>
+            </div>
+          </div>
+          <p className="muted">
+            This sport has no financial data yet. The fastest way to populate
+            it is to upload a media kit or sponsorship contract on those tabs
+            — the AI ingest panel extracts every field so you can review and
+            save in one click.
+          </p>
+          <div className="actions-row">
+            <Link
+              className="action-button primary"
+              href={`/fsp/sports/${sportCode}?tab=sponsorship` as Route}
+            >
+              Start with sponsorships
+            </Link>
+            <Link
+              className="action-button secondary"
+              href={`/fsp/sports/${sportCode}?tab=media` as Route}
+            >
+              Configure media revenue
+            </Link>
+            <Link
+              className="action-button secondary"
+              href={`/fsp/sports/${sportCode}?tab=summary` as Route}
+            >
+              Add P&L line items
+            </Link>
+          </div>
+        </article>
+      )}
+
+      <article className="card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">Modules</span>
+            <h3>Data completeness</h3>
+          </div>
+          <span className="badge">
+            {completeCount}/{tiles.length} complete
+          </span>
+        </div>
+        <div className="sport-module-grid">
+          {tiles.map((tile) => (
+            <Link
+              key={tile.tab}
+              className={`sport-module-tile state-${tile.state}`}
+              href={`/fsp/sports/${sportCode}?tab=${tile.tab}` as Route}
+            >
+              <div className="sport-module-tile-head">
+                <strong>{tile.label}</strong>
+                <span className={`signal-pill ${stateTone(tile.state)}`}>
+                  {tile.state === "complete"
+                    ? "Complete"
+                    : tile.state === "partial"
+                      ? "Partial"
+                      : "Needs setup"}
+                </span>
+              </div>
+              <span className="sport-module-tile-status">{tile.statusLabel}</span>
+              <span className="muted text-xs">{tile.hint}</span>
+            </Link>
+          ))}
+        </div>
+      </article>
+    </>
+  );
 }
 
 /* ─── P&L Summary Tab ──────────────────────────────────────── */
@@ -119,7 +421,10 @@ async function PnlSummaryTab({ sportId, sportCode }: { sportId: string; sportCod
               <h3>{title}</h3>
             </div>
             {rows.length === 0 ? (
-              <p className="notice">No {title.toLowerCase()} line items yet. Use the form below to add one.</p>
+              <EmptyState
+                title={`No ${title.toLowerCase()} line items yet`}
+                description={`Add ${title.toLowerCase()} line items below to include them in the ${sportCode} P&L summary and variance tracking.`}
+              />
             ) : (
               <div className="table-wrapper clean-table">
                 <table>
@@ -266,7 +571,10 @@ async function SponsorshipTab({ sportId, sportCode }: { sportId: string; sportCo
           <h3>Sponsorship Revenue</h3>
         </div>
         {rows.length === 0 ? (
-          <p className="notice">No sponsorship deals yet. Add your first sponsorship below.</p>
+          <EmptyState
+            title="No sponsorship deals yet"
+            description="Upload a contract PDF into the AI ingest panel below — it prefills every field automatically — or add a deal manually."
+          />
         ) : (
           <div className="table-wrapper clean-table">
             <table>
@@ -680,7 +988,10 @@ async function MediaRevenueTab({
           </span>
         </div>
         {influencers.length === 0 ? (
-          <p className="muted">No creator tiers configured yet. Add one below.</p>
+          <EmptyState
+            title="No creator tiers configured yet"
+            description="Add nano / micro / mid / macro / mega tiers to model influencer spend and brand-deal value."
+          />
         ) : (
           <div className="table-wrapper clean-table">
             <table>
@@ -799,7 +1110,10 @@ async function OpexDetailedTab({ sportId, sportCode }: { sportId: string; sportC
           <div className="card-title-row">
             <h3>OPEX Items</h3>
           </div>
-          <p className="notice">No OPEX items yet. Use the form below to add your first item.</p>
+          <EmptyState
+            title="No OPEX items yet"
+            description="Break down operating costs by category (social, PR, legal, insurance, merchandising) so the P&L has a fuller picture."
+          />
         </article>
       ) : (
         categories.map((cat) => {
@@ -948,7 +1262,10 @@ async function EventProductionTab({ sportId, sportCode }: { sportId: string; spo
           <h3>Production Items</h3>
         </div>
         {prodItems.length === 0 ? (
-          <p className="notice">No production items yet. Add items using the form below.</p>
+          <EmptyState
+            title="No production items yet"
+            description="Add per-event cost breakdowns (venue, A/V, talent, hospitality) so production costs roll into the P&L."
+          />
         ) : (
           <div className="table-wrapper clean-table">
             <table>
@@ -1049,7 +1366,10 @@ async function LeaguePayrollTab({ sportId, sportCode }: { sportId: string; sport
           <h3>League Payroll</h3>
         </div>
         {rows.length === 0 ? (
-          <p className="notice">No league payroll roles yet. Add your first role below.</p>
+          <EmptyState
+            title="No league payroll roles yet"
+            description="Add league-dedicated roles (commissioner, ops, PR, officials) with 3-year salary budgets."
+          />
         ) : (
           <div className="table-wrapper clean-table">
             <table>
@@ -1167,7 +1487,10 @@ async function TechServicesTab({ sportId, sportCode }: { sportId: string; sportC
           <h3>Tech Services</h3>
         </div>
         {rows.length === 0 ? (
-          <p className="notice">No tech service roles yet. Add your first role below.</p>
+          <EmptyState
+            title="No tech service roles yet"
+            description="Allocate shared tech/platform headcount to this sport (engineering, data, tooling). Cost is pro-rated by allocation percentage."
+          />
         ) : (
           <div className="table-wrapper clean-table">
             <table>
@@ -1358,7 +1681,7 @@ export default async function SportDetailPage({
 
   const activeTab: TabKey = TABS.some((t) => t.key === rawTab)
     ? (rawTab as TabKey)
-    : "summary";
+    : "overview";
 
   return (
     <div className="page-grid">
@@ -1387,6 +1710,9 @@ export default async function SportDetailPage({
         ))}
       </nav>
 
+      {activeTab === "overview" && (
+        <OverviewTab sportId={sportId} sportCode={sportCode} sportName={sportName} />
+      )}
       {activeTab === "summary" && <PnlSummaryTab sportId={sportId} sportCode={sportCode} />}
       {activeTab === "sponsorship" && <SponsorshipTab sportId={sportId} sportCode={sportCode} />}
       {activeTab === "media" && <MediaRevenueTab sportId={sportId} sportCode={sportCode} />}
