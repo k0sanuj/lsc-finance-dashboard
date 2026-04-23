@@ -647,3 +647,64 @@ export async function getExpenseFormOptions() {
     users: [] satisfies ExpenseFormOption[]
   };
 }
+
+// ─── Email-notification helper (minimal fields for templates) ─────────
+
+export type ExpenseNotificationContext = {
+  submissionId: string;
+  title: string;
+  statusKey: string;
+  raceName: string | null;
+  totalAmountUsd: number;
+  submitterId: string;
+  submitterName: string;
+  submitterEmail: string | null;
+  reviewNote: string | null;
+};
+
+export async function getExpenseNotificationContext(
+  submissionId: string
+): Promise<ExpenseNotificationContext | null> {
+  if (getBackend() !== "database") return null;
+  const rows = await queryRows<{
+    id: string;
+    submission_title: string;
+    submission_status: string;
+    race_name: string | null;
+    total: string;
+    submitted_by_user_id: string;
+    submitter_name: string;
+    submitter_email: string | null;
+    review_note: string | null;
+  }>(
+    `select es.id,
+            es.submission_title,
+            es.submission_status::text,
+            re.name as race_name,
+            coalesce(sum(esi.amount), 0)::text as total,
+            es.submitted_by_user_id::text,
+            au.full_name as submitter_name,
+            au.email as submitter_email,
+            es.review_note
+     from expense_submissions es
+     join app_users au on au.id = es.submitted_by_user_id
+     left join race_events re on re.id = es.race_event_id
+     left join expense_submission_items esi on esi.submission_id = es.id
+     where es.id = $1
+     group by es.id, re.name, au.full_name, au.email`,
+    [submissionId]
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    submissionId: row.id,
+    title: row.submission_title,
+    statusKey: row.submission_status,
+    raceName: row.race_name,
+    totalAmountUsd: Number(row.total) || 0,
+    submitterId: row.submitted_by_user_id,
+    submitterName: row.submitter_name,
+    submitterEmail: row.submitter_email,
+    reviewNote: row.review_note,
+  };
+}

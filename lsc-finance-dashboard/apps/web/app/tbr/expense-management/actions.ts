@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
 import { callLlm } from "@lsc/skills/shared/llm";
 import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
+import { notifyExpenseEvent } from "@lsc/skills/expenses/notify";
 import { requireRole, requireSession } from "../../../lib/auth";
 
 function normalizeWhitespace(value: string) {
@@ -256,6 +257,7 @@ export async function createExpenseSubmissionAction(formData: FormData) {
       performedBy: session.id,
       agentId: "expense-agent",
     });
+    await notifyExpenseEvent("submitted", submissionId);
   }
 
   revalidatePath("/tbr");
@@ -451,6 +453,10 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
     }
   }
 
+  if (submissionId) {
+    await notifyExpenseEvent("submitted", submissionId);
+  }
+
   revalidatePath("/tbr");
   revalidatePath("/tbr/my-expenses");
   revalidatePath("/tbr/races");
@@ -540,6 +546,14 @@ export async function updateExpenseSubmissionStatusAction(formData: FormData) {
     agentId: "expense-agent",
   });
 
+  if (nextStatus === "rejected") {
+    await notifyExpenseEvent("rejected", submissionId);
+  } else if (nextStatus === "needs_clarification") {
+    await notifyExpenseEvent("needs_clarification", submissionId);
+  }
+  // No email on set-in_review — it's an internal finance flag, not a
+  // submitter-facing state change.
+
   revalidatePath("/tbr/expense-management");
   revalidatePath(`/tbr/expense-management/${submissionId}`);
   revalidatePath(returnPath);
@@ -625,6 +639,8 @@ export async function approveExpenseSubmissionAction(formData: FormData) {
     performedBy: session.id,
     agentId: "expense-agent",
   });
+
+  await notifyExpenseEvent("approved", submissionId);
 
   revalidatePath("/tbr");
   revalidatePath("/tbr/expense-management");

@@ -118,3 +118,49 @@ export async function getUserOptions() {
 
   return [] satisfies UserOptionRow[];
 }
+
+export type UserContact = {
+  id: string;
+  fullName: string;
+  email: string;
+  role: string;
+};
+
+/** Look up one active user's email + name by id. Returns null if not found. */
+export async function getUserContactById(userId: string): Promise<UserContact | null> {
+  if (getBackend() !== "database") return null;
+  const rows = await queryRows<{
+    id: string;
+    full_name: string;
+    email: string;
+    role: string;
+  }>(
+    `select id, full_name, email, role::text as role
+     from app_users
+     where id = $1 and is_active = true
+     limit 1`,
+    [userId]
+  );
+  const row = rows[0];
+  if (!row || !row.email) return null;
+  return {
+    id: row.id,
+    fullName: row.full_name,
+    email: row.email,
+    role: row.role,
+  };
+}
+
+/** Return emails of all active finance_admin + super_admin users. */
+export async function getFinanceAdminEmails(): Promise<string[]> {
+  if (getBackend() !== "database") return [];
+  const rows = await queryRows<{ email: string }>(
+    `select email
+     from app_users
+     where is_active = true
+       and role in ('super_admin', 'finance_admin')
+       and email is not null
+       and email <> ''`
+  );
+  return rows.map((r) => r.email);
+}
