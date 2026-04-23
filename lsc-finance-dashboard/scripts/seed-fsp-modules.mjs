@@ -34,9 +34,8 @@ async function main() {
     const fspId = fspRes.rows[0]?.id;
     if (!fspId) throw new Error("FSP company not found.");
 
-    // Add Padel and Foundation sports
+    // Add Foundation sport (padel was removed from the product)
     const newSports = [
-      { code: "padel", name: "Padel", league: "World Padel Series" },
       { code: "foundation", name: "Foundation Events", league: "LSC Foundation" }
     ];
     for (const s of newSports) {
@@ -47,7 +46,7 @@ async function main() {
         [fspId, s.code, s.name, s.league]
       );
     }
-    console.log("Added Padel and Foundation Events.");
+    console.log("Added Foundation Events.");
 
     // Get Squash sport ID
     const squashRes = await client.query(

@@ -3,7 +3,7 @@
 insert into project_checklist (title, description, section, priority, status, route, sort_order, completed_at)
 values
   -- Completed items
-  ('FSP Sport entities setup', 'Basketball, Bowling (WBL), Squash, Beer Pong, Padel, Foundation Events', 'Sports Dashboard', 'high', 'done', '/fsp/sports', 10, now()),
+  ('FSP Sport entities setup', 'Basketball, Bowling (WBL), Squash, World Pong, Foundation Events', 'Sports Dashboard', 'high', 'done', '/fsp/sports', 10, now()),
   ('Sport module DB schema (12 tables)', 'pnl_line_items, sponsorships, media_metrics, media_revenue, broadcast_partners, influencer_tiers, regional_cpms, opex_items, event_production, event_config, league_payroll, tech_payroll, revenue_share', 'Sports Dashboard', 'critical', 'done', null, 20, now()),
   ('P&L Summary view (auto-computed)', 'fsp_pnl_summary SQL view: Revenue/COGS/OPEX/EBITDA per sport per scenario', 'Sports Dashboard', 'critical', 'done', null, 30, now()),
   ('Scenario support (conservative/base/optimistic)', 'Scenario enum and filtering on all P&L line items', 'Sports Dashboard', 'high', 'done', null, 40, now()),
@@ -26,7 +26,6 @@ values
   ('Excel export per sport', '9-sheet workbook matching WPS format', 'Sports Dashboard', 'medium', 'pending', null, 190, null),
   ('Bowling module data population', 'Bowling-specific line items and assumptions', 'Sports Dashboard', 'medium', 'pending', '/fsp/sports/bowling', 200, null),
   ('Basketball module data population', 'Basketball-specific line items', 'Sports Dashboard', 'medium', 'pending', '/fsp/sports/basketball', 210, null),
-  ('Beer Pong module data population', 'Entertainment-format line items', 'Sports Dashboard', 'low', 'pending', '/fsp/sports/beer_pong', 220, null),
-  ('Padel module data population', 'Padel-specific line items', 'Sports Dashboard', 'low', 'pending', '/fsp/sports/padel', 230, null),
+  ('World Pong module data population', 'Entertainment-format line items', 'Sports Dashboard', 'low', 'pending', '/fsp/sports/world_pong', 220, null),
   ('Foundation Events module', 'Non-profit structure: donations, grants, charitable costs', 'Sports Dashboard', 'low', 'pending', '/fsp/sports/foundation', 240, null)
 on conflict do nothing;

@@ -17,8 +17,7 @@ const TARGET_SPORTS = [
   { value: "squash", label: "Squash" },
   { value: "bowling", label: "Bowling" },
   { value: "basketball", label: "Basketball" },
-  { value: "beer_pong", label: "Beer Pong" },
-  { value: "padel", label: "Padel" },
+  { value: "world_pong", label: "World Pong" },
   { value: "foundation", label: "Foundation" }
 ] as const;
 

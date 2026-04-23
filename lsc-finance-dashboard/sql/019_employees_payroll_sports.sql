@@ -12,7 +12,7 @@ alter type company_code add value if not exists 'XTE';
 do $$
 begin
   if not exists (select 1 from pg_type where typname = 'fsp_sport_code') then
-    create type fsp_sport_code as enum ('basketball', 'bowling', 'squash', 'beer_pong');
+    create type fsp_sport_code as enum ('basketball', 'bowling', 'squash', 'world_pong');
   end if;
 end $$;
 

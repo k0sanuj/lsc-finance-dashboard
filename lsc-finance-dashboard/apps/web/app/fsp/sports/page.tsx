@@ -6,7 +6,7 @@ const fallbackSports = [
   { id: "fb-1", sportCode: "basketball", displayName: "Basketball", leagueName: "FSP Basketball League", isActive: true },
   { id: "fb-2", sportCode: "bowling", displayName: "Bowling", leagueName: "World Bowling League", isActive: true },
   { id: "fb-3", sportCode: "squash", displayName: "Squash", leagueName: "FSP Squash Series", isActive: true },
-  { id: "fb-4", sportCode: "beerpong", displayName: "Beer Pong", leagueName: "FSP Beer Pong Championship", isActive: false },
+  { id: "fb-4", sportCode: "world_pong", displayName: "World Pong", leagueName: "FSP World Pong Championship", isActive: false },
 ];
 
 const plannedModules = [

@@ -287,7 +287,7 @@ export const AGENT_GRAPH: Record<AgentId, AgentNode> = {
   [AgentId.SportsModuleAgent]: {
     id: AgentId.SportsModuleAgent,
     name: "Sports Module Workflow",
-    role: "FSP per-sport operations (squash, bowling, basketball, padel, beer pong, foundation)",
+    role: "FSP per-sport operations (squash, bowling, basketball, world pong, foundation)",
     kind: "workflow",
     tier: "T0",
     canTalkTo: [AgentId.Orchestrator],

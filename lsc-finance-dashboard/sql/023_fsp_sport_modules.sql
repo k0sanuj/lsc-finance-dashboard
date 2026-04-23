@@ -2,8 +2,7 @@
 -- 9 sub-modules per sport: P&L Summary, Sponsorship, Media Metrics, Media Revenue,
 -- OPEX, Event Production, League Payroll, Tech Services, Revenue Share
 
--- Update sport codes to include padel and foundation
-alter type fsp_sport_code add value if not exists 'padel';
+-- Add foundation sport code (padel was removed from the product)
 alter type fsp_sport_code add value if not exists 'foundation';
 
 -- ============================================================

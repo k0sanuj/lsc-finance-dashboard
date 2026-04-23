@@ -31,7 +31,7 @@ const BRAND_OPTIONS = [
   { value: "Basketball", label: "Basketball" },
   { value: "Bowling", label: "Bowling (World Bowling League)" },
   { value: "Squash", label: "Squash" },
-  { value: "Beer Pong", label: "Beer Pong" },
+  { value: "World Pong", label: "World Pong" },
   { value: "General", label: "General / Corporate" }
 ];
 

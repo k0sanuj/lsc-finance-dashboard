@@ -53,7 +53,7 @@ async function main() {
       { code: "basketball", name: "Basketball", league: "FSP Basketball League" },
       { code: "bowling", name: "Bowling", league: "World Bowling League" },
       { code: "squash", name: "Squash", league: "FSP Squash Series" },
-      { code: "beer_pong", name: "Beer Pong", league: "FSP Beer Pong Championship" }
+      { code: "world_pong", name: "World Pong", league: "FSP World Pong Championship" }
     ];
 
     for (const s of sports) {
