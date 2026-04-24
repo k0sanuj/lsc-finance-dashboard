@@ -34,3 +34,5 @@ export * from "./search";
 export * from "./budget-variance";
 export * from "./media-revenue";
 export * from "./fsp-dashboard";
+export * from "./quickbooks";
+export * from "./legal";

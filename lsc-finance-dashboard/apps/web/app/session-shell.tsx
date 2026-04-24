@@ -281,6 +281,8 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/messaging")) return "Cross-Dashboard Messages";
   if (pathname.startsWith("/audit-reports")) return "Audit Reports";
   if (pathname.startsWith("/audit-log")) return "Audit Log";
+  if (pathname.startsWith("/qb")) return "QuickBooks";
+  if (pathname.startsWith("/legal-integration")) return "Legal Integration";
   if (pathname.startsWith("/project-checklist")) return "Project Checklist";
   if (pathname.startsWith("/copilot")) return "Finance Copilot";
   if (pathname.startsWith("/analyzers")) return "AI Analyzers";
@@ -369,6 +371,10 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "System" }, { label: "Audit Reports" });
   } else if (pathname.startsWith("/audit-log")) {
     crumbs.push({ label: "System" }, { label: "Audit Log" });
+  } else if (pathname.startsWith("/qb")) {
+    crumbs.push({ label: "System" }, { label: "QuickBooks" });
+  } else if (pathname.startsWith("/legal-integration")) {
+    crumbs.push({ label: "System" }, { label: "Legal Integration" });
   } else if (pathname.startsWith("/project-checklist")) {
     crumbs.push({ label: "Project Checklist" });
   } else if (pathname.startsWith("/copilot")) {
@@ -703,6 +709,19 @@ function SessionShellInner({ children, user }: SessionShellProps) {
                 <li className="nav-item">
                   <Link className={isActive("/audit-log") ? "active" : ""} href={"/audit-log" as Route}>
                     Audit Log
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <Link className={isActive("/qb") ? "active" : ""} href={"/qb" as Route}>
+                    QuickBooks
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <Link
+                    className={isActive("/legal-integration") ? "active" : ""}
+                    href={"/legal-integration" as Route}
+                  >
+                    Legal Integration
                   </Link>
                 </li>
               </ul>

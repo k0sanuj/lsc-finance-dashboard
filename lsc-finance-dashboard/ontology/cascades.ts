@@ -81,7 +81,11 @@ export type CascadeTrigger =
   // AI ingestion
   | "ai-ingest:queued"
   // Project checklist (portfolio-level task tracking)
-  | "project-checklist:item:changed";
+  | "project-checklist:item:changed"
+  // QuickBooks Online integration
+  | "qb-connection:connected"
+  | "qb-connection:disconnected"
+  | "qb-accounts:synced";
 
 export type CascadeActionType =
   | "refresh-company-metrics"

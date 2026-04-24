@@ -3,8 +3,10 @@ import {
   getAuditLog,
   getExpenseSubmissionDetail,
   getExpenseSubmissionItems,
+  getQbJournalEntriesForSource,
   getRaceBudgetRules,
-  getUserOptions
+  getUserOptions,
+  type QbJournalEntryLogRow,
 } from "@lsc/db";
 import { requireRole } from "../../../../lib/auth";
 import {
@@ -62,11 +64,12 @@ export default async function ExpenseSubmissionDetailPage({
 }: ExpenseSubmissionDetailPageProps) {
   await requireRole(["super_admin", "finance_admin"]);
   const { submissionId } = await params;
-  const [submission, items, users, submissionAudit] = await Promise.all([
+  const [submission, items, users, submissionAudit, qbJournalLog] = await Promise.all([
     getExpenseSubmissionDetail(submissionId),
     getExpenseSubmissionItems(submissionId),
     getUserOptions(),
     getAuditLog({ entityType: "expense_submission", entityId: submissionId, limit: 50 }),
+    getQbJournalEntriesForSource("expense_submission", submissionId),
   ]);
   const raceBudgetRules = submission?.raceEventId
     ? await getRaceBudgetRules(submission.raceEventId)
@@ -81,6 +84,18 @@ export default async function ExpenseSubmissionDetailPage({
     : [];
 
   const auditEntries = [...submissionAudit, ...itemAudit].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+
+  // Merge QB journal entries into the timeline. They sort by createdAt
+  // alongside audit rows; we render them with a separate "QuickBooks" label
+  // so they visually stand out from user-driven actions.
+  type QbTimelineEntry = QbJournalEntryLogRow & { kind: "qb-je" };
+  const qbEntries: QbTimelineEntry[] = qbJournalLog.map((row) => ({
+    ...row,
+    kind: "qb-je",
+  }));
+  qbEntries.sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
 
@@ -328,49 +343,106 @@ export default async function ExpenseSubmissionDetailPage({
               <h3>Audit trail</h3>
             </div>
             <span className="pill subtle-pill">
-              {auditEntries.length} event
-              {auditEntries.length === 1 ? "" : "s"}
+              {auditEntries.length + qbEntries.length} event
+              {auditEntries.length + qbEntries.length === 1 ? "" : "s"}
             </span>
           </div>
-          {auditEntries.length === 0 ? (
+          {auditEntries.length === 0 && qbEntries.length === 0 ? (
             <p className="muted">
-              No recorded events yet. Status transitions and split changes will
-              appear here.
+              No recorded events yet. Status transitions, split changes, and
+              QuickBooks postings will appear here.
             </p>
           ) : (
             <div className="audit-timeline">
-              {auditEntries.map((entry) => {
-                const meta = timelineLabel(entry.action);
-                const actor = entry.performedBy
-                  ? userNameById.get(entry.performedBy) ?? "Unknown user"
-                  : entry.agentId ?? "System";
-                const rawNote = entry.afterState
-                  ? (entry.afterState as Record<string, unknown>)["reviewNote"]
-                  : null;
-                const note = typeof rawNote === "string" ? rawNote : null;
-                const override = entry.afterState
-                  ? (entry.afterState as Record<string, unknown>)[
-                      "budgetOverride"
-                    ] === true
-                  : false;
-                return (
-                  <div className="audit-timeline-entry" key={entry.id}>
-                    <div className={`audit-timeline-dot ${meta.tone}`} />
-                    <div className="audit-timeline-body">
-                      <strong>
-                        {meta.label}
-                        {override ? " (budget override)" : ""}
-                      </strong>
-                      <span className="audit-timeline-meta">
-                        {actor} · {formatTimestamp(entry.createdAt)}
-                      </span>
-                      {note ? (
-                        <span className="audit-timeline-note">{note}</span>
-                      ) : null}
+              {/* Merge audit + QB entries by createdAt */}
+              {[
+                ...auditEntries.map((e) => ({
+                  kind: "audit" as const,
+                  createdAt: e.createdAt,
+                  payload: e,
+                })),
+                ...qbEntries.map((e) => ({
+                  kind: "qb" as const,
+                  createdAt: e.createdAt,
+                  payload: e,
+                })),
+              ]
+                .sort(
+                  (a, b) =>
+                    new Date(a.createdAt).getTime() -
+                    new Date(b.createdAt).getTime()
+                )
+                .map((row) => {
+                  if (row.kind === "audit") {
+                    const entry = row.payload;
+                    const meta = timelineLabel(entry.action);
+                    const actor = entry.performedBy
+                      ? userNameById.get(entry.performedBy) ?? "Unknown user"
+                      : entry.agentId ?? "System";
+                    const rawNote = entry.afterState
+                      ? (entry.afterState as Record<string, unknown>)["reviewNote"]
+                      : null;
+                    const note = typeof rawNote === "string" ? rawNote : null;
+                    const override = entry.afterState
+                      ? (entry.afterState as Record<string, unknown>)[
+                          "budgetOverride"
+                        ] === true
+                      : false;
+                    return (
+                      <div className="audit-timeline-entry" key={`a:${entry.id}`}>
+                        <div className={`audit-timeline-dot ${meta.tone}`} />
+                        <div className="audit-timeline-body">
+                          <strong>
+                            {meta.label}
+                            {override ? " (budget override)" : ""}
+                          </strong>
+                          <span className="audit-timeline-meta">
+                            {actor} · {formatTimestamp(entry.createdAt)}
+                          </span>
+                          {note ? (
+                            <span className="audit-timeline-note">{note}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  }
+                  // QB journal entry row
+                  const je = row.payload;
+                  const tone =
+                    je.status === "posted"
+                      ? "good"
+                      : je.status === "failed"
+                        ? "risk"
+                        : "accent";
+                  const label =
+                    je.status === "posted"
+                      ? `QuickBooks JE posted (${je.qbJournalEntryId ?? "id?"})`
+                      : je.status === "failed"
+                        ? "QuickBooks JE failed"
+                        : "QuickBooks JE skipped";
+                  const actor = je.initiatedByUserId
+                    ? userNameById.get(je.initiatedByUserId) ?? "Unknown user"
+                    : "System";
+                  return (
+                    <div className="audit-timeline-entry" key={`q:${je.id}`}>
+                      <div className={`audit-timeline-dot ${tone}`} />
+                      <div className="audit-timeline-body">
+                        <strong>{label}</strong>
+                        <span className="audit-timeline-meta">
+                          {actor} · {formatTimestamp(je.createdAt)}
+                          {je.totalAmountUsd > 0
+                            ? ` · $${je.totalAmountUsd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`
+                            : ""}
+                        </span>
+                        {je.errorMessage ? (
+                          <span className="audit-timeline-note">
+                            {je.errorMessage}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           )}
         </article>

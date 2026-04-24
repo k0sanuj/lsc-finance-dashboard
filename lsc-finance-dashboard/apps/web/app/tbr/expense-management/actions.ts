@@ -7,6 +7,7 @@ import { executeAdmin, queryRowsAdmin } from "@lsc/db";
 import { callLlm } from "@lsc/skills/shared/llm";
 import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
 import { notifyExpenseEvent } from "@lsc/skills/expenses/notify";
+import { postExpenseJournal } from "@lsc/skills/quickbooks/post-expense-journal";
 import { requireRole, requireSession } from "../../../lib/auth";
 
 function normalizeWhitespace(value: string) {
@@ -641,6 +642,14 @@ export async function approveExpenseSubmissionAction(formData: FormData) {
   });
 
   await notifyExpenseEvent("approved", submissionId);
+
+  // Post to QuickBooks (non-blocking — postExpenseJournal never throws and
+  // always logs the attempt to qb_journal_entries, which the expense detail
+  // timeline surfaces).
+  await postExpenseJournal({
+    submissionId,
+    initiatedByUserId: session.id,
+  });
 
   revalidatePath("/tbr");
   revalidatePath("/tbr/expense-management");
