@@ -85,13 +85,61 @@ Finance stores every event (successful or not) for audit, keyed on
 
 ## Supported event types
 
+### `contract.created` / `contract.updated`
+
+Creates or updates a row in `contracts`. Legal is the source of truth for
+contract metadata; Finance stores a synced copy keyed on
+`legal_external_id`. Send this **before** any tranche events that reference
+the same contract.
+
+The receiver also creates a `sponsors_or_customers` row on the fly if one
+doesn't exist for `(companyCode, sponsorName)`, so Legal doesn't need to
+pre-register sponsors in Finance.
+
+```jsonc
+{
+  "eventId": "leg_evt_a1b2c3d4",
+  "eventType": "contract.created",
+  "occurredAt": "2026-04-29T12:00:00Z",
+  "payload": {
+    "legalExternalId": "leg_doc_0001",          // Legal's stable Document/contract id (REQUIRED)
+    "companyCode": "TBR",                        // "LSC" | "TBR" | "FSP" | "XTZ" | "XTE"
+    "contractName": "ACME 2026 Title Sponsorship",
+    "sponsorName": "ACME Beverages Inc.",        // Counterparty (REQUIRED)
+    "counterpartyType": "sponsor",                // "sponsor" | "customer" — defaults to sponsor
+    "contractStatus": "active",                   // "draft" | "active" | "completed" | "cancelled"
+    "contractValue": 200000.0,                    // Total contract value, USD
+    "currencyCode": "USD",
+    "startDate": "2026-06-01",                    // YYYY-MM-DD or null
+    "endDate": "2027-05-31",                      // YYYY-MM-DD or null
+    "isRecurring": false,
+    "billingFrequency": null,                     // optional: "monthly" | "quarterly" | etc.
+    "notes": "Multi-year title sponsorship; signed via Hellosign #abc123."
+  }
+}
+```
+
+**Response on success (200):**
+
+```json
+{ "ok": true, "status": "processed", "eventLogId": "…", "action": "inserted", "contractId": "…", "sponsorId": "…" }
+```
+
 ### `tranche.created` / `tranche.updated`
 
-Creates or updates a row in `contract_tranches`. The payload MUST identify
-the finance-side contract via `companyCode` + `contractName` — Finance
-resolves these to internal UUIDs. If the contract doesn't exist in Finance
-yet, the event is **rejected** (400) with a clear error — create the
-contract in Finance first, then retry.
+Creates or updates a row in `contract_tranches`. The payload identifies
+the parent contract one of two ways:
+
+1. **Preferred:** `contractLegalExternalId` — Legal's stable id for the
+   contract Document, which Finance has already received via a
+   `contract.created` event. This is the right path when Legal owns the
+   contract row.
+2. **Fallback:** `companyCode` + `contractName` — used when the contract
+   was created manually in Finance (legacy / one-off cases).
+
+If neither path resolves to a contract, the event is **rejected** (400).
+Always send `contract.created` for a Document before any tranche events
+that reference it.
 
 ```jsonc
 {
@@ -99,22 +147,24 @@ contract in Finance first, then retry.
   "eventType": "tranche.created",
   "occurredAt": "2026-05-12T14:30:00Z",
   "payload": {
-    "legalExternalId": "leg_tr_0001",      // Legal's stable tranche id (REQUIRED)
-    "companyCode": "TBR",                   // "LSC" | "TBR" | "FSP" | "XTZ" | "XTE"
-    "contractName": "ACME 2026 Title Sponsorship",  // Must match contracts.contract_name
+    "legalExternalId": "leg_tr_0001",         // Legal's stable tranche id (REQUIRED)
+    "contractLegalExternalId": "leg_doc_0001", // Legal's stable contract id (PREFERRED)
+    "companyCode": "TBR",                      // Required only as fallback if contractLegalExternalId is omitted
+    "contractName": "ACME 2026 Title Sponsorship", // Required only as fallback
     "trancheNumber": 1,
     "trancheLabel": "Signing fee",
-    "tranchePercentage": 25.0,              // 0..100
-    "trancheAmount": 50000.0,               // USD
-    "triggerType": "on_signing",            // on_signing | pre_event | post_event | on_milestone | on_date
-    "triggerDate": "2026-06-01",            // YYYY-MM-DD; ignored for on_signing
-    "triggerOffsetDays": 0,                 // for pre_event / post_event
+    "tranchePercentage": 25.0,                 // 0..100
+    "trancheAmount": 50000.0,                  // USD
+    "triggerType": "on_signing",               // on_signing | pre_event | post_event | on_milestone | on_date
+    "triggerDate": "2026-06-01",               // YYYY-MM-DD; ignored for on_signing
+    "triggerOffsetDays": 0,                    // for pre_event / post_event
     "notes": "Payable within 30 days of signing."
   }
 }
 ```
 
 **Response on success (200):**
+
 ```json
 { "ok": true, "status": "processed", "eventLogId": "…", "action": "inserted", "trancheId": "…" }
 ```

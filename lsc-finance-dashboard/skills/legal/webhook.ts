@@ -3,10 +3,13 @@ import "server-only";
 import crypto from "node:crypto";
 import {
   getActiveLegalApiKeyByPrefix,
+  lookupOrCreateSponsor,
   recordLegalApiKeyUse,
   resolveCompanyByCode,
   resolveContractByExternalRef,
+  resolveContractByLegalExternalId,
   upsertCapTableEntryByExternalId,
+  upsertContractByExternalId,
   upsertTrancheByExternalId,
 } from "@lsc/db";
 
@@ -273,6 +276,9 @@ export async function dispatchLegalEvent(
 ): Promise<DispatchResult> {
   try {
     switch (env.eventType) {
+      case "contract.created":
+      case "contract.updated":
+        return await handleContractUpsert(env);
       case "tranche.created":
       case "tranche.updated":
         return await handleTrancheUpsert(env);
@@ -306,6 +312,7 @@ async function handleTrancheUpsert(
 ): Promise<DispatchResult> {
   const p = env.payload;
   const legalExternalId = payloadString(p, "legalExternalId");
+  const contractLegalExternalId = payloadString(p, "contractLegalExternalId");
   const contractName = payloadString(p, "contractName");
   const companyCode = payloadString(p, "companyCode");
   const trancheNumber = Math.max(1, Math.floor(payloadNumber(p, "trancheNumber", 1)));
@@ -334,24 +341,6 @@ async function handleTrancheUpsert(
       responseBody: {},
     };
   }
-  if (!contractName) {
-    return {
-      status: "rejected",
-      targetEntityType: "contract_tranche",
-      targetEntityId: null,
-      errorMessage: "Missing payload.contractName.",
-      responseBody: {},
-    };
-  }
-  if (!companyCode) {
-    return {
-      status: "rejected",
-      targetEntityType: "contract_tranche",
-      targetEntityId: null,
-      errorMessage: "Missing payload.companyCode.",
-      responseBody: {},
-    };
-  }
   if (!triggerType || !validTriggerTypes.includes(triggerType)) {
     return {
       status: "rejected",
@@ -362,31 +351,53 @@ async function handleTrancheUpsert(
     };
   }
 
-  const companyId = await resolveCompanyByCode(companyCode);
-  if (!companyId) {
-    return {
-      status: "rejected",
-      targetEntityType: "contract_tranche",
-      targetEntityId: null,
-      errorMessage: `No company with code "${companyCode}".`,
-      responseBody: {},
-    };
+  // Resolve the contract: prefer Legal's stable id (set when contract.* was
+  // already synced), fall back to (companyCode, contractName) for legacy
+  // contracts created directly in Finance.
+  let contract: { id: string; companyId: string; sponsorOrCustomerId: string } | null = null;
+
+  if (contractLegalExternalId) {
+    contract = await resolveContractByLegalExternalId(contractLegalExternalId);
   }
-  const contract = await resolveContractByExternalRef(companyId, contractName);
+
   if (!contract) {
-    return {
-      status: "rejected",
-      targetEntityType: "contract_tranche",
-      targetEntityId: null,
-      errorMessage: `No contract named "${contractName}" under company "${companyCode}". Create the contract first in Finance.`,
-      responseBody: {},
-    };
+    if (!companyCode || !contractName) {
+      return {
+        status: "rejected",
+        targetEntityType: "contract_tranche",
+        targetEntityId: null,
+        errorMessage:
+          "Could not resolve contract. Provide contractLegalExternalId (preferred), or companyCode + contractName as a fallback.",
+        responseBody: {},
+      };
+    }
+    const companyId = await resolveCompanyByCode(companyCode);
+    if (!companyId) {
+      return {
+        status: "rejected",
+        targetEntityType: "contract_tranche",
+        targetEntityId: null,
+        errorMessage: `No company with code "${companyCode}".`,
+        responseBody: {},
+      };
+    }
+    const byName = await resolveContractByExternalRef(companyId, contractName);
+    if (!byName) {
+      return {
+        status: "rejected",
+        targetEntityType: "contract_tranche",
+        targetEntityId: null,
+        errorMessage: `No contract named "${contractName}" under company "${companyCode}". Send a contract.created event from Legal first, or create the contract manually in Finance.`,
+        responseBody: {},
+      };
+    }
+    contract = { id: byName.id, companyId, sponsorOrCustomerId: byName.sponsorOrCustomerId };
   }
 
   const result = await upsertTrancheByExternalId({
     legalExternalId,
     contractId: contract.id,
-    companyId,
+    companyId: contract.companyId,
     sponsorOrCustomerId: contract.sponsorOrCustomerId,
     trancheNumber,
     trancheLabel,
@@ -409,6 +420,122 @@ async function handleTrancheUpsert(
     targetEntityId: result.id,
     errorMessage: null,
     responseBody: { action: result.action, trancheId: result.id },
+  };
+}
+
+async function handleContractUpsert(
+  env: LegalEventEnvelope
+): Promise<DispatchResult> {
+  const p = env.payload;
+  const legalExternalId = payloadString(p, "legalExternalId");
+  const companyCode = payloadString(p, "companyCode");
+  const contractName = payloadString(p, "contractName");
+  const sponsorName = payloadString(p, "sponsorName");
+  const contractStatusRaw = payloadString(p, "contractStatus") ?? "draft";
+  const contractValue = payloadNumber(p, "contractValue", 0);
+  const currencyCode = payloadString(p, "currencyCode") ?? "USD";
+  const startDate = payloadString(p, "startDate");
+  const endDate = payloadString(p, "endDate");
+  const isRecurring = p.isRecurring === true;
+  const billingFrequency = payloadString(p, "billingFrequency");
+  const counterpartyType =
+    payloadString(p, "counterpartyType") === "customer" ? "customer" : "sponsor";
+  const notes = payloadString(p, "notes");
+
+  const validStatuses = ["draft", "active", "completed", "cancelled"];
+  if (!legalExternalId) {
+    return {
+      status: "rejected",
+      targetEntityType: "contract",
+      targetEntityId: null,
+      errorMessage: "Missing payload.legalExternalId.",
+      responseBody: {},
+    };
+  }
+  if (!companyCode) {
+    return {
+      status: "rejected",
+      targetEntityType: "contract",
+      targetEntityId: null,
+      errorMessage: "Missing payload.companyCode.",
+      responseBody: {},
+    };
+  }
+  if (!contractName) {
+    return {
+      status: "rejected",
+      targetEntityType: "contract",
+      targetEntityId: null,
+      errorMessage: "Missing payload.contractName.",
+      responseBody: {},
+    };
+  }
+  if (!sponsorName) {
+    return {
+      status: "rejected",
+      targetEntityType: "contract",
+      targetEntityId: null,
+      errorMessage:
+        "Missing payload.sponsorName. Finance creates a sponsors_or_customers row keyed on (companyCode, sponsorName) — provide the counterparty name from Legal.",
+      responseBody: {},
+    };
+  }
+  if (!validStatuses.includes(contractStatusRaw)) {
+    return {
+      status: "rejected",
+      targetEntityType: "contract",
+      targetEntityId: null,
+      errorMessage: `Invalid contractStatus "${contractStatusRaw}". Must be one of ${validStatuses.join(", ")}.`,
+      responseBody: {},
+    };
+  }
+
+  const companyId = await resolveCompanyByCode(companyCode);
+  if (!companyId) {
+    return {
+      status: "rejected",
+      targetEntityType: "contract",
+      targetEntityId: null,
+      errorMessage: `No company with code "${companyCode}".`,
+      responseBody: {},
+    };
+  }
+
+  const sponsorId = await lookupOrCreateSponsor(
+    companyId,
+    sponsorName,
+    counterpartyType
+  );
+
+  const result = await upsertContractByExternalId({
+    legalExternalId,
+    companyId,
+    sponsorOrCustomerId: sponsorId,
+    contractName,
+    contractStatus: contractStatusRaw as
+      | "draft"
+      | "active"
+      | "completed"
+      | "cancelled",
+    contractValue,
+    currencyCode,
+    startDate,
+    endDate,
+    isRecurring,
+    billingFrequency,
+    notes,
+  });
+
+  return {
+    status: "processed",
+    targetEntityType: "contract",
+    targetEntityId: result.id,
+    errorMessage: null,
+    responseBody: {
+      action: result.action,
+      contractId: result.id,
+      sponsorId,
+    },
   };
 }
 

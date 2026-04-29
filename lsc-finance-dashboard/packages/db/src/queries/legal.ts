@@ -510,3 +510,153 @@ export async function resolveContractByExternalRef(
     ? { id: rows[0].id, sponsorOrCustomerId: rows[0].sponsor_or_customer_id }
     : null;
 }
+
+// ──────────────────────────────────────────────────────────────
+// contracts upsert (Legal sources contracts; Finance receives them)
+// ──────────────────────────────────────────────────────────────
+
+function normalizeSponsorName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * Look up a sponsors_or_customers row by (company_id, normalized_name);
+ * if not found, insert one. Used at contract.created time when Legal
+ * sends a sponsor name we may not have on file yet.
+ */
+export async function lookupOrCreateSponsor(
+  companyId: string,
+  sponsorName: string,
+  counterpartyType: "sponsor" | "customer" = "sponsor"
+): Promise<string> {
+  const normalized = normalizeSponsorName(sponsorName);
+  const existing = await queryRowsAdmin<{ id: string }>(
+    `select id::text from sponsors_or_customers
+     where company_id = $1 and normalized_name = $2
+     limit 1`,
+    [companyId, normalized]
+  );
+  if (existing[0]) return existing[0].id;
+
+  const inserted = await queryRowsAdmin<{ id: string }>(
+    `insert into sponsors_or_customers (company_id, name, normalized_name, counterparty_type)
+     values ($1, $2, $3, $4)
+     returning id::text`,
+    [companyId, sponsorName.trim(), normalized, counterpartyType]
+  );
+  return inserted[0].id;
+}
+
+export type UpsertContractByExternalIdInput = {
+  legalExternalId: string;
+  companyId: string;
+  sponsorOrCustomerId: string;
+  contractName: string;
+  contractStatus: "draft" | "active" | "completed" | "cancelled";
+  contractValue: number;
+  currencyCode: string;
+  startDate: string | null;
+  endDate: string | null;
+  isRecurring: boolean;
+  billingFrequency: string | null;
+  notes: string | null;
+};
+
+export async function upsertContractByExternalId(
+  input: UpsertContractByExternalIdInput
+): Promise<{ id: string; action: "inserted" | "updated" }> {
+  const existing = await queryRowsAdmin<{ id: string }>(
+    `select id::text from contracts where legal_external_id = $1 limit 1`,
+    [input.legalExternalId]
+  );
+  if (existing[0]) {
+    await executeAdmin(
+      `update contracts set
+         company_id = $2,
+         sponsor_or_customer_id = $3,
+         contract_name = $4,
+         contract_status = $5::contract_status,
+         contract_value = $6::numeric,
+         currency_code = $7,
+         start_date = $8::date,
+         end_date = $9::date,
+         is_recurring = $10,
+         billing_frequency = $11,
+         notes = $12,
+         updated_at = now()
+       where id = $1`,
+      [
+        existing[0].id,
+        input.companyId,
+        input.sponsorOrCustomerId,
+        input.contractName,
+        input.contractStatus,
+        input.contractValue,
+        input.currencyCode,
+        input.startDate,
+        input.endDate,
+        input.isRecurring,
+        input.billingFrequency,
+        input.notes,
+      ]
+    );
+    return { id: existing[0].id, action: "updated" };
+  }
+  const rows = await queryRowsAdmin<{ id: string }>(
+    `insert into contracts (
+       legal_external_id, company_id, sponsor_or_customer_id, contract_name,
+       contract_status, contract_value, currency_code,
+       start_date, end_date, is_recurring, billing_frequency, notes
+     )
+     values (
+       $1, $2, $3, $4,
+       $5::contract_status, $6::numeric, $7,
+       $8::date, $9::date, $10, $11, $12
+     )
+     returning id::text`,
+    [
+      input.legalExternalId,
+      input.companyId,
+      input.sponsorOrCustomerId,
+      input.contractName,
+      input.contractStatus,
+      input.contractValue,
+      input.currencyCode,
+      input.startDate,
+      input.endDate,
+      input.isRecurring,
+      input.billingFrequency,
+      input.notes,
+    ]
+  );
+  return { id: rows[0].id, action: "inserted" };
+}
+
+/**
+ * Resolve a contract by its Legal-side stable id. Used by tranche events
+ * so a tranche referencing the same Legal contract finds it without a
+ * separate name match.
+ */
+export async function resolveContractByLegalExternalId(
+  legalExternalId: string
+): Promise<{ id: string; companyId: string; sponsorOrCustomerId: string } | null> {
+  if (getBackend() !== "database") return null;
+  const rows = await queryRowsAdmin<{
+    id: string;
+    company_id: string;
+    sponsor_or_customer_id: string;
+  }>(
+    `select id::text, company_id::text, sponsor_or_customer_id::text
+     from contracts
+     where legal_external_id = $1
+     limit 1`,
+    [legalExternalId]
+  );
+  return rows[0]
+    ? {
+        id: rows[0].id,
+        companyId: rows[0].company_id,
+        sponsorOrCustomerId: rows[0].sponsor_or_customer_id,
+      }
+    : null;
+}
