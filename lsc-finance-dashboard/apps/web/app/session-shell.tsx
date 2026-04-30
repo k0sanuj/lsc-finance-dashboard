@@ -9,6 +9,7 @@ import { ToastNotice } from "./components/toast-notice";
 import { CommandPalette } from "./components/command-palette";
 import { PALETTE_COMMANDS } from "./components/command-list";
 import { CmdKTrigger } from "./components/cmdk-trigger";
+import { ENTITY_REGISTRY, getEntityMetadata, normalizeCompanyCode } from "./lib/entities";
 
 type NavSubLink = {
   href: Route;
@@ -64,11 +65,53 @@ const COMPANY_SCOPED_ROUTES = [
 /** Map a company code in URL to sidebar section label */
 function companyCodeToLabel(code: string | undefined | null): string | null {
   if (!code) return null;
-  const upper = code.toUpperCase();
-  if (upper === "FSP") return "FSP";
-  if (upper === "XTZ" || upper === "XTE") return "XTZ India";
-  if (upper === "TBR" || upper === "LSC") return "TBR";
-  return null;
+  return getEntityMetadata(code).shortLabel;
+}
+
+function companyCodeToHref(code: string | undefined | null): Route {
+  const normalized = normalizeCompanyCode(code, "TBR");
+  return ENTITY_REGISTRY[normalized].homeHref;
+}
+
+function getLscNav(): CompanyNav {
+  return {
+    href: "/",
+    label: "LSC",
+    roles: ALL_ROLES,
+    sections: [
+      {
+        label: "Command Center",
+        links: [
+          { href: "/costs/LSC" as Route, label: "Costs", roles: [...ALL_ADMIN, "viewer"] },
+          { href: "/payments/LSC" as Route, label: "Payments", roles: ALL_ADMIN },
+          { href: "/receivables/LSC" as Route, label: "Receivables", roles: ALL_ADMIN },
+          { href: "/documents/LSC" as Route, label: "Documents", roles: ALL_ADMIN },
+          { href: "/commercial-goals/LSC" as Route, label: "Commercial Goals", roles: ALL_ROLES },
+        ],
+      },
+      {
+        label: "Shared Finance",
+        links: [
+          { href: "/subscriptions" as Route, label: "Subscriptions", roles: [...ALL_ADMIN, "viewer"] },
+          { href: "/vendors" as Route, label: "Vendors", roles: [...ALL_ADMIN, "viewer"] },
+          { href: "/treasury" as Route, label: "Treasury & Cash Flow", roles: ALL_ADMIN },
+          { href: "/deal-pipeline" as Route, label: "Deal Pipeline", roles: ALL_ADMIN },
+          { href: "/event-budgets" as Route, label: "Event Budgets", roles: ALL_ADMIN },
+        ],
+      },
+      {
+        label: "Control",
+        links: [
+          { href: "/ai-ingest" as Route, label: "AI Data Ingestion", roles: ALL_ADMIN },
+          { href: "/ai-analysis" as Route, label: "AI Analysis", roles: ALL_ADMIN },
+          { href: "/cap-table" as Route, label: "Cap Table", roles: ALL_ADMIN },
+          { href: "/litigation" as Route, label: "Litigation & Compliance", roles: ALL_ADMIN },
+          { href: "/tax-filings" as Route, label: "Tax & Filing", roles: ALL_ADMIN },
+          { href: "/arena-ads" as Route, label: "Arena & Ads", roles: ALL_ADMIN },
+        ],
+      },
+    ],
+  };
 }
 
 function getTbrNav(): CompanyNav {
@@ -312,19 +355,19 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     if (labels[sub]) crumbs.push({ label: labels[sub] });
   } else if (pathname.startsWith("/costs/")) {
     const c = companyCodeToLabel(pathname.slice("/costs/".length).split("/")[0]) ?? "TBR";
-    crumbs.push({ label: c, href: c === "FSP" ? "/fsp" : c === "XTZ India" ? "/gig-workers" : "/tbr" }, { label: "Costs" });
+    crumbs.push({ label: c, href: companyCodeToHref(pathname.slice("/costs/".length).split("/")[0]) }, { label: "Costs" });
   } else if (pathname.startsWith("/payments/")) {
     const c = companyCodeToLabel(pathname.slice("/payments/".length).split("/")[0]) ?? "TBR";
-    crumbs.push({ label: c, href: c === "FSP" ? "/fsp" : c === "XTZ India" ? "/gig-workers" : "/tbr" }, { label: "Payments" });
+    crumbs.push({ label: c, href: companyCodeToHref(pathname.slice("/payments/".length).split("/")[0]) }, { label: "Payments" });
   } else if (pathname.startsWith("/receivables/")) {
     const c = companyCodeToLabel(pathname.slice("/receivables/".length).split("/")[0]) ?? "TBR";
-    crumbs.push({ label: c, href: c === "FSP" ? "/fsp" : c === "XTZ India" ? "/gig-workers" : "/tbr" }, { label: "Receivables" });
+    crumbs.push({ label: c, href: companyCodeToHref(pathname.slice("/receivables/".length).split("/")[0]) }, { label: "Receivables" });
   } else if (pathname.startsWith("/documents/")) {
     const c = companyCodeToLabel(pathname.slice("/documents/".length).split("/")[0]) ?? "TBR";
-    crumbs.push({ label: c, href: c === "FSP" ? "/fsp" : c === "XTZ India" ? "/gig-workers" : "/tbr" }, { label: "Documents" });
+    crumbs.push({ label: c, href: companyCodeToHref(pathname.slice("/documents/".length).split("/")[0]) }, { label: "Documents" });
   } else if (pathname.startsWith("/commercial-goals/")) {
     const c = companyCodeToLabel(pathname.slice("/commercial-goals/".length).split("/")[0]) ?? "TBR";
-    crumbs.push({ label: c, href: c === "FSP" ? "/fsp" : c === "XTZ India" ? "/gig-workers" : "/tbr" }, { label: "Commercial Goals" });
+    crumbs.push({ label: c, href: companyCodeToHref(pathname.slice("/commercial-goals/".length).split("/")[0]) }, { label: "Commercial Goals" });
   } else if (pathname.startsWith("/subscriptions")) {
     crumbs.push({ label: "Finance", href: "/" }, { label: "Subscriptions" });
   } else if (pathname.startsWith("/vendors")) {
@@ -426,7 +469,7 @@ function SessionShellInner({ children, user }: SessionShellProps) {
     const isSharedPeopleRoute = SHARED_PEOPLE_ROUTES.some((r) => pathname.startsWith(r));
     if (isSharedPeopleRoute) {
       const companyParam = searchParams.get("company");
-      const label = companyCodeToLabel(companyParam) ?? "TBR";
+      const label = companyCodeToLabel(companyParam) ?? "XTZ India";
       setExpandedCompany(label);
       return;
     }
@@ -447,9 +490,16 @@ function SessionShellInner({ children, user }: SessionShellProps) {
       return;
     }
 
-    // 5. TBR-exclusive routes (these do NOT have /[company] segments)
+    // 5. TBR-exclusive routes
     if (
-      pathname.startsWith("/tbr") ||
+      pathname.startsWith("/tbr")
+    ) {
+      setExpandedCompany("TBR");
+      return;
+    }
+
+    // 6. Shared finance/control routes live under LSC.
+    if (
       pathname.startsWith("/subscriptions") ||
       pathname.startsWith("/vendors") ||
       pathname.startsWith("/cap-table") ||
@@ -462,7 +512,7 @@ function SessionShellInner({ children, user }: SessionShellProps) {
       pathname.startsWith("/ai-ingest") ||
       pathname.startsWith("/ai-analysis")
     ) {
-      setExpandedCompany("TBR");
+      setExpandedCompany("LSC");
       return;
     }
     // Otherwise: leave current expansion alone (don't force-close on Portfolio pages)
@@ -490,7 +540,7 @@ function SessionShellInner({ children, user }: SessionShellProps) {
   // Build company navs based on role
   const companies: CompanyNav[] = role === "team_member"
     ? [getTeamMemberNav()]
-    : [getTbrNav(), getFspNav(), getXtzNav()];
+    : [getLscNav(), getTbrNav(), getFspNav(), getXtzNav()];
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";

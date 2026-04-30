@@ -14,8 +14,16 @@ import {
   deleteSubscriptionAction
 } from "./actions";
 import { BillUploader } from "../components/bill-uploader";
+import {
+  formatEntityShortLabel,
+  getCompanyOptions,
+  normalizeCompanyCode,
+  VISIBLE_ENTITY_ORDER,
+  type VisibleEntityCode
+} from "../lib/entities";
 
-const COMPANIES = ["LSC", "TBR", "XTZ", "XTE", "FSP"];
+const COMPANIES = VISIBLE_ENTITY_ORDER;
+const COMPANY_OPTIONS = getCompanyOptions(COMPANIES);
 
 const CATEGORIES = [
   "infrastructure",
@@ -63,17 +71,17 @@ export default async function SubscriptionsPage({ searchParams }: SubscriptionsP
 
   const activeCount = subs.filter((s) => s.status === "active").length;
   const categoryMax = Math.max(1, ...summary.byCategory.map((c) => c.monthlyTotal));
-  const entityMax = Math.max(1, ...summary.byEntity.map((e) => e.monthlyTotal));
 
   // Group by entity for the org-wide dashboard breakdown
-  const byEntity = COMPANIES.map((code) => {
-    const list = subs.filter((s) => s.companyCode === code);
+  const byEntity = COMPANIES.map((code: VisibleEntityCode) => {
+    const list = subs.filter((s) => normalizeCompanyCode(s.companyCode, "LSC") === code);
     const monthly = list.reduce(
       (sum, s) => sum + Number(String(s.monthlyCost).replace(/[^0-9.-]/g, "")),
       0
     );
     return { code, count: list.length, monthly, list };
   }).filter((g) => g.count > 0);
+  const entityMax = Math.max(1, ...byEntity.map((e) => e.monthly));
 
   return (
     <div className="page-grid">
@@ -183,21 +191,21 @@ export default async function SubscriptionsPage({ searchParams }: SubscriptionsP
               <span className="section-kicker">Entity breakdown</span>
               <h3>Monthly spend by entity</h3>
             </div>
-            <span className="pill">{summary.byEntity.length} entities</span>
+            <span className="pill">{byEntity.length} entities</span>
           </div>
           <div className="chart-list">
-            {summary.byEntity.length > 0 ? (
-              summary.byEntity.map((ent) => (
-                <div className="chart-row" key={ent.companyCode}>
+            {byEntity.length > 0 ? (
+              byEntity.map((ent) => (
+                <div className="chart-row" key={ent.code}>
                   <div className="chart-meta">
-                    <strong>{ent.companyCode}</strong>
-                    <span>{formatCurrency(ent.monthlyTotal)}</span>
+                    <strong>{formatEntityShortLabel(ent.code)}</strong>
+                    <span>{formatCurrency(ent.monthly)}</span>
                   </div>
                   <div className="chart-track">
                     <div
                       className="chart-fill secondary"
                       style={{
-                        width: `${Math.max(8, (ent.monthlyTotal / entityMax) * 100)}%`
+                        width: `${Math.max(8, (ent.monthly / entityMax) * 100)}%`
                       }}
                     />
                   </div>
@@ -256,9 +264,9 @@ export default async function SubscriptionsPage({ searchParams }: SubscriptionsP
             <label className="field">
               <span>Owning entity (who pays)</span>
               <select name="companyCode" defaultValue="LSC" required>
-                {COMPANIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                {COMPANY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -323,7 +331,7 @@ export default async function SubscriptionsPage({ searchParams }: SubscriptionsP
             <div>
               <span className="section-kicker">{group.code}</span>
               <h3>
-                {group.code} software stack
+                {formatEntityShortLabel(group.code)} software stack
               </h3>
             </div>
             <span className="badge">

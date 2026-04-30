@@ -4,6 +4,7 @@ import { analyzeDocumentWithGemini, type GeminiAnalyzerContext } from "../../doc
 import { storeUploadedDocument } from "@lsc/db";
 import crypto from "node:crypto";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
+import { getEntityMetadata, normalizeCompanyCode } from "../../lib/entities";
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +13,8 @@ export async function POST(request: Request) {
 
     const file = formData.get("document") as File | null;
     const note = (formData.get("documentNote") as string) ?? "";
-    const companyCode = (formData.get("companyCode") as string) ?? "TBR";
+    const companyCode = normalizeCompanyCode((formData.get("companyCode") as string) ?? "TBR", "TBR");
+    const company = getEntityMetadata(companyCode);
     const workflowContext = (formData.get("workflowContext") as string) ?? "invoice-hub";
 
     if (!file || file.size === 0) {
@@ -59,7 +61,7 @@ export async function POST(request: Request) {
     // Build Gemini context
     const context: GeminiAnalyzerContext = {
       analysisVersion: "2026-03-21-invoice-hub-v2",
-      company: { code: companyCode, name: companyCode === "TBR" ? "Team Blue Rising" : "FSP" },
+      company: { code: companyCode, name: company.label },
       actor: { role: session.role },
       workflow: {
         raw: workflowContext,

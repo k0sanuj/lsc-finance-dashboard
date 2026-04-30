@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
 import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
 import { requireRole, requireSession } from "../../lib/auth";
+import { normalizeCompanyCode } from "../lib/entities";
 
 function clean(value: FormDataEntryValue | null): string {
   return String(value ?? "").trim();
@@ -27,7 +28,7 @@ export async function addSubscriptionAction(formData: FormData): Promise<void> {
   const session = await requireSession();
   const name = clean(formData.get("name"));
   const provider = clean(formData.get("provider"));
-  const companyCode = clean(formData.get("companyCode"));
+  const companyCode = normalizeCompanyCode(clean(formData.get("companyCode")), "LSC");
   const monthlyCost = num(formData.get("monthlyCost"));
   const billingCycle = clean(formData.get("billingCycle")) || "monthly";
   const category = clean(formData.get("category")) || "other";

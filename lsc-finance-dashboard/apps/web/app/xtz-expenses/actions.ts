@@ -6,6 +6,7 @@ import type { Route } from "next";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
 import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
 import { requireRole, requireSession } from "../../lib/auth";
+import { normalizeCompanyCode } from "../lib/entities";
 
 function norm(v: string) { return v.replace(/\s+/g, " ").trim(); }
 
@@ -18,8 +19,8 @@ export async function submitExpenseAction(formData: FormData) {
   const session = await requireSession();
 
   const title = norm(String(formData.get("title") ?? ""));
-  const billingEntityCode = norm(String(formData.get("billingEntity") ?? "XTZ"));
-  const reimbursingEntityCode = norm(String(formData.get("reimbursingEntity") ?? "XTZ"));
+  const billingEntityCode = normalizeCompanyCode(norm(String(formData.get("billingEntity") ?? "XTZ")), "XTZ");
+  const reimbursingEntityCode = normalizeCompanyCode(norm(String(formData.get("reimbursingEntity") ?? "XTZ")), "XTZ");
   const taggedBrand = norm(String(formData.get("taggedBrand") ?? ""));
   const operatorNote = norm(String(formData.get("operatorNote") ?? ""));
   const merchantName = norm(String(formData.get("merchantName") ?? ""));

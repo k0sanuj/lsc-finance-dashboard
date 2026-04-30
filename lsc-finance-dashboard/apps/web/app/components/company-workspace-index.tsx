@@ -4,7 +4,7 @@ import type { SharedCompanyCode } from "../lib/shared-workspace";
 import { buildPageHref } from "../lib/shared-workspace";
 
 type CompanySnapshot = {
-  code: "LSC" | "TBR" | "FSP";
+  code: "LSC" | "TBR" | "FSP" | "XTZ";
   name: string;
   revenue: string;
   cost: string;
@@ -46,7 +46,7 @@ export function CompanyWorkspaceIndex({
   description
 }: CompanyWorkspaceIndexProps) {
   const indexedCompanies = companySnapshots.filter(
-    (company) => company.code === "TBR" || company.code === "FSP"
+    (company) => company.code === "LSC" || company.code === "TBR" || company.code === "FSP" || company.code === "XTZ"
   );
 
   return (

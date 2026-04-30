@@ -18,9 +18,11 @@ import { DocumentAnalysisSummary } from "../../components/document-analysis-summ
 import {
   buildCompanyPath,
   formatDocumentWorkflowForSelection,
+  formatSharedCompanyName,
   isSharedCompanyCode
 } from "../../lib/shared-workspace";
 import { formatWorkflowContextLabel } from "../../lib/workflow-labels";
+import type { VisibleEntityCode } from "../../lib/entities";
 
 type DocumentsCompanyPageProps = {
   params: Promise<{
@@ -52,7 +54,32 @@ type QueueRow = {
   updateSummary?: string;
 };
 
-const workstreamsByCompany = {
+const workstreamsByCompany: Record<VisibleEntityCode, readonly {
+  key: "expense-support" | "vendor-invoices" | "commercial-docs";
+  title: string;
+  description: string;
+  badge: string;
+}[]> = {
+  LSC: [
+    {
+      key: "vendor-invoices",
+      title: "Vendor invoices",
+      description: "Dubai entity payables and shared operating bills.",
+      badge: "Step 1"
+    },
+    {
+      key: "commercial-docs",
+      title: "Commercial documents",
+      description: "Holding company contracts, source documents, and approvals.",
+      badge: "Step 2"
+    },
+    {
+      key: "expense-support",
+      title: "Expense support",
+      description: "Shared expense receipts and reimbursement support.",
+      badge: "Step 3"
+    }
+  ],
   TBR: [
     {
       key: "expense-support",
@@ -92,10 +119,31 @@ const workstreamsByCompany = {
       description: "Operational expense documents.",
       badge: "Step 3"
     }
+  ],
+  XTZ: [
+    {
+      key: "vendor-invoices",
+      title: "Vendor invoices",
+      description: "XTZ India payroll, contractor, and vendor support.",
+      badge: "Step 1"
+    },
+    {
+      key: "expense-support",
+      title: "Expense support",
+      description: "Receipts, reimbursements, and payout evidence.",
+      badge: "Step 2"
+    },
+    {
+      key: "commercial-docs",
+      title: "Commercial documents",
+      description: "India entity source documents and service agreements.",
+      badge: "Step 3"
+    }
   ]
-} as const;
+};
 
-function getAnalyzerConfig(company: "TBR" | "FSP", view: string) {
+function getAnalyzerConfig(company: VisibleEntityCode, view: string) {
+  const companyName = formatSharedCompanyName(company);
   if (company === "TBR" && view === "expense-support") {
     return {
       title: "Analyze TBR expense support",
@@ -106,29 +154,29 @@ function getAnalyzerConfig(company: "TBR" | "FSP", view: string) {
 
   if (view === "vendor-invoices") {
     return {
-      title: `Analyze ${company} vendor invoice`,
+      title: `Analyze ${companyName} vendor invoice`,
       description: "Upload a vendor or payable invoice and keep it inside the invoice-support workflow.",
       notePlaceholder: "Example: E1 payable invoice, platform vendor bill, or support invoice with due date."
     };
   }
 
   return {
-    title: `Analyze ${company} commercial document`,
+    title: `Analyze ${companyName} commercial document`,
     description: "Upload a contract, prize statement, or other revenue-supporting finance document.",
     notePlaceholder: "Example: sponsorship contract, prize confirmation, or commercial term sheet."
   };
 }
 
-function formatWorkflowHeading(company: "TBR" | "FSP", view: string) {
+function formatWorkflowHeading(company: VisibleEntityCode, view: string) {
   if (company === "TBR" && view === "expense-support") {
     return "Expense support for TBR operations";
   }
 
   if (view === "vendor-invoices") {
-    return company === "TBR" ? "Vendor and E1 invoice support" : "Platform bill and invoice support";
+    return company === "TBR" ? "Vendor and E1 invoice support" : `${formatSharedCompanyName(company)} invoice support`;
   }
 
-  return company === "TBR" ? "Commercial source support" : "Commercial launch support";
+  return company === "TBR" ? "Commercial source support" : `${formatSharedCompanyName(company)} source support`;
 }
 
 export default async function DocumentsCompanyPage({
@@ -188,10 +236,10 @@ export default async function DocumentsCompanyPage({
       <CompanyWorkspaceShell
         basePath="/documents"
         companyCode={companyCode}
-        description={`${companyCode} document workspace across workflow categories.`}
+        description={`${formatSharedCompanyName(companyCode)} document workspace across workflow categories.`}
         eyebrow={`${companyCode} documents`}
         selectedView={selectedView}
-        title={`${companyCode === "TBR" ? "Team Blue Rising" : "Future of Sports"} document workspace`}
+        title={`${formatSharedCompanyName(companyCode)} document workspace`}
         workstreams={companyWorkstreams}
       />
 

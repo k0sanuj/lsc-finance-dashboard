@@ -1,11 +1,14 @@
-export type SharedCompanyCode = "TBR" | "FSP";
+import type { VisibleEntityCode } from "./entities";
+import { formatEntityLabel, isVisibleEntityCode, normalizeCompanyCode } from "./entities";
+
+export type SharedCompanyCode = VisibleEntityCode;
 
 export function getSelectedSharedCompany(value?: string): SharedCompanyCode {
-  return value === "FSP" ? "FSP" : "TBR";
+  return normalizeCompanyCode(value, "TBR");
 }
 
 export function isSharedCompanyCode(value?: string): value is SharedCompanyCode {
-  return value === "TBR" || value === "FSP";
+  return isVisibleEntityCode(value);
 }
 
 export function buildCompanyPath(
@@ -22,7 +25,7 @@ export function buildCompanyPath(
 }
 
 export function formatSharedCompanyName(companyCode: SharedCompanyCode) {
-  return companyCode === "TBR" ? "Team Blue Rising" : "Future of Sports";
+  return formatEntityLabel(companyCode);
 }
 
 export function buildPageHref(

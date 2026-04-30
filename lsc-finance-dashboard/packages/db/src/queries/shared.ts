@@ -11,7 +11,7 @@ export type OverviewMetric = {
 };
 
 export type EntitySnapshotRow = {
-  code: "LSC" | "TBR" | "FSP";
+  code: "LSC" | "TBR" | "FSP" | "XTZ";
   name: string;
   revenue: string;
   cost: string;
@@ -50,7 +50,7 @@ export type TotalsAccumulator = {
 };
 
 export type EntitySnapshotSource = {
-  company_code: "LSC" | "TBR" | "FSP";
+  company_code: "LSC" | "TBR" | "FSP" | "XTZ";
   company_name: string;
   recognized_revenue: string;
   approved_expenses: string;

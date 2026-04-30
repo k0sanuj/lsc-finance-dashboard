@@ -43,7 +43,7 @@ export const SAYAN_BENEFICIARY = {
   }
 } as const;
 
-// XTE as an issuer (for invoices XTE sends TO individuals/companies like Yadav Jani)
+// Dubai LSC entity as an issuer (for invoices sent to individuals/companies like Yadav Jani).
 export const XTE_ISSUER = {
   legalName: "XTZ Esports Tech Ltd",
   address: "Unit 208, 209, Level 1\nGate Avenue – South Zone\nDubai International Financial Centre\nDubai, UAE",
@@ -56,6 +56,9 @@ export const XTE_ISSUER = {
     swift: "EBILAEAD"
   }
 } as const;
+
+export const LSC_DUBAI_RECIPIENT = XTE_RECIPIENT;
+export const LSC_DUBAI_ISSUER = XTE_ISSUER;
 
 export type XtzInvoiceSection =
   | "payroll"
@@ -491,4 +494,3 @@ export async function getSoftwareExpenses(
     status: r.status
   }));
 }
-

@@ -17,7 +17,7 @@ import { DocumentAnalyzerPanel } from "../../components/document-analyzer-panel"
 import { DocumentAnalysisSummary } from "../../components/document-analysis-summary";
 import { ModalLauncher } from "../../components/modal-launcher";
 import { requireRole } from "../../../lib/auth";
-import { buildCompanyPath, isSharedCompanyCode } from "../../lib/shared-workspace";
+import { buildCompanyPath, formatSharedCompanyName, isSharedCompanyCode } from "../../lib/shared-workspace";
 import { formatWorkflowContextLabel } from "../../lib/workflow-labels";
 
 type CostCompanyPageProps = {
@@ -94,9 +94,10 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
   const status = pageParams?.status ?? null;
   const message = pageParams?.message ?? null;
 
+  const costInsightCompany = companyCode === "FSP" ? "FSP" : "TBR";
   const [entitySnapshots, costInsights, seasons] = await Promise.all([
     getEntitySnapshots(),
-    getCostInsights(companyCode),
+    getCostInsights(costInsightCompany),
     companyCode === "TBR" ? getTbrSeasonSummaries() : Promise.resolve([])
   ]);
 
@@ -105,16 +106,16 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
   const selectedSeasonSummary =
     seasons.find((season) => season.seasonYear === selectedSeason) ?? seasons.at(-1) ?? null;
 
-  if (companyCode === "FSP") {
+  if (companyCode !== "TBR") {
     return (
       <div className="page-grid">
         <CompanyWorkspaceShell
           basePath="/costs"
           companyCode={companyCode}
-          description="FSP cost workspace — no live costs yet."
-          eyebrow="FSP costs"
+          description={`${formatSharedCompanyName(companyCode)} cost workspace.`}
+          eyebrow={`${companyCode} costs`}
           selectedView={selectedView}
-          title="Future of Sports cost workspace"
+          title={`${formatSharedCompanyName(companyCode)} cost workspace`}
           workstreams={workstreams}
         />
 
@@ -123,7 +124,7 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
             <div className="card-title-row">
               <div>
                 <span className="section-kicker">Selected company</span>
-                <h3>FSP costs will appear once operating data exists</h3>
+                <h3>{formatSharedCompanyName(companyCode)} cost records will appear once canonical costs exist</h3>
               </div>
               <span className="badge">Placeholder</span>
             </div>

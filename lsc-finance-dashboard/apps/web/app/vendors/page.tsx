@@ -4,13 +4,14 @@ import { EmptyState } from "../components/empty-state";
 import { RowHighlight } from "../components/row-highlight";
 import { SubmitButton } from "../components/submit-button";
 import { addVendorAction, deleteVendorAction } from "./actions";
+import { getCompanyOptions, VISIBLE_ENTITY_ORDER } from "../lib/entities";
 
 const VENDOR_TYPES = [
   "production_partner", "venue", "saas", "service_provider",
   "equipment", "catering", "travel", "legal", "other"
 ];
 
-const COMPANIES = ["LSC", "TBR", "XTZ", "XTE", "FSP"];
+const COMPANY_OPTIONS = getCompanyOptions(VISIBLE_ENTITY_ORDER);
 
 function statusSignal(status: string): string {
   switch (status) {
@@ -87,8 +88,8 @@ export default async function VendorsPage() {
               <span>Linked entity</span>
               <select name="companyCode" defaultValue="XTZ">
                 <option value="">None</option>
-                {COMPANIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                {COMPANY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
             </label>
