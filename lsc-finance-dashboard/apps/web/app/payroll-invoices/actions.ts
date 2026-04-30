@@ -8,11 +8,12 @@ import {
   queryRowsAdmin,
   convertCurrency,
   XTZ_ISSUER,
-  XTE_RECIPIENT,
-  XTE_ISSUER
+  LSC_DUBAI_RECIPIENT,
+  LSC_DUBAI_ISSUER
 } from "@lsc/db";
 import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
 import { requireRole, requireSession } from "../../lib/auth";
+import { normalizeCompanyCode } from "../lib/entities";
 
 function redirectTo(
   status: "success" | "error",
@@ -43,9 +44,10 @@ function getMonth(formData: FormData): string {
 }
 
 async function getCompanyIdByCode(code: string): Promise<string | null> {
+  const normalizedCode = normalizeCompanyCode(code, "LSC");
   const rows = await queryRowsAdmin<{ id: string }>(
     `select id from companies where code = $1::company_code limit 1`,
-    [code]
+    [normalizedCode]
   );
   return rows[0]?.id ?? null;
 }
@@ -244,8 +246,8 @@ export async function deleteProvisionAction(formData: FormData): Promise<void> {
 export async function generateXtzInvoiceAction(formData: FormData): Promise<void> {
   await requireRole(["super_admin", "finance_admin"]);
 
-  const fromCompanyCode = clean(formData.get("fromCompanyCode")) || "XTZ";
-  const toCompanyCode = clean(formData.get("toCompanyCode")) || "XTE";
+  const fromCompanyCode = normalizeCompanyCode(clean(formData.get("fromCompanyCode")) || "XTZ", "XTZ");
+  const toCompanyCode = normalizeCompanyCode(clean(formData.get("toCompanyCode")) || "LSC", "LSC");
   const payrollMonth = clean(formData.get("payrollMonth"));
   const invoiceCurrency = clean(formData.get("invoiceCurrency")) || "USD";
   const paymentMethod = clean(formData.get("paymentMethod")) || "Wire transfer (USD)";
@@ -431,7 +433,7 @@ export async function generateXtzInvoiceAction(formData: FormData): Promise<void
   // ── Section 4: software expenses paid by XTZ (rare) — only those owned/billed
   // Software expenses are typically LSC-owned per user instruction so we skip
   // unless explicitly tagged to XTZ. We still surface the LSC totals for visibility
-  // but don't auto-bill them on the XTZ→XTE invoice.
+  // but don't auto-bill them on the XTZ-to-LSC invoice.
   const softwareRows = await queryRowsAdmin<{
     id: string;
     vendor_name: string;
@@ -567,8 +569,8 @@ export async function generateXtzInvoiceAction(formData: FormData): Promise<void
       XTZ_ISSUER.bank.adCode,
       XTZ_ISSUER.bank.branch,
       XTZ_ISSUER.bank.branchAddress,
-      XTE_RECIPIENT.legalName,
-      XTE_RECIPIENT.address
+      LSC_DUBAI_RECIPIENT.legalName,
+      LSC_DUBAI_RECIPIENT.address
     ]
   );
 
@@ -726,12 +728,12 @@ export async function deleteInvoiceAction(formData: FormData): Promise<void> {
 
 // ── Record incoming invoice (vendor/contractor → company) ──
 // The vendor is the ISSUER (their name + bank on the invoice header).
-// The company (XTE/XTZ) is the RECIPIENT (billed to).
+// The company (LSC/XTZ) is the RECIPIENT (billed to).
 
 export async function createDirectInvoiceAction(formData: FormData): Promise<void> {
   await requireRole(["super_admin", "finance_admin"]);
 
-  const billedToEntity = clean(formData.get("issuerEntity")); // "XTZ" or "XTE" — the company being billed
+  const billedToEntity = normalizeCompanyCode(clean(formData.get("issuerEntity")), "LSC");
   const vendorName = clean(formData.get("recipientName")); // the vendor sending the invoice
   const vendorAddress = clean(formData.get("recipientAddress"));
   const invoiceMonth = clean(formData.get("invoiceMonth"));
@@ -764,12 +766,12 @@ export async function createDirectInvoiceAction(formData: FormData): Promise<voi
   }
 
   const monthDate = invoiceMonth.length === 7 ? `${invoiceMonth}-01` : invoiceMonth;
-  const billedToCode = billedToEntity || "XTE";
+  const billedToCode = billedToEntity || "LSC";
   const billedToCompanyId = await getCompanyIdByCode(billedToCode);
   if (!billedToCompanyId) redirectTo("error", `Company ${billedToCode} not found.`, undefined, getMonth(formData));
 
   // The billed-to company's details go in the "recipient" fields
-  const billedTo = billedToCode === "XTZ" ? XTZ_ISSUER : XTE_ISSUER;
+  const billedTo = billedToCode === "XTZ" ? XTZ_ISSUER : LSC_DUBAI_ISSUER;
   const billedToAddress = billedTo.address;
   const billedToLegalName = billedTo.legalName;
 

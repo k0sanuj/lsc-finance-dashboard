@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { requireRole } from "../../../lib/auth";
-import { getXtzInvoiceById, XTZ_ISSUER, XTE_ISSUER } from "@lsc/db";
+import { getXtzInvoiceById } from "@lsc/db";
 import type { XtzInvoiceItemRow } from "@lsc/db";
 import { updateInvoiceStatusAction } from "../actions";
 import { PrintButton, DownloadPdfButton } from "../../components/print-button";
@@ -61,15 +61,14 @@ export default async function InvoiceDetailPage({ params, searchParams }: PagePr
     sectionTotals[sec] = grouped[sec]!.reduce((s, i) => s + i.amount, 0);
   }
 
-  // Determine if the issuer is XTZ India or XTE (for bank details display)
-  const isXteIssuer =
+  // Determine if the issuer is the Dubai LSC entity for bank details display.
+  const isDubaiLscIssuer =
     header.issuerLegalName.includes("Esports Tech") ||
     header.issuerLegalName.includes("XTZ Esports");
 
-  // For XTE invoices, detect if bank has IBAN (UAE) vs IFSC (India)
-  const hasIban = isXteIssuer;
+  const hasIban = isDubaiLscIssuer;
 
-  // Flatten all items into a single numbered list (matching the XTE template)
+  // Flatten all items into a single numbered list for the printable template.
   let globalLineNum = 0;
 
   return (

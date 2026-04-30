@@ -117,8 +117,8 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
   );
   const liveInrUsdRate = liveInrUsd?.rate ?? 0.01183;
 
-  // Pre-compute live preview of payroll for the selected month
-  // Sayan is invoiced separately (directly by XTE) — excluded from XTZ India invoice
+  // Pre-compute live preview of payroll for the selected month.
+  // Sayan is invoiced separately to the Dubai LSC entity.
   const activeEmps = xtzEmployees.filter(
     (e) =>
       e.fullName !== "Sayan Mukherjee" &&
@@ -174,11 +174,11 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
       <header className="workspace-header">
         <div className="workspace-header-left">
           <span className="section-kicker">
-            XTZ India Private Limited &rarr; XTZ Dubai
+            XTZ India Private Limited &rarr; LSC / XTZ Esports Tech Ltd (Dubai)
           </span>
           <h3>XTZ Invoice Generator</h3>
           <p className="muted">
-            Monthly invoice from XTZ India to XTZ Dubai — payroll, third party vendors,
+            Monthly invoice from XTZ India to LSC / XTZ Esports Tech Ltd (Dubai) — payroll, third party vendors,
             reimbursements, software expenses, and provisions in one unified invoice. Live INR→USD rate
             applied to Anuj &amp; Sayan; everyone else uses fixed USD salaries.
           </p>
@@ -360,7 +360,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
 
         <form action={generateXtzInvoiceAction} className="inline-actions" style={{ marginTop: 16 }}>
           <input type="hidden" name="fromCompanyCode" value="XTZ" />
-          <input type="hidden" name="toCompanyCode" value="XTE" />
+          <input type="hidden" name="toCompanyCode" value="LSC" />
           <input type="hidden" name="payrollMonth" value={selectedMonth} />
           <input type="hidden" name="invoiceCurrency" value="USD" />
           <input type="hidden" name="paymentMethod" value="Wire transfer (USD)" />
@@ -371,7 +371,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
             style={{ flex: 1, minWidth: 280 }}
           />
           <button className="action-button primary" type="submit">
-            Generate XTZ India → XTZ Dubai invoice for {selectedMonth}
+            Generate XTZ India → LSC Dubai invoice for {selectedMonth}
           </button>
         </form>
       </section>
@@ -778,7 +778,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
         </div>
         <p className="muted" style={{ marginTop: 0 }}>
           Use this when a vendor or contractor (e.g. Sayan Mukherjee) sends an invoice
-          to XTZ Dubai or XTZ India. The vendor&apos;s bank details are pulled from the vendor
+          to LSC Dubai or XTZ India. The vendor&apos;s bank details are pulled from the vendor
           directory. Add vendors on the <a href="/vendors" className="ghost-link">Vendors page</a>.
         </p>
         <VendorSelector vendors={allVendors} formId="direct-invoice-form" />
@@ -786,8 +786,8 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
           <div className="form-grid">
             <label className="field">
               <span>Billed to (receiving company)</span>
-              <select name="issuerEntity" defaultValue="XTE" required>
-                <option value="XTE">XTZ Esports Tech Ltd (Dubai)</option>
+              <select name="issuerEntity" defaultValue="LSC" required>
+                <option value="LSC">LSC / XTZ Esports Tech Ltd (Dubai)</option>
                 <option value="XTZ">XTZ India Private Limited</option>
               </select>
             </label>

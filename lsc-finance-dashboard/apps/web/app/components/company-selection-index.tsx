@@ -4,7 +4,7 @@ import type { SharedCompanyCode } from "../lib/shared-workspace";
 import { buildCompanyPath, formatSharedCompanyName } from "../lib/shared-workspace";
 
 type CompanySnapshot = {
-  code: "LSC" | "TBR" | "FSP";
+  code: "LSC" | "TBR" | "FSP" | "XTZ";
   name: string;
   revenue: string;
   cost: string;
@@ -21,7 +21,7 @@ type CompanySelectionIndexProps = {
   companySnapshots: readonly CompanySnapshot[];
 };
 
-const companyOrder: SharedCompanyCode[] = ["TBR", "FSP"];
+const companyOrder: SharedCompanyCode[] = ["LSC", "TBR", "FSP", "XTZ"];
 
 export function CompanySelectionIndex({
   basePath,
@@ -55,7 +55,7 @@ export function CompanySelectionIndex({
           <div className="card-title-row">
             <div>
               <span className="section-kicker">Portfolio context</span>
-              <h3>LSC stays above the company branches</h3>
+              <h3>LSC / Dubai is consolidated separately from India operations</h3>
             </div>
             <span className="pill">Step 1</span>
           </div>
@@ -85,14 +85,14 @@ export function CompanySelectionIndex({
           </div>
           <div className="info-grid">
             <div className="process-step">
-              <span className="process-step-index">TBR</span>
-              <strong>Active operating entity</strong>
-              <span className="muted">Use this path for live race, expense, invoice, payment, and commercial workflows.</span>
+              <span className="process-step-index">LSC</span>
+              <strong>Holding and consolidated view</strong>
+              <span className="muted">Use this path for Dubai entity costs, documents, receivables, and controls.</span>
             </div>
             <div className="process-step">
-              <span className="process-step-index">FSP</span>
-              <strong>Structured but intentionally lighter</strong>
-              <span className="muted">Keep the same route shape without overloading the page before live operating data exists.</span>
+              <span className="process-step-index">XTZ</span>
+              <strong>India operating workspace</strong>
+              <span className="muted">Use this path for payroll, vendor, payout, and reimbursement records.</span>
             </div>
           </div>
         </article>

@@ -2,8 +2,10 @@ import { getPayrollByMonth, getPayrollDetail } from "@lsc/db";
 import { requireRole } from "../../lib/auth";
 import type { Route } from "next";
 import Link from "next/link";
+import { getCompanyOptions, getEntityMetadata, normalizeCompanyCode, type VisibleEntityCode } from "../lib/entities";
 
-const COMPANIES = ["XTZ", "XTE"] as const;
+const COMPANIES = ["XTZ", "LSC"] as const satisfies readonly VisibleEntityCode[];
+const COMPANY_OPTIONS = getCompanyOptions(COMPANIES);
 
 function fmt(value: number): string {
   return value.toLocaleString("en-US", {
@@ -35,7 +37,8 @@ export default async function SalaryPayablePage({
   await requireRole(["super_admin", "finance_admin", "viewer"]);
 
   const params = await searchParams;
-  const company = params.company || "XTZ";
+  const company = normalizeCompanyCode(params.company, "XTZ");
+  const entity = getEntityMetadata(company);
   const selectedMonth = params.month;
 
   const [months, detail] = await Promise.all([
@@ -57,24 +60,21 @@ export default async function SalaryPayablePage({
         <div className="workspace-header-left">
           <span className="section-kicker">Payroll</span>
           <h3>Salary Payable</h3>
-          <p className="muted">
-            Month-by-month salary breakdown for all employees
-          </p>
         </div>
         <div className="workspace-header-right">
-          <span className="pill">{company}</span>
+          <span className="pill">{entity.shortLabel}</span>
         </div>
       </section>
 
       {/* Company filter */}
       <nav style={{ display: "flex", gap: "0.5rem" }}>
-        {COMPANIES.map((c) => (
+        {COMPANY_OPTIONS.map((option) => (
           <Link
-            key={c}
-            href={`/salary-payable?company=${c}` as Route}
-            className={`segment-chip${c === company ? " active" : ""}`}
+            key={option.value}
+            href={`/salary-payable?company=${option.value}` as Route}
+            className={`segment-chip${option.value === company ? " active" : ""}`}
           >
-            {c}
+            {option.shortLabel}
           </Link>
         ))}
       </nav>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CameraCapture } from "./camera-capture";
+import type { VisibleEntityCode } from "../lib/entities";
 
 type ExtractedField = {
   key: string;
@@ -23,7 +24,7 @@ type AnalysisResult = {
 type DocumentAnalyzerPanelProps = {
   title: string;
   description: string;
-  companyCode?: "TBR" | "FSP" | "LSC";
+  companyCode?: VisibleEntityCode;
   redirectPath: string;
   notePlaceholder: string;
   workflowTag: string;

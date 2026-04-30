@@ -4,6 +4,7 @@ import { queryRows } from "@lsc/db";
 import { formatCurrency, formatDateLabel, getBackend } from "@lsc/db";
 import { requireRole } from "../../lib/auth";
 import { submitExpenseAction, reviewExpenseAction } from "./actions";
+import { getCompanyOptions } from "../lib/entities";
 
 type XtzExpensesPageProps = {
   searchParams?: Promise<{ view?: string; status?: string; message?: string }>;
@@ -36,9 +37,7 @@ const BRAND_OPTIONS = [
 ];
 
 const ENTITY_OPTIONS = [
-  { value: "XTZ", label: "XTZ India Pvt Ltd (paid by XTZ India)" },
-  { value: "XTE", label: "XTZ Esports Tech Ltd / LSC (paid by LSC directly)" },
-  { value: "TBR", label: "TBR (paid by TBR)" }
+  ...getCompanyOptions(["XTZ", "LSC", "TBR"] as const)
 ];
 
 async function getXtzExpenseQueue(): Promise<ExpenseQueueRow[]> {

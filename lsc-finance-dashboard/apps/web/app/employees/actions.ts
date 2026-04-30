@@ -6,6 +6,7 @@ import { executeAdmin, queryRowsAdmin } from "@lsc/db";
 import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
 import { requireRole, requireSession } from "../../lib/auth";
 import type { Route } from "next";
+import { normalizeCompanyCode } from "../lib/entities";
 
 function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -25,7 +26,7 @@ export async function addEmployeeAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
   const session = await requireSession();
 
-  const companyCode = normalizeWhitespace(String(formData.get("companyCode") ?? ""));
+  const companyCode = normalizeCompanyCode(normalizeWhitespace(String(formData.get("companyCode") ?? "")), "XTZ");
   const fullName = normalizeWhitespace(String(formData.get("fullName") ?? ""));
   const email = normalizeWhitespace(String(formData.get("email") ?? ""));
   const designation = normalizeWhitespace(String(formData.get("designation") ?? ""));
@@ -78,7 +79,7 @@ export async function updateEmployeeAction(formData: FormData) {
   const session = await requireSession();
 
   const employeeId = normalizeWhitespace(String(formData.get("employeeId") ?? ""));
-  const company = normalizeWhitespace(String(formData.get("company") ?? ""));
+  const company = normalizeCompanyCode(normalizeWhitespace(String(formData.get("company") ?? "")), "XTZ");
 
   if (!employeeId) {
     redirectToEmployees("error", "Employee ID required.", company);
@@ -143,7 +144,7 @@ export async function updateEmployeeStatusAction(formData: FormData) {
 
   const employeeId = normalizeWhitespace(String(formData.get("employeeId") ?? ""));
   const newStatus = normalizeWhitespace(String(formData.get("newStatus") ?? ""));
-  const company = normalizeWhitespace(String(formData.get("company") ?? ""));
+  const company = normalizeCompanyCode(normalizeWhitespace(String(formData.get("company") ?? "")), "XTZ");
 
   if (!employeeId || !newStatus) {
     redirectToEmployees("error", "Employee and status are required.", company);
@@ -175,7 +176,7 @@ export async function updateSalaryAction(formData: FormData) {
   const employeeId = normalizeWhitespace(String(formData.get("employeeId") ?? ""));
   const baseSalary = normalizeWhitespace(String(formData.get("baseSalary") ?? ""));
   const salaryCurrency = normalizeWhitespace(String(formData.get("salaryCurrency") ?? ""));
-  const company = normalizeWhitespace(String(formData.get("company") ?? ""));
+  const company = normalizeCompanyCode(normalizeWhitespace(String(formData.get("company") ?? "")), "XTZ");
 
   if (!employeeId || !baseSalary) {
     redirectToEmployees("error", "Employee and salary required.", company);

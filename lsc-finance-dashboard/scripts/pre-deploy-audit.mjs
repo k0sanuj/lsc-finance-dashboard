@@ -25,6 +25,7 @@ import { execSync } from "child_process";
 const ROOT = join(import.meta.dirname, "..");
 const WEB = join(ROOT, "apps", "web");
 const ENV_PATH = join(WEB, ".env.local");
+const BUILD_TIMEOUT_MS = Number.parseInt(process.env.LSC_AUDIT_BUILD_TIMEOUT_MS ?? "", 10) || 600000;
 
 // ─── Helpers ───────────────────────────────────────────────
 
@@ -338,7 +339,7 @@ function auditBuild() {
     const output = execSync("npx pnpm --filter web build 2>&1", {
       cwd: ROOT,
       encoding: "utf8",
-      timeout: 120000,
+      timeout: BUILD_TIMEOUT_MS,
     });
 
     if (output.includes("Compiled successfully")) {

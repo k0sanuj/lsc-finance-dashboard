@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { executeAdmin, queryRowsAdmin } from "@lsc/db";
 import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
 import { requireRole, requireSession } from "../../lib/auth";
+import { normalizeCompanyCode } from "../lib/entities";
 
 function clean(v: FormDataEntryValue | null): string {
   return String(v ?? "").trim();
@@ -23,7 +24,8 @@ export async function addVendorAction(formData: FormData): Promise<void> {
 
   const name = clean(formData.get("name"));
   const vendorType = clean(formData.get("vendorType")) || "service_provider";
-  const companyCode = clean(formData.get("companyCode"));
+  const rawCompanyCode = clean(formData.get("companyCode"));
+  const companyCode = rawCompanyCode ? normalizeCompanyCode(rawCompanyCode, "LSC") : "";
   const paymentTerms = clean(formData.get("paymentTerms"));
   const address = clean(formData.get("address"));
   const city = clean(formData.get("city"));

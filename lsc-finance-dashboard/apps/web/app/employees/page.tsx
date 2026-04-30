@@ -9,16 +9,16 @@ import {
   updateSalaryAction,
   updateEmployeeAction
 } from "./actions";
+import {
+  formatEntityShortLabel,
+  getCompanyOptions,
+  getEntityMetadata,
+  normalizeCompanyCode,
+  type VisibleEntityCode
+} from "../lib/entities";
 
-const COMPANIES = ["XTZ", "XTE", "TBR", "FSP"] as const;
-
-const COMPANY_CURRENCY: Record<string, string> = {
-  XTZ: "INR",
-  XTE: "USD",
-  TBR: "AED",
-  FSP: "USD",
-  LSC: "USD"
-};
+const COMPANIES = ["XTZ", "LSC", "TBR", "FSP"] as const satisfies readonly VisibleEntityCode[];
+const COMPANY_OPTIONS = getCompanyOptions(COMPANIES);
 
 type EmployeesPageProps = {
   searchParams?: Promise<{
@@ -33,8 +33,9 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
   const params = searchParams ? await searchParams : undefined;
   const status = params?.status ?? null;
   const message = params?.message ?? null;
-  const company = params?.company ?? "XTZ";
-  const defaultCurrency = COMPANY_CURRENCY[company] ?? "USD";
+  const company = normalizeCompanyCode(params?.company, "XTZ");
+  const entity = getEntityMetadata(company);
+  const defaultCurrency = entity.defaultCurrency;
 
   const [employees, fxRates] = await Promise.all([
     getEmployees(company),
@@ -68,13 +69,13 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
 
       {/* Company filter */}
       <nav className="inline-actions">
-        {COMPANIES.map((code) => (
+        {COMPANY_OPTIONS.map((option) => (
           <a
-            key={code}
-            href={`/employees?company=${code}`}
-            className={`segment-chip${code === company ? " active" : ""}`}
+            key={option.value}
+            href={`/employees?company=${option.value}`}
+            className={`segment-chip${option.value === company ? " active" : ""}`}
           >
-            {code}
+            {option.shortLabel}
           </a>
         ))}
       </nav>
@@ -84,7 +85,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
         <article className="metric-card accent-brand">
           <div className="metric-topline"><span className="metric-label">Total</span></div>
           <div className="metric-value">{totalCount}</div>
-          <span className="metric-subvalue">{company}</span>
+          <span className="metric-subvalue">{formatEntityShortLabel(company)}</span>
         </article>
         <article className="metric-card accent-good">
           <div className="metric-topline"><span className="metric-label">Active</span></div>
@@ -208,8 +209,8 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
       <article className="card">
         <div className="card-title-row">
           <div>
-            <span className="section-kicker">Directory</span>
-            <h3>Employees — {company}</h3>
+              <span className="section-kicker">Directory</span>
+            <h3>Employees — {entity.label}</h3>
           </div>
           <span className="badge">{totalCount} records</span>
         </div>
