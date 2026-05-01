@@ -123,6 +123,18 @@ Represents one extracted field proposed by the analyzer and later approved, corr
 
 Represents the posting of approved extracted data into canonical finance tables.
 
+### AiIntakeDraft
+
+Represents the shared approval object for AI-assisted source intake. A draft is created from either an uploaded file or typed/pasted source text and targets one approved canonical posting family such as vendor invoice, expense receipt, reimbursement bundle, sponsorship document, FSP media kit, FSP sponsorship document, or XTZ India payroll/vendor support.
+
+### AiIntakeDraftField
+
+Represents one AI-extracted field with both the extracted value and the human-editable preview value. Canonical posting must use the approved preview value.
+
+### AiIntakePostingEvent
+
+Represents the bridge from an approved AI intake draft to the canonical table and record that were created or updated.
+
 ### ImportBatch
 
 Represents a specific import operation and preserves operational lineage.
@@ -145,6 +157,9 @@ Represents a specific import operation and preserves operational lineage.
 - extracted fields belong to an analysis run
 - approved extracted fields can post into contracts, invoices, payments, expenses, or revenue records
 - posting events preserve the bridge from approved document facts to canonical records
+- AI intake draft belongs to a source document and company
+- AI intake draft fields belong to one AI intake draft
+- AI intake posting events preserve the bridge from approved preview fields to canonical records
 
 ## Data Layers
 
@@ -181,6 +196,9 @@ Exposes filtered views, APIs, and page-level read models.
 - document_analysis_runs
 - document_extracted_fields
 - document_posting_events
+- ai_intake_drafts
+- ai_intake_draft_fields
+- ai_intake_posting_events
 - import_batches
 - raw_import_rows
 

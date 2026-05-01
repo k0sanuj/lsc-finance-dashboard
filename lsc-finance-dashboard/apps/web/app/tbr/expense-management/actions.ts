@@ -275,12 +275,17 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
   const raceEventId = normalizeWhitespace(String(formData.get("raceEventId") ?? "")) || null;
   const returnPath =
     normalizeWhitespace(String(formData.get("returnPath") ?? "")) || "/tbr/my-expenses";
-  const intakeEventIds = normalizeWhitespace(String(formData.get("intakeEventIds") ?? ""))
+  const selectedBillRefs = normalizeWhitespace(String(formData.get("intakeEventIds") ?? ""))
     .split(",")
     .map((value) => normalizeWhitespace(value))
     .filter(Boolean);
+  const legacyIntakeEventIds = selectedBillRefs.filter((value) => !value.startsWith("ai:"));
+  const aiDraftIds = selectedBillRefs
+    .filter((value) => value.startsWith("ai:"))
+    .map((value) => value.slice(3))
+    .filter(Boolean);
 
-  if (!submissionTitle || !raceEventId || intakeEventIds.length === 0) {
+  if (!submissionTitle || !raceEventId || selectedBillRefs.length === 0) {
     redirectToExpenseWorkflow(
       "error",
       "Choose at least one analyzed bill and enter a report title.",
@@ -297,26 +302,179 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
     redirectToExpenseWorkflow("error", "TBR company record was not found.", returnPath);
   }
 
-  const selectedRows = await queryRowsAdmin<{
-    intake_event_id: string;
-    analysis_run_id: string;
-    source_document_id: string;
-    source_file_name: string | null;
-    extracted_summary: Record<string, unknown> | null;
-  }>(
-    `select
-       die.id as intake_event_id,
-       die.analysis_run_id,
-       die.source_document_id,
-       dar.source_file_name,
-       dar.extracted_summary
-     from document_intake_events die
-     join document_analysis_runs dar on dar.id = die.analysis_run_id
-     where die.id = any($1::uuid[])
-       and die.app_user_id = $2
-       and die.workflow_context like ('tbr-race:' || $3::text || '%')`,
-    [intakeEventIds, session.id, raceEventId]
-  );
+  type SelectedBill = {
+    billRef: string;
+    sourceDocumentId: string;
+    sourceFileName: string | null;
+    amount: number;
+    currencyCode: string;
+    expenseDate: string | null;
+    merchantName: string;
+    description: string | null;
+    aiSummary: Record<string, unknown>;
+    aiDraftId?: string;
+  };
+
+  const selectedRows: SelectedBill[] = [];
+
+  if (legacyIntakeEventIds.length > 0) {
+    const legacyRows = await queryRowsAdmin<{
+      intake_event_id: string;
+      analysis_run_id: string;
+      source_document_id: string;
+      source_file_name: string | null;
+      extracted_summary: Record<string, unknown> | null;
+    }>(
+      `select
+         die.id as intake_event_id,
+         die.analysis_run_id,
+         die.source_document_id,
+         dar.source_file_name,
+         dar.extracted_summary
+       from document_intake_events die
+       join document_analysis_runs dar on dar.id = die.analysis_run_id
+       where die.id = any($1::uuid[])
+         and die.app_user_id = $2
+         and die.workflow_context like ('tbr-race:' || $3::text || '%')`,
+      [legacyIntakeEventIds, session.id, raceEventId]
+    );
+
+    for (const row of legacyRows) {
+      const summary = row.extracted_summary ?? {};
+      const usdAmount =
+        parseNormalizedNumber(summary.usdAmount) ||
+        (String(summary.originalCurrency ?? summary.currencyCode ?? "").toUpperCase() === "USD"
+          ? parseNormalizedNumber(summary.originalAmount)
+          : 0);
+      const merchantName =
+        normalizeWhitespace(
+          String(
+            summary.vendorName ??
+              summary.merchantName ??
+              summary.counterparty ??
+              row.source_file_name ??
+              "Uploaded bill"
+          )
+        ) || "Uploaded bill";
+      const description =
+        normalizeWhitespace(
+          String(summary.financeInterpretation ?? summary.proposedTarget ?? row.source_file_name ?? "")
+        ) || null;
+      const expenseDate = normalizeDate(summary.expenseDate);
+
+      selectedRows.push({
+        billRef: row.intake_event_id,
+        sourceDocumentId: row.source_document_id,
+        sourceFileName: row.source_file_name,
+        amount: usdAmount,
+        currencyCode: "USD",
+        expenseDate,
+        merchantName,
+        description,
+        aiSummary: {
+          analysisRunId: row.analysis_run_id,
+          intakeEventId: row.intake_event_id,
+          originalAmount: summary.originalAmount ?? null,
+          originalCurrency: summary.originalCurrency ?? summary.currencyCode ?? null,
+          usdAmount,
+          expenseDate,
+          sourceFileName: row.source_file_name ?? null
+        }
+      });
+    }
+  }
+
+  if (aiDraftIds.length > 0) {
+    const aiRows = await queryRowsAdmin<{
+      ai_draft_id: string;
+      source_document_id: string;
+      source_name: string | null;
+      finance_interpretation: string | null;
+      field_values: Record<string, unknown> | null;
+    }>(
+      `select
+         aid.id as ai_draft_id,
+         aid.source_document_id::text,
+         aid.source_name,
+         aid.finance_interpretation,
+         fields.field_values
+       from ai_intake_drafts aid
+       left join lateral (
+         select jsonb_object_agg(aidf.field_key, aidf.preview_value) as field_values
+         from ai_intake_draft_fields aidf
+         where aidf.draft_id = aid.id
+       ) fields on true
+       where aid.id = any($1::uuid[])
+         and aid.submitted_by_user_id = $2::uuid
+         and aid.workflow_context like ('tbr-race:' || $3::text || ':%')
+         and aid.target_kind in ('expense_receipt', 'reimbursement_bundle')
+         and aid.status = 'approved'
+         and aid.source_document_id is not null`,
+      [aiDraftIds, session.id, raceEventId]
+    );
+
+    const readField = (fields: Record<string, unknown> | null, ...keys: string[]) => {
+      if (!fields) return "";
+      for (const key of keys) {
+        const value = fields[key];
+        if (value === null || value === undefined) continue;
+        if (typeof value === "string") return value;
+        if (typeof value === "number" || typeof value === "boolean") return String(value);
+        return JSON.stringify(value);
+      }
+      return "";
+    };
+
+    for (const row of aiRows) {
+      const fields = row.field_values ?? {};
+      const originalCurrency =
+        readField(fields, "currency_code", "original_currency", "currency").toUpperCase().match(/[A-Z]{3}/)?.[0] ??
+        "USD";
+      const usdAmount = parseNormalizedNumber(readField(fields, "usd_amount"));
+      const originalAmount = parseNormalizedNumber(readField(fields, "original_amount", "total_amount", "amount"));
+      const currencyCode = usdAmount > 0 ? "USD" : originalCurrency;
+      const amount = usdAmount > 0 ? usdAmount : originalAmount;
+      const merchantName =
+        normalizeWhitespace(
+          readField(fields, "merchant_name", "vendor_name", "counterparty_name", "payee") ||
+            row.source_name ||
+            "AI intake bill"
+        ) || "AI intake bill";
+      const description =
+        normalizeWhitespace(
+          readField(fields, "description", "document_description", "category") ||
+            row.finance_interpretation ||
+            row.source_name ||
+            ""
+        ) || null;
+      const expenseDate = normalizeDate(
+        readField(fields, "expense_date", "transaction_date", "document_date", "date")
+      );
+
+      selectedRows.push({
+        billRef: `ai:${row.ai_draft_id}`,
+        sourceDocumentId: row.source_document_id,
+        sourceFileName: row.source_name,
+        amount,
+        currencyCode,
+        expenseDate,
+        merchantName,
+        description,
+        aiDraftId: row.ai_draft_id,
+        aiSummary: {
+          aiIntakeDraftId: row.ai_draft_id,
+          sourceFileName: row.source_name ?? null,
+          amount,
+          currencyCode,
+          originalAmount,
+          originalCurrency,
+          usdAmount: usdAmount || null,
+          expenseDate,
+          fields
+        }
+      });
+    }
+  }
 
   if (selectedRows.length === 0) {
     redirectToExpenseWorkflow("error", "The selected bills could not be loaded.", returnPath);
@@ -326,7 +484,7 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
     `select distinct esi.source_document_id
      from expense_submission_items esi
      where esi.source_document_id = any($1::uuid[])`,
-    [selectedRows.map((row) => row.source_document_id)]
+    [selectedRows.map((row) => row.sourceDocumentId)]
   );
 
   if (duplicateRows.length > 0) {
@@ -337,21 +495,12 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
     );
   }
 
-  const validRows = selectedRows.filter((row) => {
-    const summary = row.extracted_summary ?? {};
-    const usdAmount =
-      parseNormalizedNumber(summary.usdAmount) ||
-      (String(summary.originalCurrency ?? summary.currencyCode ?? "").toUpperCase() === "USD"
-        ? parseNormalizedNumber(summary.originalAmount)
-        : 0);
-
-    return usdAmount > 0;
-  });
+  const validRows = selectedRows.filter((row) => row.amount > 0);
 
   if (validRows.length === 0) {
     redirectToExpenseWorkflow(
       "error",
-      "The selected bills do not have usable USD amounts yet.",
+      "The selected bills do not have usable amounts yet.",
       returnPath
     );
   }
@@ -378,31 +527,6 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
   }
 
   for (const row of validRows) {
-    const summary = row.extracted_summary ?? {};
-    const usdAmount =
-      parseNormalizedNumber(summary.usdAmount) ||
-      (String(summary.originalCurrency ?? summary.currencyCode ?? "").toUpperCase() === "USD"
-        ? parseNormalizedNumber(summary.originalAmount)
-        : 0);
-
-    const merchantName =
-      normalizeWhitespace(
-        String(
-          summary.vendorName ??
-            summary.merchantName ??
-            summary.counterparty ??
-            row.source_file_name ??
-            "Uploaded bill"
-        )
-      ) || "Uploaded bill";
-
-    const description =
-      normalizeWhitespace(
-        String(summary.financeInterpretation ?? summary.proposedTarget ?? row.source_file_name ?? "")
-      ) || null;
-
-    const expenseDate = normalizeDate(summary.expenseDate);
-
     const itemRows = await queryRowsAdmin<{ id: string }>(
       `insert into expense_submission_items (
          submission_id,
@@ -416,24 +540,17 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
          split_count,
          ai_summary
        )
-       values ($1, $2, $3, $4, 'USD', $5, $6, 'solo', 1, $7::jsonb)
+       values ($1, $2, $3, $4, $5, $6, $7, 'solo', 1, $8::jsonb)
        returning id`,
       [
         submissionId,
-        row.source_document_id,
-        merchantName,
-        expenseDate,
-        usdAmount,
-        description,
-        JSON.stringify({
-          analysisRunId: row.analysis_run_id,
-          intakeEventId: row.intake_event_id,
-          originalAmount: summary.originalAmount ?? null,
-          originalCurrency: summary.originalCurrency ?? summary.currencyCode ?? null,
-          usdAmount,
-          expenseDate,
-          sourceFileName: row.source_file_name ?? null
-        })
+        row.sourceDocumentId,
+        row.merchantName,
+        row.expenseDate,
+        row.currencyCode,
+        row.amount,
+        row.description,
+        JSON.stringify(row.aiSummary)
       ]
     );
 
@@ -449,7 +566,43 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
            split_amount
          )
          values ($1, $2, $3, 100, $4)`,
-        [itemId, session.id, session.fullName, usdAmount]
+        [itemId, session.id, session.fullName, row.amount]
+      );
+    }
+  }
+
+  const postedAiDraftIds = validRows
+    .map((row) => row.aiDraftId)
+    .filter((value): value is string => Boolean(value));
+
+  if (postedAiDraftIds.length > 0) {
+    await executeAdmin(
+      `update ai_intake_drafts
+       set status = 'posted',
+           target_entity_type = 'expense_submission',
+           target_entity_id = $2::uuid,
+           posted_at = now(),
+           updated_at = now()
+       where id = any($1::uuid[])`,
+      [postedAiDraftIds, submissionId]
+    );
+
+    for (const aiDraftId of postedAiDraftIds) {
+      await executeAdmin(
+        `insert into ai_intake_posting_events (
+           draft_id,
+           posting_status,
+           canonical_target_table,
+           canonical_target_id,
+           posting_summary,
+           completed_at
+         )
+         values ($1, 'posted', 'expense_submissions', $2, $3, now())`,
+        [
+          aiDraftId,
+          submissionId,
+          `Grouped into race expense report "${submissionTitle}".`
+        ]
       );
     }
   }

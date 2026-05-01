@@ -5,9 +5,11 @@ import { formatCurrency, formatDateLabel, getBackend } from "@lsc/db";
 import { requireRole } from "../../lib/auth";
 import { submitExpenseAction, reviewExpenseAction } from "./actions";
 import { getCompanyOptions } from "../lib/entities";
+import { AIIntakePanel } from "../components/ai-intake-panel";
+import { AIIntakeReviewPanel } from "../components/ai-intake-review-panel";
 
 type XtzExpensesPageProps = {
-  searchParams?: Promise<{ view?: string; status?: string; message?: string }>;
+  searchParams?: Promise<{ view?: string; status?: string; message?: string; aiDraftId?: string }>;
 };
 
 type ExpenseQueueRow = {
@@ -107,6 +109,7 @@ export default async function XtzExpensesPage({ searchParams }: XtzExpensesPageP
   const view = params?.view === "review" ? "review" : "submit";
   const status = params?.status ?? null;
   const message = params?.message ?? null;
+  const aiDraftId = params?.aiDraftId ?? null;
 
   const queue = await getXtzExpenseQueue();
 
@@ -160,78 +163,101 @@ export default async function XtzExpensesPage({ searchParams }: XtzExpensesPageP
       </section>
 
       {view === "submit" ? (
-        <article className="card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">New claim</span>
-              <h3>Submit expense for reimbursement</h3>
-            </div>
-          </div>
-          <form action={submitExpenseAction}>
-            <div className="form-grid">
-              <div className="field">
-                <label>Expense title</label>
-                <input name="title" type="text" placeholder="e.g. Travel to Jeddah, Office supplies" required />
-              </div>
-              <div className="field">
-                <label>Merchant / vendor</label>
-                <input name="merchantName" type="text" placeholder="e.g. Emirates Airlines, Amazon" />
-              </div>
-              <div className="field">
-                <label>Expense date</label>
-                <input name="expenseDate" type="date" required />
-              </div>
-              <div className="field">
-                <label>Amount</label>
-                <input name="amount" type="number" min="0" step="0.01" required />
-              </div>
-              <div className="field">
-                <label>Currency</label>
-                <select name="currency" defaultValue="INR">
-                  <option value="INR">INR</option>
-                  <option value="USD">USD</option>
-                  <option value="AED">AED</option>
-                  <option value="KES">KES</option>
-                </select>
-              </div>
-              <div className="field">
-                <label>Who paid? (billing entity)</label>
-                <select name="billingEntity" defaultValue="XTZ" aria-label="Billing entity">
-                  {ENTITY_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label>Who reimburses?</label>
-                <select name="reimbursingEntity" defaultValue="XTZ" aria-label="Reimbursing entity">
-                  {ENTITY_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label>Which brand is this for?</label>
-                <select name="taggedBrand" defaultValue="" aria-label="Tagged brand">
-                  {BRAND_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label>Description</label>
-                <input name="description" type="text" placeholder="What was this expense for?" />
-              </div>
-              <div className="field">
-                <label>Notes for reviewer</label>
-                <input name="operatorNote" type="text" placeholder="Any context for the finance team" />
-              </div>
-              <div className="form-actions">
-                <button className="action-button primary" type="submit">Submit expense</button>
+        <>
+          <AIIntakePanel
+            companyCode="XTZ"
+            defaultTargetKind="expense_receipt"
+            description="Upload a receipt or paste expense details, then approve the mapped preview before it enters the reimbursement queue."
+            notePlaceholder="Example: paid by Anuj for TBR travel, reimbursed by XTZ, INR receipt."
+            redirectPath="/xtz-expenses?view=submit"
+            targetOptions={[
+              { value: "expense_receipt", label: "Expense receipt" },
+              { value: "reimbursement_bundle", label: "Reimbursement bundle" },
+              { value: "xtz_payroll_vendor_invoice_support", label: "Payroll/vendor support" },
+            ]}
+            title="AI receipt intake"
+            workflowContext="xtz-expenses:submit"
+          />
+
+          <AIIntakeReviewPanel
+            draftId={aiDraftId}
+            redirectPath="/xtz-expenses?view=submit"
+            title="XTZ expense preview"
+          />
+
+          <article className="card">
+            <div className="card-title-row">
+              <div>
+                <span className="section-kicker">New claim</span>
+                <h3>Submit expense for reimbursement</h3>
               </div>
             </div>
-          </form>
-        </article>
+            <form action={submitExpenseAction}>
+              <div className="form-grid">
+                <div className="field">
+                  <label>Expense title</label>
+                  <input name="title" type="text" placeholder="e.g. Travel to Jeddah, Office supplies" required />
+                </div>
+                <div className="field">
+                  <label>Merchant / vendor</label>
+                  <input name="merchantName" type="text" placeholder="e.g. Emirates Airlines, Amazon" />
+                </div>
+                <div className="field">
+                  <label>Expense date</label>
+                  <input name="expenseDate" type="date" required />
+                </div>
+                <div className="field">
+                  <label>Amount</label>
+                  <input name="amount" type="number" min="0" step="0.01" required />
+                </div>
+                <div className="field">
+                  <label>Currency</label>
+                  <select name="currency" defaultValue="INR">
+                    <option value="INR">INR</option>
+                    <option value="USD">USD</option>
+                    <option value="AED">AED</option>
+                    <option value="KES">KES</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Who paid? (billing entity)</label>
+                  <select name="billingEntity" defaultValue="XTZ" aria-label="Billing entity">
+                    {ENTITY_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Who reimburses?</label>
+                  <select name="reimbursingEntity" defaultValue="XTZ" aria-label="Reimbursing entity">
+                    {ENTITY_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Which brand is this for?</label>
+                  <select name="taggedBrand" defaultValue="" aria-label="Tagged brand">
+                    {BRAND_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Description</label>
+                  <input name="description" type="text" placeholder="What was this expense for?" />
+                </div>
+                <div className="field">
+                  <label>Notes for reviewer</label>
+                  <input name="operatorNote" type="text" placeholder="Any context for the finance team" />
+                </div>
+                <div className="form-actions">
+                  <button className="action-button primary" type="submit">Submit expense</button>
+                </div>
+              </div>
+            </form>
+          </article>
+        </>
       ) : null}
 
       {view === "review" ? (

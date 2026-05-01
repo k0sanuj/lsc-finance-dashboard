@@ -10,6 +10,7 @@
     "typecheck": "pnpm --filter web typecheck",
     "db:apply": "node scripts/apply-sql.mjs sql/001_initial_schema.sql sql/002_derived_views.sql sql/003_seed_reference_data.sql sql/005_document_intelligence.sql sql/006_contract_source_document.sql sql/007_auth_and_teams.sql sql/010_document_intake_events.sql",
     "db:apply:document-intake": "node scripts/apply-sql.mjs sql/010_document_intake_events.sql",
+    "db:apply:ai-intake": "node scripts/apply-sql.mjs sql/035_ai_intake_drafts.sql",
     "db:apply:auth": "node scripts/apply-sql.mjs sql/007_auth_and_teams.sql",
     "db:setup-roles": "node scripts/apply-sql.mjs sql/004_roles_and_grants.sql",
     "import:csv": "node scripts/import-csv.mjs",

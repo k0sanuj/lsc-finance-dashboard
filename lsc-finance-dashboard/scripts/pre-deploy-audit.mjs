@@ -176,6 +176,10 @@ async function auditDatabase() {
     const docRes = await pool.query("SELECT count(*)::int as cnt FROM document_analysis_runs");
     ok(`Document analysis runs: ${docRes.rows[0]?.cnt}`);
 
+    // AI intake drafts
+    const aiDraftRes = await pool.query("SELECT count(*)::int as cnt FROM ai_intake_drafts");
+    ok(`AI intake drafts: ${aiDraftRes.rows[0]?.cnt}`);
+
     // Views exist
     const views = ["consolidated_company_metrics", "monthly_financial_summary", "payments_due", "tbr_race_cost_summary"];
     for (const view of views) {

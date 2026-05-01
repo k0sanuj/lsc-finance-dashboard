@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  getAiIntakeRaceBills,
   getDocumentAnalysisQueue,
   getMyExpenseSubmissions,
   getTbrRaceCardById,
@@ -7,7 +8,8 @@ import {
 } from "@lsc/db";
 import { requireRole, requireSession } from "../../../../lib/auth";
 import { BudgetVarianceTable } from "../../../components/budget-variance-table";
-import { DocumentAnalyzerPanel } from "../../../components/document-analyzer-panel";
+import { AIIntakePanel } from "../../../components/ai-intake-panel";
+import { AIIntakeReviewPanel } from "../../../components/ai-intake-review-panel";
 import { ModalLauncher } from "../../../components/modal-launcher";
 import { RaceExpenseReportBuilder } from "../../../components/race-expense-report-builder";
 
@@ -22,6 +24,7 @@ type RaceBillRow = {
   status: string;
   previewDataUrl?: string | null;
   linkedSubmissionTitle?: string | null;
+  canSelect?: boolean;
 };
 
 type RaceDetailPageProps = {
@@ -31,6 +34,7 @@ type RaceDetailPageProps = {
   searchParams?: Promise<{
     status?: string;
     message?: string;
+    aiDraftId?: string;
   }>;
 };
 
@@ -56,12 +60,13 @@ export default async function TbrRaceDetailPage({ params, searchParams }: RaceDe
     );
   }
 
-  const [rawBillQueue, mySubmissions, variance] = await Promise.all([
+  const [rawLegacyBillQueue, aiBillQueue, mySubmissions, variance] = await Promise.all([
     getDocumentAnalysisQueue(session.id, workflowContextPrefix),
+    getAiIntakeRaceBills(session.id, raceId),
     getMyExpenseSubmissions(session.id, raceId),
     getTbrBudgetVariance({ raceEventId: raceId })
   ]);
-  const billQueue = rawBillQueue as RaceBillRow[];
+  const billQueue = [...aiBillQueue, ...(rawLegacyBillQueue as RaceBillRow[])];
   const varianceRows = variance.map((v) => ({
     label: v.categoryName,
     sublabel: v.signal === "over" ? `${Math.abs(v.variancePct).toFixed(1)}% over approved` : undefined,
@@ -95,6 +100,13 @@ export default async function TbrRaceDetailPage({ params, searchParams }: RaceDe
         </section>
       ) : null}
 
+      <AIIntakeReviewPanel
+        draftId={query?.aiDraftId}
+        redirectPath={`/tbr/races/${raceId}`}
+        restrictToUserId={session.id}
+        title={`${race.name} receipt preview`}
+      />
+
       <section className="card">
         <div className="card-title-row">
           <div>
@@ -122,15 +134,20 @@ export default async function TbrRaceDetailPage({ params, searchParams }: RaceDe
             title={`Add expense evidence for ${race.name}`}
             triggerLabel="Add expense"
           >
-            <DocumentAnalyzerPanel
+            <AIIntakePanel
+              companyCode="TBR"
+              defaultTargetKind="expense_receipt"
               title="Submit bills and receipts"
               description="Use individual bills for separate receipts, or upload one report bundle when the files already belong together."
               redirectPath={`/tbr/races/${raceId}`}
               notePlaceholder="Example: Jeddah meals and transport, Dubai merchant, reimbursable."
-              workflowTag="Race intake"
               workflowContext={`${workflowContextPrefix}:expense-bills`}
-              allowMultiple
-              showSubmissionMode
+              targetEntityId={raceId}
+              targetEntityType="race_event"
+              targetOptions={[
+                { value: "expense_receipt", label: "Expense receipt" },
+                { value: "reimbursement_bundle", label: "Reimbursement bundle" },
+              ]}
               variant="plain"
             />
           </ModalLauncher>

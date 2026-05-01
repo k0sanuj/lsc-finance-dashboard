@@ -12,7 +12,8 @@ import {
   type SportModuleCompleteness,
 } from "@lsc/db";
 import { BudgetVarianceTable } from "../../../components/budget-variance-table";
-import AIExtractPanel from "../../../components/ai-extract-panel";
+import { AIIntakePanel } from "../../../components/ai-intake-panel";
+import { AIIntakeReviewPanel } from "../../../components/ai-intake-review-panel";
 import { EmptyState } from "../../../components/empty-state";
 import {
   addPnlLineItemAction, updatePnlLineItemAction, deletePnlLineItemAction,
@@ -749,11 +750,17 @@ async function SponsorshipTab({ sportId, sportCode }: { sportId: string; sportCo
         <div className="card-title-row">
           <h3>Add Sponsorship</h3>
         </div>
-        <AIExtractPanel
-          endpoint="/api/analyze/sponsorship"
-          targetForm="add-sponsorship"
-          label="Extract from sponsorship contract"
-          hint="Upload a signed or draft sponsorship contract PDF — Gemini extracts sponsor name, tier, 3-year values, dates, deliverables."
+        <AIIntakePanel
+          companyCode="FSP"
+          defaultTargetKind="fsp_sport_sponsorship_document"
+          description="Upload or type sponsorship terms, then approve the mapped preview before the sport sponsorship table is updated."
+          notePlaceholder="Example: title sponsor deck for this sport, three-year value, signed or pipeline status."
+          redirectPath={`/fsp/sports/${sportCode}?tab=sponsorship`}
+          targetEntityId={sportId}
+          targetEntityType="fsp_sport"
+          title="Extract from sponsorship document"
+          variant="plain"
+          workflowContext={`fsp-sport:${sportCode}:sponsorship`}
         />
 
         <form action={addSponsorshipAction} data-ai-target="add-sponsorship">
@@ -964,14 +971,16 @@ async function MediaRevenueTab({
         </div>
       </article>
 
-      <AIExtractPanel
-        endpoint="/api/analyze/media-kit"
-        targetFormByKey={{
-          nonLinear: "media-non_linear",
-          linear: "media-linear",
-        }}
-        label="Extract from media kit / rate card"
-        hint="Upload a media kit, broadcast proposal, or rate card — Gemini extracts CPMs, impressions, and avg viewership for both non-linear and linear channels."
+      <AIIntakePanel
+        companyCode="FSP"
+        defaultTargetKind="fsp_sport_media_kit"
+        description="Upload or type media kit assumptions, then approve the mapped preview before CPM rows are updated."
+        notePlaceholder="Example: media kit with linear/non-linear CPMs, impressions, viewership, and audience assumptions."
+        redirectPath={`/fsp/sports/${sportCode}?tab=media`}
+        targetEntityId={sportId}
+        targetEntityType="fsp_sport"
+        title="Extract from media kit / rate card"
+        workflowContext={`fsp-sport:${sportCode}:media`}
       />
 
       {renderChannel("Non-Linear (OTT / Streaming)", "non_linear", nonLinear)}
@@ -1665,12 +1674,12 @@ export default async function SportDetailPage({
   searchParams,
 }: {
   params: Promise<{ sport: string }>;
-  searchParams: Promise<{ tab?: string; status?: string; message?: string }>;
+  searchParams: Promise<{ tab?: string; status?: string; message?: string; aiDraftId?: string }>;
 }): Promise<React.ReactElement> {
   await requireRole(["super_admin", "finance_admin", "commercial_user", "viewer"]);
 
   const { sport: sportCode } = await params;
-  const { tab: rawTab, status, message } = await searchParams;
+  const { tab: rawTab, status, message, aiDraftId } = await searchParams;
 
   const sportId = await getSportIdByCode(sportCode);
   if (!sportId) notFound();
@@ -1709,6 +1718,12 @@ export default async function SportDetailPage({
           </Link>
         ))}
       </nav>
+
+      <AIIntakeReviewPanel
+        draftId={aiDraftId}
+        redirectPath={`/fsp/sports/${sportCode}?tab=${activeTab}`}
+        title={`${sportName} AI intake preview`}
+      />
 
       {activeTab === "overview" && (
         <OverviewTab sportId={sportId} sportCode={sportCode} sportName={sportName} />

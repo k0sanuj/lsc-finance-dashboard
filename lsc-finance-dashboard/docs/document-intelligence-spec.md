@@ -8,11 +8,14 @@ The dashboard should not rely on manual metric entry alone. Uploaded documents m
 
 1. User uploads a finance document in the portal, or creates a controlled manual entry when no external document exists.
 2. The app creates a `source_document`.
-3. An analyzer run is created in `document_analysis_runs`.
-4. The analyzer extracts proposed fields into `document_extracted_fields`.
-5. The user reviews, approves, edits, or rejects extracted fields.
-6. Approved fields are posted into canonical tables.
-7. A `document_posting_event` records what was posted and where.
+3. The app creates an `ai_intake_draft` for the selected canonical target.
+4. The analyzer extracts proposed fields into `ai_intake_draft_fields`.
+5. The user reviews, edits, approves, rejects, or discards the preview fields.
+6. Approved fields are posted into canonical tables by the target-specific mapper.
+7. An `ai_intake_posting_event` records what was posted and where.
+8. A cascade audit log entry records draft creation, approval, rejection, discard, and canonical posting.
+
+`document_analysis_runs`, `document_extracted_fields`, and `document_posting_events` remain as legacy document-intelligence history. New user-facing upload/type flows should use `ai_intake_drafts` first.
 
 ## Supported First Document Types
 
@@ -22,6 +25,9 @@ The dashboard should not rely on manual metric entry alone. Uploaded documents m
 - reimbursement report
 - expense receipt bundle
 - controlled manual finance entry
+- FSP sport media kit
+- FSP sport sponsorship document
+- XTZ India payroll/vendor invoice support
 
 ## Required Extracted Fields By Type
 
@@ -81,11 +87,12 @@ The dashboard should not rely on manual metric entry alone. Uploaded documents m
 - nothing posts to canonical finance tables without user approval
 - confidence should inform the UI but never replace approval
 - edited fields must overwrite extracted values, not sit beside them ambiguously
+- `ai_intake_draft_fields.preview_value` is the user-editable value that posts to canonical records
 - manual entry must still create a `source_document` with `document_type = manual_upload`
 - manual entry must require a reason and reviewer trail so it cannot bypass truth controls
 - every posted canonical record must remain traceable to:
   - source document
-  - analyzer run
+  - AI intake draft
   - approved field set
 
 ## Truth Policy
@@ -102,7 +109,14 @@ The dashboard should not rely on manual metric entry alone. Uploaded documents m
 - sponsorship contract -> `sponsors_or_customers`, `contracts`, `invoices`, `payments`, `revenue_records`
 - vendor invoice -> `invoices`, `payments`, optionally `expenses`
 - prize statement -> `revenue_records`
-- reimbursement report -> `expenses`
+- expense receipt / reimbursement report -> `expense_submissions`, `expense_submission_items`
+- FSP sport sponsorship document -> `fsp_sponsorships`
+- FSP sport media kit -> `fsp_media_revenue_cpm` when CPM/impression fields are present
+- XTZ India payroll/vendor support -> `software_expenses`, `reimbursement_items`, `provisions`, or payable `invoices` depending on approved section mapping
+
+TBR race receipt drafts are a controlled exception to immediate posting: approval marks the receipt as ready for report grouping, then the report builder creates `expense_submissions` and `expense_submission_items` with source document and AI draft lineage.
+
+The TBR invoice hub uses the shared AI draft queue for uploaded invoices. Approved vendor invoice drafts post directly to canonical payable `invoices` and planned `payments`; the manual payable queue remains available for non-document entries.
 
 ## UI Surface
 
@@ -116,6 +130,8 @@ The `Documents` page should show:
 - extracted field table with confidence and approval state
 - pending postings
 - completed postings with canonical links
+
+The same shared AI intake review surface should also be used by FSP sport modules and XTZ India expense/vendor-support modules. Direct DOM prefill without approval should be treated as legacy behavior.
 
 Every upload attempt should create a visible intake event, even when the underlying document hash reuses an existing analysis run.
 

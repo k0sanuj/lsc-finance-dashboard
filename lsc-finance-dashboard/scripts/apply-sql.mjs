@@ -39,6 +39,7 @@ async function loadEnvFile(envPath) {
 async function main() {
   const projectRoot = process.cwd();
   await loadEnvFile(path.join(projectRoot, ".env.local"));
+  await loadEnvFile(path.join(projectRoot, "apps", "web", ".env.local"));
 
   const sqlFiles = process.argv.slice(2);
 

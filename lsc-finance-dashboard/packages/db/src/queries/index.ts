@@ -27,6 +27,7 @@ export * from "./checklist";
 export * from "./event-budget";
 export * from "./deal-pipeline";
 export * from "./ai-ingestion";
+export * from "./ai-intake";
 export * from "./treasury";
 export * from "./sport-infrastructure";
 export * from "./xtz-invoices";

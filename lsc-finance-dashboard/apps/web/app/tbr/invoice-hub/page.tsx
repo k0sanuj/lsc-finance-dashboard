@@ -1,33 +1,27 @@
 import type { Route } from "next";
 import Link from "next/link";
 import {
-  getDocumentAnalysisDetail,
-  getDocumentAnalysisQueue,
-  getDocumentExtractedFields,
-  getDocumentPostingEvents,
+  getAiIntakeQueue,
   getExpenseFormOptions,
   getInvoiceApprovalQueue,
   getInvoiceWorkflowSummary
 } from "@lsc/db";
-import { requireRole, requireSession } from "../../../lib/auth";
+import { requireRole } from "../../../lib/auth";
 import {
   approveAndPostInvoiceIntakeAction,
   createInvoiceIntakeAction,
   updateInvoiceIntakeStatusAction
 } from "./actions";
-import { DocumentAnalyzerPanel } from "../../components/document-analyzer-panel";
-import { DocumentAnalysisSummary } from "../../components/document-analysis-summary";
+import { AIIntakePanel } from "../../components/ai-intake-panel";
+import { AIIntakeReviewPanel } from "../../components/ai-intake-review-panel";
 import { ModalLauncher } from "../../components/modal-launcher";
 import { RowHighlight } from "../../components/row-highlight";
-import {
-  formatDocumentWorkflowForSelection
-} from "../../lib/shared-workspace";
 
 type InvoiceHubPageProps = {
   searchParams?: Promise<{
     status?: string;
     message?: string;
-    analysisRunId?: string;
+    aiDraftId?: string;
   }>;
 };
 
@@ -49,22 +43,14 @@ type QueueRow = {
 };
 
 type SourceQueueRow = {
-  id?: string;
-  intakeEventId?: string;
-  sourceDocumentId?: string;
-  documentName: string;
-  documentType: string;
+  id: string;
+  sourceName: string;
+  detectedDocumentType: string;
   status: string;
   proposedTarget: string;
-  createdAt?: string;
-  workflowContext?: string;
-  intakeStatus?: string;
-  intakeCategory?: string;
-  updateSummary?: string;
-  originCountry?: string;
-  currencyCode?: string;
+  createdAt: string;
+  confidence: string;
   previewAvailable?: boolean;
-  previewDataUrl?: string | null;
 };
 
 function parseCurrency(value: string) {
@@ -76,34 +62,27 @@ function formatStatusLabel(value: string) {
 }
 
 export default async function InvoiceHubPage({ searchParams }: InvoiceHubPageProps) {
-  const session = await requireRole(["super_admin", "finance_admin"]);
+  await requireRole(["super_admin", "finance_admin"]);
   const params = searchParams ? await searchParams : undefined;
-  const selectedAnalysisRunId = params?.analysisRunId ?? undefined;
+  const selectedAiDraftId = params?.aiDraftId ?? undefined;
 
-  const [summary, queue, formOptions, sourceQueue, documentDetail, documentFields, postingEvents] = await Promise.all([
+  const [summary, queue, formOptions, sourceQueue] = await Promise.all([
     getInvoiceWorkflowSummary(),
     getInvoiceApprovalQueue(),
     getExpenseFormOptions(),
-    getDocumentAnalysisQueue(session.id),
-    selectedAnalysisRunId ? getDocumentAnalysisDetail(selectedAnalysisRunId, session.id) : Promise.resolve(null),
-    selectedAnalysisRunId ? getDocumentExtractedFields(selectedAnalysisRunId) : Promise.resolve([]),
-    selectedAnalysisRunId ? getDocumentPostingEvents(selectedAnalysisRunId) : Promise.resolve([])
+    getAiIntakeQueue({
+      companyCode: "TBR",
+      workflowContextPrefix: "invoice-hub",
+      targetKind: "vendor_invoice",
+      limit: 20,
+    })
   ]);
 
   const status = params?.status ?? null;
   const message = params?.message ?? null;
   const workflowSummary = summary as WorkflowMetric[];
   const intakeQueue = queue as QueueRow[];
-  const sourceRuns = (sourceQueue as SourceQueueRow[]).filter((item) => {
-    const workflow = String(item.workflowContext ?? "").toLowerCase();
-    return (
-      workflow === "invoice-hub" ||
-      workflow.includes("invoice") ||
-      workflow.includes("payments:tbr:vendor-invoices") ||
-      formatDocumentWorkflowForSelection(item.workflowContext, item.proposedTarget, item.documentType) ===
-        "vendor-invoices"
-    );
-  });
+  const sourceRuns = sourceQueue as SourceQueueRow[];
 
   const pendingReview = intakeQueue.filter((r) => r.status === "submitted" || r.status === "in_review");
   const totalPending = pendingReview.reduce((s, r) => s + parseCurrency(r.totalAmount), 0);
@@ -160,24 +139,23 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
         <div className="card-title-row">
           <div>
             <span className="section-kicker">Upload invoices</span>
-            <h3>Add payables — single or bulk</h3>
+            <h3>Add payable invoice</h3>
           </div>
           <div className="inline-actions">
             <ModalLauncher
-              triggerLabel="Upload invoices"
+              triggerLabel="Upload invoice"
               title="Upload invoice documents"
-              description="Upload one or multiple invoice files. AI will scan each document, extract vendor, amount, dates, and create draft payable records for your review."
+              description="Upload one invoice file. AI will extract vendor, amount, dates, and create a draft payable record for your review."
               eyebrow="AI-powered intake"
             >
-              <DocumentAnalyzerPanel
+              <AIIntakePanel
+                companyCode="TBR"
+                defaultTargetKind="vendor_invoice"
                 title="Upload invoices"
-                description="Drop single or multiple invoice files. Each will be scanned by AI and staged as a draft payable for review. Toggle 'Reimbursement' if an employee paid and needs to be reimbursed."
+                description="Upload one invoice or paste invoice text. AI extracts the fields into a review draft before any payable is posted."
                 redirectPath="/tbr/invoice-hub"
                 notePlaceholder="E.g.: E1 Lagos catering invoices. Mark any that are reimbursements."
-                workflowTag="Invoice intake"
                 workflowContext="invoice-hub"
-                allowMultiple
-                showSubmissionMode
                 variant="plain"
               />
             </ModalLauncher>
@@ -267,8 +245,14 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
             </ModalLauncher>
           </div>
         </div>
-        <p>Upload documents for AI scanning or enter details manually — drafts appear in the queue below.</p>
+        <p>Upload documents for AI review or enter details manually. AI drafts require preview approval before posting to payables.</p>
       </section>
+
+      <AIIntakeReviewPanel
+        draftId={selectedAiDraftId}
+        redirectPath="/tbr/invoice-hub"
+        title="Invoice AI intake preview"
+      />
 
       {/* Scanned documents — AI results */}
       {sourceRuns.length > 0 && (
@@ -287,29 +271,25 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
                   <tr>
                     <th>Document</th>
                     <th>Type</th>
-                    <th>Country / Currency</th>
+                    <th>Target</th>
+                    <th>Confidence</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sourceRuns.map((row) => (
-                    <tr key={row.intakeEventId ?? row.id}>
+                    <tr key={row.id}>
                       <td>
-                        {row.id ? (
-                          <Link href={`/tbr/invoice-hub?analysisRunId=${row.id}`}>
-                            {row.documentName}
-                          </Link>
-                        ) : (
-                          row.documentName
-                        )}
+                        <Link href={`/tbr/invoice-hub?aiDraftId=${row.id}`}>
+                          {row.sourceName}
+                        </Link>
                       </td>
-                      <td>{row.intakeCategory ?? row.documentType}</td>
+                      <td>{row.detectedDocumentType}</td>
+                      <td>{row.proposedTarget}</td>
+                      <td>{Math.round(Number(row.confidence) * 100)}%</td>
                       <td>
-                        {row.originCountry ?? "—"} / {row.currencyCode ?? "—"}
-                      </td>
-                      <td>
-                        <span className={`pill ${row.intakeStatus === "posted" || row.status === "approved" ? "signal-pill signal-good" : "subtle-pill"}`}>
-                          {formatStatusLabel(row.intakeStatus ?? row.status)}
+                        <span className={`pill ${row.status === "posted" || row.status === "approved" ? "signal-pill signal-good" : "subtle-pill"}`}>
+                          {formatStatusLabel(row.status)}
                         </span>
                       </td>
                     </tr>
@@ -319,24 +299,15 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
             </div>
           </article>
 
-          {selectedAnalysisRunId ? (
-            <DocumentAnalysisSummary
-              detail={documentDetail}
-              fields={documentFields}
-              postingEvents={postingEvents}
-              title="Document detail"
-            />
-          ) : (
-            <section className="card compact-section-card">
-              <div className="process-step">
-                <span className="process-step-index">Tip</span>
-                <strong>Click a document name to view extracted fields</strong>
-                <span className="muted">
-                  The AI extraction shows vendor, amount, dates, and other fields pulled from the document.
-                </span>
-              </div>
-            </section>
-          )}
+          <section className="card compact-section-card">
+            <div className="process-step">
+              <span className="process-step-index">Tip</span>
+              <strong>Click a document name to view extracted fields</strong>
+              <span className="muted">
+                Approved AI invoice drafts post directly to canonical payable invoices and planned payments.
+              </span>
+            </div>
+          </section>
         </section>
       )}
 

@@ -2,19 +2,17 @@ import type { Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  getDocumentAnalysisDetail,
-  getDocumentAnalysisQueue,
-  getDocumentExtractedFields,
-  getDocumentPostingEvents,
-  getEntitySnapshots
+  getAiIntakeQueue
 } from "@lsc/db";
 import { requireRole } from "../../../lib/auth";
-import { approveDocumentAnalysisAction } from "../actions";
 import { CompanyWorkspaceShell } from "../../components/company-workspace-shell";
-import { DocumentAnalyzerPanel } from "../../components/document-analyzer-panel";
+import {
+  AIIntakePanel,
+  type AiIntakeTargetKind,
+  type AiIntakeTargetOption
+} from "../../components/ai-intake-panel";
+import { AIIntakeReviewPanel } from "../../components/ai-intake-review-panel";
 import { ModalLauncher } from "../../components/modal-launcher";
-import { FormButton } from "../form-button";
-import { DocumentAnalysisSummary } from "../../components/document-analysis-summary";
 import {
   buildCompanyPath,
   formatDocumentWorkflowForSelection,
@@ -32,26 +30,21 @@ type DocumentsCompanyPageProps = {
     view?: string;
     status?: string;
     message?: string;
-    analysisRunId?: string;
+    aiDraftId?: string;
   }>;
 };
 
 type QueueRow = {
-  id?: string;
-  intakeEventId?: string;
-  documentName: string;
-  documentType: string;
+  id: string;
+  sourceName: string;
+  detectedDocumentType: string;
   status: string;
   confidence: string;
   proposedTarget: string;
-  createdAt?: string;
-  workflowContext?: string;
-  intakeStatus?: string;
-  originCountry?: string;
-  currencyCode?: string;
+  createdAt: string;
+  workflowContext: string | null;
+  targetKind: string;
   previewAvailable?: boolean;
-  intakeCategory?: string;
-  updateSummary?: string;
 };
 
 const workstreamsByCompany: Record<VisibleEntityCode, readonly {
@@ -167,6 +160,45 @@ function getAnalyzerConfig(company: VisibleEntityCode, view: string) {
   };
 }
 
+function getAiIntakeTargets(company: VisibleEntityCode, view: string): {
+  defaultTargetKind: AiIntakeTargetKind;
+  targetOptions: AiIntakeTargetOption[];
+} {
+  if (company === "XTZ" && view === "vendor-invoices") {
+    return {
+      defaultTargetKind: "xtz_payroll_vendor_invoice_support",
+      targetOptions: [
+        { value: "xtz_payroll_vendor_invoice_support", label: "XTZ payroll/vendor support" },
+        { value: "vendor_invoice", label: "Vendor invoice" },
+      ],
+    };
+  }
+
+  if (view === "expense-support") {
+    return {
+      defaultTargetKind: "expense_receipt",
+      targetOptions: [
+        { value: "expense_receipt", label: "Expense receipt" },
+        { value: "reimbursement_bundle", label: "Reimbursement bundle" },
+      ],
+    };
+  }
+
+  if (view === "commercial-docs") {
+    return {
+      defaultTargetKind: "sponsorship_commercial_document",
+      targetOptions: [
+        { value: "sponsorship_commercial_document", label: "Sponsorship / commercial document" },
+      ],
+    };
+  }
+
+  return {
+    defaultTargetKind: "vendor_invoice",
+    targetOptions: [{ value: "vendor_invoice", label: "Vendor invoice" }],
+  };
+}
+
 function formatWorkflowHeading(company: VisibleEntityCode, view: string) {
   if (company === "TBR" && view === "expense-support") {
     return "Expense support for TBR operations";
@@ -183,7 +215,7 @@ export default async function DocumentsCompanyPage({
   params,
   searchParams
 }: DocumentsCompanyPageProps) {
-  const session = await requireRole(["super_admin", "finance_admin"]);
+  await requireRole(["super_admin", "finance_admin"]);
   const routeParams = await params;
   const resolvedCompany = routeParams.company?.toUpperCase();
   if (!isSharedCompanyCode(resolvedCompany)) {
@@ -196,18 +228,17 @@ export default async function DocumentsCompanyPage({
   const selectedView = companyWorkstreams.some((item) => item.key === pageParams?.view)
     ? pageParams?.view ?? companyWorkstreams[0].key
     : companyWorkstreams[0].key;
-  const selectedAnalysisRunId = pageParams?.analysisRunId ?? undefined;
+  const selectedAiDraftId = pageParams?.aiDraftId ?? undefined;
   const analyzerConfig = getAnalyzerConfig(companyCode, selectedView);
+  const targetConfig = getAiIntakeTargets(companyCode, selectedView);
   const status = pageParams?.status ?? null;
   const message = pageParams?.message ?? null;
 
-  const [entitySnapshots, queue, detail, fields, postingEvents] = await Promise.all([
-    getEntitySnapshots(),
-    getDocumentAnalysisQueue(session.id),
-    selectedAnalysisRunId ? getDocumentAnalysisDetail(selectedAnalysisRunId, session.id) : Promise.resolve(null),
-    selectedAnalysisRunId ? getDocumentExtractedFields(selectedAnalysisRunId) : Promise.resolve([]),
-    selectedAnalysisRunId ? getDocumentPostingEvents(selectedAnalysisRunId) : Promise.resolve([])
-  ]);
+  const queue = await getAiIntakeQueue({
+    companyCode,
+    workflowContextPrefix: `documents:${companyCode.toLowerCase()}:${selectedView}`,
+    limit: 20
+  });
 
   const filteredQueue = (queue as QueueRow[]).filter((item) => {
     if (companyCode === "FSP") {
@@ -215,15 +246,15 @@ export default async function DocumentsCompanyPage({
     }
 
     return (
-      formatDocumentWorkflowForSelection(item.workflowContext, item.proposedTarget, item.documentType) ===
+      formatDocumentWorkflowForSelection(item.workflowContext, item.proposedTarget, item.detectedDocumentType) ===
       selectedView
     );
   });
   const analyzedCount = filteredQueue.filter((item) =>
-    ["analyzed", "reused"].includes(String(item.intakeStatus ?? item.status))
+    ["needs_review", "approved", "posted"].includes(String(item.status))
   ).length;
   const pendingReviewCount = filteredQueue.filter(
-    (item) => String(item.intakeStatus ?? item.status) === "pending_review"
+    (item) => String(item.status) === "needs_review"
   ).length;
   const previewCount = filteredQueue.filter((item) => item.previewAvailable).length;
   const workflowInsight = {
@@ -298,14 +329,15 @@ export default async function DocumentsCompanyPage({
               title={analyzerConfig.title}
               triggerLabel="Add document"
             >
-              <DocumentAnalyzerPanel
+              <AIIntakePanel
                 companyCode={companyCode}
                 description={analyzerConfig.description}
+                defaultTargetKind={targetConfig.defaultTargetKind}
                 notePlaceholder={analyzerConfig.notePlaceholder}
                 redirectPath={buildCompanyPath("/documents", companyCode, { view: selectedView })}
+                targetOptions={targetConfig.targetOptions}
                 title={analyzerConfig.title}
                 workflowContext={`documents:${companyCode.toLowerCase()}:${selectedView}`}
-                workflowTag="Categorized intake"
                 variant="plain"
               />
             </ModalLauncher>
@@ -338,36 +370,34 @@ export default async function DocumentsCompanyPage({
                 <th>Document</th>
                 <th>Category</th>
                 <th>Type</th>
-                <th>Updates</th>
+                <th>Target</th>
                 <th>When</th>
-                <th>Country / currency</th>
+                <th>Confidence</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
               {filteredQueue.length > 0 ? (
                 filteredQueue.map((item) => (
-                  <tr key={item.intakeEventId ?? item.id}>
+                  <tr key={item.id}>
                     <td>
                       <Link
                         href={buildCompanyPath("/documents", companyCode, {
                           view: selectedView,
-                          analysisRunId: item.id
+                          aiDraftId: item.id
                         }) as Route}
                       >
-                        {item.documentName}
+                        {item.sourceName}
                       </Link>
                     </td>
-                    <td>{item.intakeCategory ?? "Unmapped"}</td>
-                    <td>{item.documentType}</td>
-                    <td>{item.updateSummary ?? formatWorkflowContextLabel(item.workflowContext)}</td>
+                    <td>{item.targetKind.replace(/_/g, " ")}</td>
+                    <td>{item.detectedDocumentType}</td>
+                    <td>{item.proposedTarget || formatWorkflowContextLabel(item.workflowContext)}</td>
                     <td>{item.createdAt}</td>
-                    <td>
-                      {item.originCountry} / {item.currencyCode}
-                    </td>
+                    <td>{Math.round(Number(item.confidence) * 100)}%</td>
                     <td>
                       <div className="inline-actions">
-                        <span className="pill">{item.intakeStatus}</span>
+                        <span className="pill">{item.status.replace(/_/g, " ")}</span>
                         {item.previewAvailable ? <span className="pill">preview</span> : null}
                       </div>
                     </td>
@@ -385,47 +415,14 @@ export default async function DocumentsCompanyPage({
         </div>
       </section>
 
-      {selectedAnalysisRunId ? (
-        <>
-          <DocumentAnalysisSummary
-            detail={detail}
-            fields={fields}
-            postingEvents={postingEvents}
-            title="Selected analysis run"
-          />
-
-          <section className="card">
-            <div className="card-title-row">
-              <div>
-                <span className="section-kicker">Approval</span>
-                <h3>Approve the selected run</h3>
-              </div>
-            </div>
-            {detail ? (
-              <div className="hero-actions">
-                {detail.status === "pending_review" ? (
-                  <form action={approveDocumentAnalysisAction}>
-                    <input name="analysisRunId" type="hidden" value={detail.analysisRunId} />
-                    <input
-                      name="redirectPath"
-                      type="hidden"
-                      value={buildCompanyPath("/documents", companyCode, {
-                        view: selectedView,
-                        analysisRunId: detail.analysisRunId
-                      })}
-                    />
-                    <FormButton label="Approve and post" pendingLabel="Posting..." />
-                  </form>
-                ) : (
-                  <span className="muted">This document has already moved past the approval step.</span>
-                )}
-              </div>
-            ) : (
-              <span className="muted">Select one run from the queue to approve it.</span>
-            )}
-          </section>
-        </>
-      ) : null}
+      <AIIntakeReviewPanel
+        draftId={selectedAiDraftId}
+        redirectPath={buildCompanyPath("/documents", companyCode, {
+          view: selectedView,
+          aiDraftId: selectedAiDraftId
+        })}
+        title="Selected AI intake draft"
+      />
     </div>
   );
 }

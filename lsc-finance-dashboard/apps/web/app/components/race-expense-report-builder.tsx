@@ -15,6 +15,7 @@ type BillRow = {
   status: string;
   previewDataUrl?: string | null;
   linkedSubmissionTitle?: string | null;
+  canSelect?: boolean;
 };
 
 type RaceExpenseReportBuilderProps = {
@@ -32,7 +33,7 @@ export function RaceExpenseReportBuilder({
   const [open, setOpen] = useState(false);
 
   const selectableRows = useMemo(
-    () => rows.filter((row) => row.intakeEventId && !row.linkedSubmissionTitle),
+    () => rows.filter((row) => row.intakeEventId && !row.linkedSubmissionTitle && (row.canSelect ?? true)),
     [rows]
   );
 
@@ -84,13 +85,14 @@ export function RaceExpenseReportBuilder({
                 rows.map((row) => {
                   const intakeEventId = row.intakeEventId ?? "";
                   const linked = Boolean(row.linkedSubmissionTitle);
+                  const canSelect = !linked && Boolean(intakeEventId) && (row.canSelect ?? true);
                   const checked = intakeEventId ? selectedIds.includes(intakeEventId) : false;
 
                   return (
                     <tr key={`${row.id ?? row.documentName}-${row.expenseDate ?? "date"}`}>
                       <td>
-                        {linked || !intakeEventId ? (
-                          <span className="pill subtle-pill">linked</span>
+                        {!canSelect ? (
+                          <span className="pill subtle-pill">{linked ? "linked" : "review first"}</span>
                         ) : (
                           <input
                             aria-label={`Select ${row.documentName}`}
@@ -191,7 +193,7 @@ export function RaceExpenseReportBuilder({
               <div className="actions-row">
                 <FormButton label="Create expense report" pendingLabel="Creating..." />
                 <span className="muted">
-                  Each selected bill becomes one line item in the report using the analyzed USD value.
+                  Each selected bill becomes one line item in the report using the approved preview amount.
                 </span>
               </div>
             </form>

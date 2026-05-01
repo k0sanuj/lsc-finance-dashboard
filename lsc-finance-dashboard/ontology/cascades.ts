@@ -80,6 +80,10 @@ export type CascadeTrigger =
   | "document:posted"
   // AI ingestion
   | "ai-ingest:queued"
+  | "ai-intake:draft-created"
+  | "ai-intake:draft-approved"
+  | "ai-intake:draft-rejected"
+  | "ai-intake:draft-discarded"
   // Project checklist (portfolio-level task tracking)
   | "project-checklist:item:changed"
   // QuickBooks Online integration
@@ -290,6 +294,30 @@ export const CASCADE_RULES: CascadeRule[] = [
     trigger: "document:approved",
     actions: [
       { type: "write-audit-log", description: "Record document approval for posting" },
+    ],
+  },
+  {
+    trigger: "ai-intake:draft-created",
+    actions: [
+      { type: "write-audit-log", description: "Record AI intake draft creation" },
+    ],
+  },
+  {
+    trigger: "ai-intake:draft-approved",
+    actions: [
+      { type: "write-audit-log", description: "Record AI intake approval and posting result" },
+    ],
+  },
+  {
+    trigger: "ai-intake:draft-rejected",
+    actions: [
+      { type: "write-audit-log", description: "Record AI intake rejection" },
+    ],
+  },
+  {
+    trigger: "ai-intake:draft-discarded",
+    actions: [
+      { type: "write-audit-log", description: "Record AI intake discard" },
     ],
   },
 ];

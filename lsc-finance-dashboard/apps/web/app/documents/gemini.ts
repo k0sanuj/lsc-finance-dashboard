@@ -21,7 +21,10 @@ export type GeminiAnalyzerContext = {
       | "generic_document_review"
       | "tbr_race_expense_submission"
       | "finance_invoice_intake"
-      | "finance_cost_review";
+      | "finance_cost_review"
+      | "ai_intake_review"
+      | "fsp_sport_asset_intake"
+      | "xtz_india_support_intake";
     submissionMode: string | null;
     redirectPath: string;
   };
@@ -82,6 +85,9 @@ const responseSchema = {
         "Expense Receipt",
         "Prize Statement",
         "Reimbursement Report",
+        "FSP Media Kit",
+        "FSP Sponsorship Document",
+        "XTZ Payroll Support",
         "Controlled Manual Entry",
         "Unknown"
       ]
@@ -144,17 +150,20 @@ function buildPrompt(
     compact
       ? "Keep financeInterpretation under 120 characters and return no more than 8 fields."
       : "Keep financeInterpretation concise and return no more than 12 fields.",
-    "Supported document types: Sponsorship Contract, Vendor Invoice, Expense Receipt, Prize Statement, Reimbursement Report, Controlled Manual Entry, Unknown.",
+    "Supported document types: Sponsorship Contract, Vendor Invoice, Expense Receipt, Prize Statement, Reimbursement Report, FSP Media Kit, FSP Sponsorship Document, XTZ Payroll Support, Controlled Manual Entry, Unknown.",
     "For sponsorship contracts, extract counterparty, amount, currency, start date, end date, payment schedule, and revenue type if present.",
     "For prize statements, extract counterparty, award basis, amount, currency, and recognition date.",
     "For vendor invoices, extract vendor, invoice number, issue date, due date, amount, currency, and category if present.",
     "For expense receipts, extract merchant, transaction date, total amount, original currency, origin country, and issuer country whenever possible.",
     "For reimbursement reports, extract person, merchant, transaction date, amount, currency, reimbursable status, and category.",
+    "For FSP media kits, extract channel, non_linear_impressions_y1/y2/y3, linear_impressions_y1/y2/y3, non_linear_cpm_y1/y2/y3, linear_cpm_y1/y2/y3, avg_viewership, audience geography, and assumptions if present.",
+    "For FSP sponsorship documents, extract sponsor_name, segment, tier, contract_status, year_1_value, year_2_value, year_3_value, currency_code, contract_start, contract_end, payment_schedule, and deliverables_summary.",
+    "For XTZ payroll or vendor support, extract vendor_name, employee_or_payee, payroll_month, invoice_number, issue_date, due_date, section, amount, currency_code, and description.",
     "Also extract bill-origin context when present: origin_source, origin_country, issuer_country, and currency_code.",
     "Country can come from merchant address, tax details, phone prefix, city-country pair, airport code, card slip metadata, or other issuer markers.",
     "If Dubai, Abu Dhabi, UAE, or United Arab Emirates appears, infer country as United Arab Emirates and currency_code as AED unless the document explicitly states another currency.",
     "Currency must be a 3-letter ISO currency code when present or strongly inferable from the document.",
-    "Choose canonical targets conservatively: contracts, invoices, payments, expenses, revenue_records, sponsors_or_customers.",
+    "Choose canonical targets conservatively: contracts, invoices, payments, expenses, revenue_records, sponsors_or_customers, expense_submissions, fsp_sponsorships, fsp_media_revenue_cpm, reimbursement_items, provisions, software_expenses.",
     "If a value is monetary, normalize normalizedValue to digits only with decimal point and no currency symbol.",
     "If a date is present, normalize normalizedValue to YYYY-MM-DD.",
     `Document name: ${fileName}`,
@@ -189,6 +198,21 @@ function buildPrompt(
   if (context?.workflow.kind === "finance_invoice_intake") {
     lines.push(
       "This upload comes from the finance invoice-intake workflow. Prioritize vendor invoice extraction and payable review fields."
+    );
+  }
+
+  if (context?.workflow.kind === "fsp_sport_asset_intake") {
+    lines.push(
+      "This upload comes from an FSP sport module. Keep fields directly mappable to sport sponsorship or media-revenue assumptions.",
+      "If it is a sponsorship deck or contract, prefer FSP Sponsorship Document unless it is a signed holding-company contract.",
+      "If it is a media kit, rate card, broadcast proposal, or audience report, prefer FSP Media Kit."
+    );
+  }
+
+  if (context?.workflow.kind === "xtz_india_support_intake") {
+    lines.push(
+      "This upload comes from XTZ India payroll/vendor support. Prioritize payroll month, payee/vendor, invoice dates, amount, currency, reimbursement/software/provision section, and supporting description.",
+      "Do not create employee salary assumptions from a support document unless the document explicitly states the payroll amount and period."
     );
   }
 
