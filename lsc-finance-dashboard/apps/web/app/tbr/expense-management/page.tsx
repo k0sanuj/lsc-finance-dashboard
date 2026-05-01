@@ -112,7 +112,7 @@ export default async function ExpenseManagementPage({
     <div className="page-grid">
       <section className="workspace-header">
         <div className="workspace-header-left">
-          <span className="section-kicker">TBR approval dashboard</span>
+          <span className="section-kicker">Expense Management</span>
           <h3>Expense review and budget management</h3>
         </div>
         <div className="workspace-header-right">
@@ -315,6 +315,7 @@ export default async function ExpenseManagementPage({
       <section className="card compact-section-card">
         <div className="card-title-row">
           <div>
+            <span className="section-kicker">Exception-first finance review</span>
             <h3>Approval queue</h3>
           </div>
           <span className="pill">{queue.length} reports</span>
