@@ -340,6 +340,55 @@ export type SportModuleCompleteness = {
   hasAnyData: boolean;
 };
 
+export type FspSportCockpitMetrics = {
+  sportId: string;
+  sportCode: string;
+  sportName: string;
+  scenario: string;
+  revenueY1: number;
+  revenueY2: number;
+  revenueY3: number;
+  cogsY1: number;
+  cogsY2: number;
+  cogsY3: number;
+  opexY1: number;
+  opexY2: number;
+  opexY3: number;
+  ebitdaY1: number;
+  ebitdaY2: number;
+  ebitdaY3: number;
+  ebitdaMarginY1: number;
+  sponsorshipPipelineY1: number;
+  sponsorshipPipelineY2: number;
+  sponsorshipPipelineY3: number;
+  sponsorshipRecordCount: number;
+  signedSponsorshipCount: number;
+  mediaRevenueY1: number;
+  mediaRevenueY2: number;
+  mediaRevenueY3: number;
+  mediaChannelCount: number;
+  productionCostPerEvent: number;
+  productionItemCount: number;
+  opexItemCount: number;
+  moduleCompletenessScore: number;
+};
+
+function scoreCompleteness(counts: SportModuleCompleteness) {
+  const modules = [
+    counts.pnlLineItems > 0,
+    counts.sponsorships > 0,
+    counts.mediaChannelsConfigured > 0,
+    counts.influencerTiers > 0,
+    counts.opexItems > 0,
+    counts.productionItems > 0,
+    counts.leagueRoles > 0,
+    counts.techRoles > 0,
+    counts.revenueShareRows > 0,
+    counts.hasEventConfig,
+  ];
+  return Math.round((modules.filter(Boolean).length / modules.length) * 100);
+}
+
 export async function getSportModuleCompleteness(
   sportId: string
 ): Promise<SportModuleCompleteness> {
@@ -421,4 +470,185 @@ export async function getSportModuleCompleteness(
     completeness.hasEventConfig;
 
   return completeness;
+}
+
+export async function getFspSportCockpitMetrics(
+  sportId: string,
+  scenario: string = "base"
+): Promise<FspSportCockpitMetrics | null> {
+  if (getBackend() !== "database") return null;
+
+  const [rows, completeness] = await Promise.all([
+    queryRows<{
+      sport_id: string;
+      sport_code: string;
+      sport_name: string;
+      scenario: string | null;
+      revenue_y1: string;
+      revenue_y2: string;
+      revenue_y3: string;
+      cogs_y1: string;
+      cogs_y2: string;
+      cogs_y3: string;
+      opex_y1: string;
+      opex_y2: string;
+      opex_y3: string;
+      ebitda_y1: string;
+      ebitda_y2: string;
+      ebitda_y3: string;
+      sponsorship_y1: string;
+      sponsorship_y2: string;
+      sponsorship_y3: string;
+      sponsorship_count: string;
+      sponsorship_signed_count: string;
+      media_y1: string;
+      media_y2: string;
+      media_y3: string;
+      media_channel_count: string;
+      production_cost_per_event: string;
+      production_item_count: string;
+      opex_item_count: string;
+    }>(
+      `with pnl as (
+         select sport_id,
+                sport_code::text,
+                sport_name,
+                scenario::text,
+                revenue_y1::text,
+                revenue_y2::text,
+                revenue_y3::text,
+                cogs_y1::text,
+                cogs_y2::text,
+                cogs_y3::text,
+                opex_y1::text,
+                opex_y2::text,
+                opex_y3::text,
+                ebitda_y1::text,
+                ebitda_y2::text,
+                ebitda_y3::text
+         from fsp_pnl_summary
+         where sport_id = $1::uuid
+           and (scenario::text = $2::text or scenario::text = 'base' or scenario is null)
+         order by case
+           when scenario::text = $2::text then 0
+           when scenario::text = 'base' then 1
+           else 2
+         end
+         limit 1
+       ),
+       sponsorship as (
+         select sport_id,
+                coalesce(sum(year_1_value), 0)::text as sponsorship_y1,
+                coalesce(sum(year_2_value), 0)::text as sponsorship_y2,
+                coalesce(sum(year_3_value), 0)::text as sponsorship_y3,
+                count(*)::text as sponsorship_count,
+                count(*) filter (where contract_status in ('signed', 'active'))::text as sponsorship_signed_count
+         from fsp_sponsorships
+         where sport_id = $1::uuid
+         group by sport_id
+       ),
+       media as (
+         select sport_id,
+                coalesce(sum((impressions_y1 / 1000) * cpm_y1), 0)::numeric(14,2)::text as media_y1,
+                coalesce(sum((impressions_y2 / 1000) * cpm_y2), 0)::numeric(14,2)::text as media_y2,
+                coalesce(sum((impressions_y3 / 1000) * cpm_y3), 0)::numeric(14,2)::text as media_y3,
+                count(*)::text as media_channel_count
+         from fsp_media_revenue_cpm
+         where sport_id = $1::uuid
+         group by sport_id
+       ),
+       production as (
+         select sport_id,
+                coalesce(sum(line_total), 0)::text as production_cost_per_event,
+                count(*)::text as production_item_count
+         from fsp_event_production
+         where sport_id = $1::uuid
+         group by sport_id
+       ),
+       opex as (
+         select sport_id,
+                count(*)::text as opex_item_count
+         from fsp_opex_items
+         where sport_id = $1::uuid
+         group by sport_id
+       )
+       select fs.id::text as sport_id,
+              fs.sport_code::text,
+              fs.display_name as sport_name,
+              coalesce(pnl.scenario, $2::text) as scenario,
+              coalesce(pnl.revenue_y1, '0') as revenue_y1,
+              coalesce(pnl.revenue_y2, '0') as revenue_y2,
+              coalesce(pnl.revenue_y3, '0') as revenue_y3,
+              coalesce(pnl.cogs_y1, '0') as cogs_y1,
+              coalesce(pnl.cogs_y2, '0') as cogs_y2,
+              coalesce(pnl.cogs_y3, '0') as cogs_y3,
+              coalesce(pnl.opex_y1, '0') as opex_y1,
+              coalesce(pnl.opex_y2, '0') as opex_y2,
+              coalesce(pnl.opex_y3, '0') as opex_y3,
+              coalesce(pnl.ebitda_y1, '0') as ebitda_y1,
+              coalesce(pnl.ebitda_y2, '0') as ebitda_y2,
+              coalesce(pnl.ebitda_y3, '0') as ebitda_y3,
+              coalesce(sponsorship.sponsorship_y1, '0') as sponsorship_y1,
+              coalesce(sponsorship.sponsorship_y2, '0') as sponsorship_y2,
+              coalesce(sponsorship.sponsorship_y3, '0') as sponsorship_y3,
+              coalesce(sponsorship.sponsorship_count, '0') as sponsorship_count,
+              coalesce(sponsorship.sponsorship_signed_count, '0') as sponsorship_signed_count,
+              coalesce(media.media_y1, '0') as media_y1,
+              coalesce(media.media_y2, '0') as media_y2,
+              coalesce(media.media_y3, '0') as media_y3,
+              coalesce(media.media_channel_count, '0') as media_channel_count,
+              coalesce(production.production_cost_per_event, '0') as production_cost_per_event,
+              coalesce(production.production_item_count, '0') as production_item_count,
+              coalesce(opex.opex_item_count, '0') as opex_item_count
+       from fsp_sports fs
+       left join pnl on pnl.sport_id = fs.id
+       left join sponsorship on sponsorship.sport_id = fs.id
+       left join media on media.sport_id = fs.id
+       left join production on production.sport_id = fs.id
+       left join opex on opex.sport_id = fs.id
+       where fs.id = $1::uuid
+       limit 1`,
+      [sportId, scenario]
+    ),
+    getSportModuleCompleteness(sportId),
+  ]);
+
+  const row = rows[0];
+  if (!row) return null;
+
+  const revenueY1 = Number(row.revenue_y1) || 0;
+  const ebitdaY1 = Number(row.ebitda_y1) || 0;
+
+  return {
+    sportId: row.sport_id,
+    sportCode: row.sport_code,
+    sportName: row.sport_name,
+    scenario: row.scenario ?? scenario,
+    revenueY1,
+    revenueY2: Number(row.revenue_y2) || 0,
+    revenueY3: Number(row.revenue_y3) || 0,
+    cogsY1: Number(row.cogs_y1) || 0,
+    cogsY2: Number(row.cogs_y2) || 0,
+    cogsY3: Number(row.cogs_y3) || 0,
+    opexY1: Number(row.opex_y1) || 0,
+    opexY2: Number(row.opex_y2) || 0,
+    opexY3: Number(row.opex_y3) || 0,
+    ebitdaY1,
+    ebitdaY2: Number(row.ebitda_y2) || 0,
+    ebitdaY3: Number(row.ebitda_y3) || 0,
+    ebitdaMarginY1: revenueY1 ? Number(((ebitdaY1 / revenueY1) * 100).toFixed(1)) : 0,
+    sponsorshipPipelineY1: Number(row.sponsorship_y1) || 0,
+    sponsorshipPipelineY2: Number(row.sponsorship_y2) || 0,
+    sponsorshipPipelineY3: Number(row.sponsorship_y3) || 0,
+    sponsorshipRecordCount: Number(row.sponsorship_count) || 0,
+    signedSponsorshipCount: Number(row.sponsorship_signed_count) || 0,
+    mediaRevenueY1: Number(row.media_y1) || 0,
+    mediaRevenueY2: Number(row.media_y2) || 0,
+    mediaRevenueY3: Number(row.media_y3) || 0,
+    mediaChannelCount: Number(row.media_channel_count) || 0,
+    productionCostPerEvent: Number(row.production_cost_per_event) || 0,
+    productionItemCount: Number(row.production_item_count) || 0,
+    opexItemCount: Number(row.opex_item_count) || 0,
+    moduleCompletenessScore: scoreCompleteness(completeness),
+  };
 }

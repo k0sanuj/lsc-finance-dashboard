@@ -8,13 +8,16 @@ import {
   getSportEventConfig, getFspSports, getSportOpexItems, getSportEventProduction,
   getFspSportBudgetVariance,
   getSportMediaRevenue, getSportInfluencerEconomics,
-  getSportModuleCompleteness, getFspPnlSummaries,
+  getSportModuleCompleteness,
+  getAiIntakeQueue, getFspSportCockpitMetrics,
   type SportModuleCompleteness,
+  type AiIntakeQueueRow,
 } from "@lsc/db";
 import { BudgetVarianceTable } from "../../../components/budget-variance-table";
 import { AIIntakePanel } from "../../../components/ai-intake-panel";
 import { AIIntakeReviewPanel } from "../../../components/ai-intake-review-panel";
 import { EmptyState } from "../../../components/empty-state";
+import { HorizontalMetricBars, formatCompactCurrency } from "../../../components/dashboard-charts";
 import {
   addPnlLineItemAction, updatePnlLineItemAction, deletePnlLineItemAction,
   addSponsorshipAction, updateSponsorshipStatusAction,
@@ -39,6 +42,12 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
+const SCENARIOS = [
+  { key: "base", label: "Base" },
+  { key: "upside", label: "Upside" },
+  { key: "conservative", label: "Conservative" },
+] as const;
+
 function fmt(value: number): string {
   return value.toLocaleString("en-US", {
     style: "currency",
@@ -53,6 +62,58 @@ function fmtPct(value: number): string {
 
 function parseNum(v: string): number {
   return Number(String(v).replace(/[^0-9.\-]/g, "")) || 0;
+}
+
+function compact(value: number): string {
+  return formatCompactCurrency(value);
+}
+
+function sportTabHref(sportCode: string, tab: TabKey, scenario: string) {
+  const scenarioQuery = scenario !== "base" ? `&scenario=${scenario}` : "";
+  return `/fsp/sports/${sportCode}?tab=${tab}${scenarioQuery}` as Route;
+}
+
+function normalizeScenario(value: string | undefined) {
+  if (value && SCENARIOS.some((item) => item.key === value)) return value;
+  return "base";
+}
+
+function setupChecklist(completeness: SportModuleCompleteness) {
+  return [
+    {
+      label: "P&L model",
+      ready: completeness.pnlLineItems > 0,
+      detail: completeness.pnlLineItems > 0
+        ? `${completeness.pnlLineItems} line items linked`
+        : "Add revenue, COGS, and OPEX line items",
+    },
+    {
+      label: "Sponsorship pipeline",
+      ready: completeness.sponsorships > 0,
+      detail: completeness.sponsorships > 0
+        ? `${completeness.sponsorships} deals, ${completeness.sponsorshipsSigned} signed/active`
+        : "Upload sponsorship decks or contracts",
+    },
+    {
+      label: "Media revenue assumptions",
+      ready: completeness.mediaChannelsConfigured > 0,
+      detail: completeness.mediaChannelsConfigured > 0
+        ? `${completeness.mediaChannelsConfigured}/2 CPM channels configured`
+        : "Upload a media kit or rate card",
+    },
+    {
+      label: "Production cost stack",
+      ready: completeness.productionItems > 0 && completeness.hasEventConfig,
+      detail: completeness.productionItems > 0
+        ? `${completeness.productionItems} production items${completeness.hasEventConfig ? " with event config" : ""}`
+        : "Set event scale and production cost lines",
+    },
+    {
+      label: "Operating model",
+      ready: completeness.opexItems > 0 || completeness.leagueRoles > 0 || completeness.techRoles > 0,
+      detail: `${completeness.opexItems} OPEX, ${completeness.leagueRoles} league roles, ${completeness.techRoles} tech roles`,
+    },
+  ];
 }
 
 /* ─── Overview Tab ─────────────────────────────────────────── */
@@ -203,26 +264,30 @@ async function OverviewTab({
   sportId,
   sportCode,
   sportName,
+  scenario,
+  aiDrafts,
 }: {
   sportId: string;
   sportCode: string;
   sportName: string;
+  scenario: string;
+  aiDrafts: AiIntakeQueueRow[];
 }): Promise<React.ReactElement> {
-  const [completeness, pnlSummaries] = await Promise.all([
+  const [completeness, cockpit] = await Promise.all([
     getSportModuleCompleteness(sportId),
-    getFspPnlSummaries("base"),
+    getFspSportCockpitMetrics(sportId, scenario),
   ]);
-
-  const pnl = pnlSummaries.find((s) => s.sportId === sportId);
-  const revenueY1 = pnl?.revenueY1 ?? 0;
-  const revenueY3 = pnl?.revenueY3 ?? 0;
-  const ebitdaY1 = pnl?.ebitdaY1 ?? 0;
-  const ebitdaY3 = pnl?.ebitdaY3 ?? 0;
-  const ebitdaMarginY1 = pnl?.ebitdaMarginY1 ?? 0;
 
   const tiles = buildModuleTiles(completeness);
   const completeCount = tiles.filter((t) => t.state === "complete").length;
   const emptyCount = tiles.filter((t) => t.state === "empty").length;
+  const openChecklistItems = setupChecklist(completeness).filter((item) => !item.ready).length;
+  const revenueY1 = cockpit?.revenueY1 ?? 0;
+  const costY1 = (cockpit?.cogsY1 ?? 0) + (cockpit?.opexY1 ?? 0);
+  const ebitdaY1 = cockpit?.ebitdaY1 ?? 0;
+  const sponsorshipRevenue = cockpit?.sponsorshipPipelineY1 ?? 0;
+  const mediaRevenue = cockpit?.mediaRevenueY1 ?? 0;
+  const otherRevenue = Math.max(revenueY1 - sponsorshipRevenue - mediaRevenue, 0);
 
   return (
     <>
@@ -238,83 +303,195 @@ async function OverviewTab({
             {emptyCount > 0 ? `${emptyCount} module${emptyCount === 1 ? "" : "s"} need setup` : "All modules populated"}
           </span>
         </article>
-        {revenueY1 > 0 && (
-          <article className="metric-card accent-good">
-            <div className="metric-topline">
-              <span className="metric-label">Y1 revenue</span>
-            </div>
-            <div className="metric-value">{fmt(revenueY1)}</div>
-          </article>
-        )}
-        {(revenueY1 > 0 || ebitdaY1 !== 0) && (
-          <article
-            className={`metric-card ${ebitdaY1 >= 0 ? "accent-good" : "accent-risk"}`}
-          >
-            <div className="metric-topline">
-              <span className="metric-label">Y1 EBITDA</span>
-            </div>
-            <div className="metric-value">{fmt(ebitdaY1)}</div>
-            <span className="metric-subvalue">
-              Margin: {ebitdaMarginY1.toFixed(1)}%
-            </span>
-          </article>
-        )}
-        {revenueY3 > 0 && (
-          <article className="metric-card accent-good">
-            <div className="metric-topline">
-              <span className="metric-label">Y3 revenue</span>
-            </div>
-            <div className="metric-value">{fmt(revenueY3)}</div>
-          </article>
-        )}
-        {(revenueY3 > 0 || ebitdaY3 !== 0) && (
-          <article
-            className={`metric-card ${ebitdaY3 >= 0 ? "accent-good" : "accent-risk"}`}
-          >
-            <div className="metric-topline">
-              <span className="metric-label">Y3 EBITDA</span>
-            </div>
-            <div className="metric-value">{fmt(ebitdaY3)}</div>
-          </article>
-        )}
+        <article className="metric-card accent-good">
+          <div className="metric-topline">
+            <span className="metric-label">Y1 revenue</span>
+          </div>
+          <div className="metric-value">{compact(revenueY1)}</div>
+          <span className="metric-subvalue">{cockpit?.sponsorshipRecordCount ?? 0} sponsorship records</span>
+        </article>
+        <article className="metric-card accent-risk">
+          <div className="metric-topline">
+            <span className="metric-label">Y1 cost</span>
+          </div>
+          <div className="metric-value">{compact(costY1)}</div>
+          <span className="metric-subvalue">COGS + OPEX from sport P&amp;L</span>
+        </article>
+        <article className={`metric-card ${ebitdaY1 >= 0 ? "accent-good" : "accent-risk"}`}>
+          <div className="metric-topline">
+            <span className="metric-label">Y1 EBITDA</span>
+          </div>
+          <div className="metric-value">{compact(ebitdaY1)}</div>
+          <span className="metric-subvalue">Margin: {(cockpit?.ebitdaMarginY1 ?? 0).toFixed(1)}%</span>
+        </article>
       </section>
 
-      {!completeness.hasAnyData && (
+      <section className="grid-two">
         <article className="card">
           <div className="card-title-row">
             <div>
-              <span className="section-kicker">Getting started</span>
-              <h3>Welcome to the {sportName} module</h3>
+              <span className="section-kicker">Scenario selector</span>
+              <h3>{sportName} cockpit</h3>
             </div>
+            <span className="pill">{(cockpit?.scenario ?? scenario).replace(/_/g, " ")}</span>
           </div>
-          <p className="muted">
-            This sport has no financial data yet. The fastest way to populate
-            it is to upload a media kit or sponsorship contract on those tabs
-            — the AI ingest panel extracts every field so you can review and
-            save in one click.
-          </p>
-          <div className="actions-row">
-            <Link
-              className="action-button primary"
-              href={`/fsp/sports/${sportCode}?tab=sponsorship` as Route}
-            >
-              Start with sponsorships
-            </Link>
-            <Link
-              className="action-button secondary"
-              href={`/fsp/sports/${sportCode}?tab=media` as Route}
-            >
-              Configure media revenue
-            </Link>
-            <Link
-              className="action-button secondary"
-              href={`/fsp/sports/${sportCode}?tab=summary` as Route}
-            >
-              Add P&L line items
-            </Link>
+          <div className="segment-row">
+            {SCENARIOS.map((item) => (
+              <Link
+                className={`segment-chip${scenario === item.key ? " active" : ""}`}
+                href={sportTabHref(sportCode, "overview", item.key)}
+                key={item.key}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+
+          <div className="mt-lg">
+            <HorizontalMetricBars
+              rows={[
+                { label: "Y1 revenue", value: cockpit?.revenueY1 ?? 0, displayValue: compact(cockpit?.revenueY1 ?? 0), tone: "good" },
+                { label: "Y2 revenue", value: cockpit?.revenueY2 ?? 0, displayValue: compact(cockpit?.revenueY2 ?? 0), tone: "good" },
+                { label: "Y3 revenue", value: cockpit?.revenueY3 ?? 0, displayValue: compact(cockpit?.revenueY3 ?? 0), tone: "good" },
+                { label: "Y1 EBITDA", value: Math.abs(cockpit?.ebitdaY1 ?? 0), displayValue: compact(cockpit?.ebitdaY1 ?? 0), tone: (cockpit?.ebitdaY1 ?? 0) >= 0 ? "good" : "risk" },
+                { label: "Y3 EBITDA", value: Math.abs(cockpit?.ebitdaY3 ?? 0), displayValue: compact(cockpit?.ebitdaY3 ?? 0), tone: (cockpit?.ebitdaY3 ?? 0) >= 0 ? "good" : "risk" },
+              ]}
+            />
           </div>
         </article>
-      )}
+
+        <article className="card">
+          <AIIntakePanel
+            companyCode="FSP"
+            defaultTargetKind="fsp_sport_media_kit"
+            description="Upload or type a media kit, sponsorship deck, contract, or budget support. AI extracts mapped fields into an editable preview before updating this sport."
+            notePlaceholder={`Example: ${sportName} media kit, rate card, sponsorship proposal, or launch budget assumptions.`}
+            redirectPath={`/fsp/sports/${sportCode}?tab=overview`}
+            targetEntityId={sportId}
+            targetEntityType="fsp_sport"
+            targetOptions={[
+              { value: "fsp_sport_media_kit", label: "Media kit / rate card" },
+              { value: "fsp_sport_sponsorship_document", label: "Sponsorship document" },
+            ]}
+            title="AI sport intake"
+            variant="plain"
+            workflowContext={`fsp-sport:${sportCode}:cockpit`}
+          />
+        </article>
+      </section>
+
+      <section className="grid-two">
+        <article className="card">
+          <div className="card-title-row">
+            <div>
+              <span className="section-kicker">Revenue mix</span>
+              <h3>Y1 commercial composition</h3>
+            </div>
+          </div>
+          <HorizontalMetricBars
+            rows={[
+              { label: "Sponsorship pipeline", value: sponsorshipRevenue, displayValue: compact(sponsorshipRevenue), sublabel: `${cockpit?.signedSponsorshipCount ?? 0} signed/active`, tone: "good" },
+              { label: "Media revenue potential", value: mediaRevenue, displayValue: compact(mediaRevenue), sublabel: `${cockpit?.mediaChannelCount ?? 0}/2 media channels`, tone: "secondary" },
+              { label: "Other P&L revenue", value: otherRevenue, displayValue: compact(otherRevenue), tone: "warn" },
+            ]}
+          />
+        </article>
+
+        <article className="card">
+          <div className="card-title-row">
+            <div>
+              <span className="section-kicker">Cost stack</span>
+              <h3>Y1 cost drivers</h3>
+            </div>
+          </div>
+          <HorizontalMetricBars
+            rows={[
+              { label: "COGS", value: cockpit?.cogsY1 ?? 0, displayValue: compact(cockpit?.cogsY1 ?? 0), tone: "risk" },
+              { label: "OPEX", value: cockpit?.opexY1 ?? 0, displayValue: compact(cockpit?.opexY1 ?? 0), sublabel: `${cockpit?.opexItemCount ?? 0} operating items`, tone: "warn" },
+              { label: "Event production / event", value: cockpit?.productionCostPerEvent ?? 0, displayValue: compact(cockpit?.productionCostPerEvent ?? 0), sublabel: `${cockpit?.productionItemCount ?? 0} production items`, tone: "secondary" },
+            ]}
+          />
+        </article>
+      </section>
+
+      <section className="grid-two">
+        <article className="card">
+          <div className="card-title-row">
+            <div>
+              <span className="section-kicker">EBITDA bridge</span>
+              <h3>Revenue to margin</h3>
+            </div>
+          </div>
+          <HorizontalMetricBars
+            rows={[
+              { label: "Revenue", value: revenueY1, displayValue: compact(revenueY1), tone: "good" },
+              { label: "Less COGS", value: cockpit?.cogsY1 ?? 0, displayValue: compact(-(cockpit?.cogsY1 ?? 0)), tone: "risk" },
+              { label: "Less OPEX", value: cockpit?.opexY1 ?? 0, displayValue: compact(-(cockpit?.opexY1 ?? 0)), tone: "warn" },
+              { label: "EBITDA", value: Math.abs(ebitdaY1), displayValue: compact(ebitdaY1), tone: ebitdaY1 >= 0 ? "good" : "risk" },
+            ]}
+          />
+        </article>
+
+        <article className="card">
+          <div className="card-title-row">
+            <div>
+              <span className="section-kicker">Setup checklist</span>
+              <h3>Open assumptions and documents</h3>
+            </div>
+            <span className="pill">{openChecklistItems} open</span>
+          </div>
+          <div className="key-value-list">
+            {setupChecklist(completeness).map((item) => (
+              <div className="key-value-row" key={item.label}>
+                <span>{item.label}</span>
+                <strong>{item.ready ? "Ready" : item.detail}</strong>
+              </div>
+            ))}
+          </div>
+        </article>
+      </section>
+
+      <article className="card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">AI source drafts</span>
+            <h3>Recent approved-preview workflow</h3>
+          </div>
+          <span className="badge">{aiDrafts.length} drafts</span>
+        </div>
+        {aiDrafts.length === 0 ? (
+          <p className="muted">No FSP AI intake drafts have been created for this sport yet.</p>
+        ) : (
+          <div className="table-wrapper clean-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Source</th>
+                  <th>Target</th>
+                  <th>Status</th>
+                  <th>Confidence</th>
+                  <th>Preview</th>
+                </tr>
+              </thead>
+              <tbody>
+                {aiDrafts.map((draft) => (
+                  <tr key={draft.id}>
+                    <td>{draft.sourceName}</td>
+                    <td>{draft.targetKind.replace(/_/g, " ")}</td>
+                    <td><span className="pill">{draft.status.replace(/_/g, " ")}</span></td>
+                    <td>{Math.round(Number(draft.confidence) * 100)}%</td>
+                    <td>
+                      <Link className="ghost-link" href={`/fsp/sports/${sportCode}?tab=overview&aiDraftId=${draft.id}` as Route}>
+                        Open preview
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </article>
 
       <article className="card">
         <div className="card-title-row">
@@ -1674,23 +1851,31 @@ export default async function SportDetailPage({
   searchParams,
 }: {
   params: Promise<{ sport: string }>;
-  searchParams: Promise<{ tab?: string; status?: string; message?: string; aiDraftId?: string }>;
+  searchParams: Promise<{ tab?: string; scenario?: string; status?: string; message?: string; aiDraftId?: string }>;
 }): Promise<React.ReactElement> {
   await requireRole(["super_admin", "finance_admin", "commercial_user", "viewer"]);
 
   const { sport: sportCode } = await params;
-  const { tab: rawTab, status, message, aiDraftId } = await searchParams;
+  const { tab: rawTab, scenario: rawScenario, status, message, aiDraftId } = await searchParams;
 
   const sportId = await getSportIdByCode(sportCode);
   if (!sportId) notFound();
 
-  const allSports = await getFspSports();
+  const [allSports, aiDrafts] = await Promise.all([
+    getFspSports(),
+    getAiIntakeQueue({
+      companyCode: "FSP",
+      workflowContextPrefix: `fsp-sport:${sportCode}:`,
+      limit: 8,
+    }),
+  ]);
   const sportEntry = allSports.find((s) => s.sportCode === sportCode);
   const sportName = sportEntry?.displayName ?? sportCode;
 
   const activeTab: TabKey = TABS.some((t) => t.key === rawTab)
     ? (rawTab as TabKey)
     : "overview";
+  const scenario = normalizeScenario(rawScenario);
 
   return (
     <div className="page-grid">
@@ -1712,7 +1897,7 @@ export default async function SportDetailPage({
           <Link
             key={t.key}
             className={`segment-chip${activeTab === t.key ? " active" : ""}`}
-            href={`/fsp/sports/${sportCode}?tab=${t.key}` as Route}
+            href={sportTabHref(sportCode, t.key, scenario)}
           >
             {t.label}
           </Link>
@@ -1721,12 +1906,18 @@ export default async function SportDetailPage({
 
       <AIIntakeReviewPanel
         draftId={aiDraftId}
-        redirectPath={`/fsp/sports/${sportCode}?tab=${activeTab}`}
+        redirectPath={sportTabHref(sportCode, activeTab, scenario)}
         title={`${sportName} AI intake preview`}
       />
 
       {activeTab === "overview" && (
-        <OverviewTab sportId={sportId} sportCode={sportCode} sportName={sportName} />
+        <OverviewTab
+          aiDrafts={aiDrafts}
+          scenario={scenario}
+          sportCode={sportCode}
+          sportId={sportId}
+          sportName={sportName}
+        />
       )}
       {activeTab === "summary" && <PnlSummaryTab sportId={sportId} sportCode={sportCode} />}
       {activeTab === "sponsorship" && <SponsorshipTab sportId={sportId} sportCode={sportCode} />}

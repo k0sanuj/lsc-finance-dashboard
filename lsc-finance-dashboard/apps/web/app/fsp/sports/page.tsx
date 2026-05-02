@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { requireRole } from "../../../lib/auth";
-import { getFspPnlSummaries, getFspSports, getSportModuleCompleteness } from "@lsc/db";
+import { getAiIntakeQueue, getFspPnlSummaries, getFspSports, getSportModuleCompleteness } from "@lsc/db";
 import { HorizontalMetricBars, formatCompactCurrency } from "../../components/dashboard-charts";
 
 const fallbackSports = [
@@ -49,9 +49,14 @@ function completenessScore(counts: Awaited<ReturnType<typeof getSportModuleCompl
 export default async function FspSportsPage(): Promise<React.ReactElement> {
   await requireRole(["super_admin", "finance_admin", "commercial_user", "viewer"]);
 
-  const [dbSports, pnlSummaries] = await Promise.all([
+  const [dbSports, pnlSummaries, aiDrafts] = await Promise.all([
     getFspSports(),
     getFspPnlSummaries("base"),
+    getAiIntakeQueue({
+      companyCode: "FSP",
+      workflowContextPrefix: "fsp-sport:",
+      limit: 8,
+    }),
   ]);
   const sports = dbSports.length > 0 ? dbSports : fallbackSports;
   const pnlByCode = new Map(pnlSummaries.map((summary) => [summary.sportCode, summary]));
@@ -68,6 +73,10 @@ export default async function FspSportsPage(): Promise<React.ReactElement> {
   const totalCost = pnlSummaries.reduce((sum, sport) => sum + sport.cogsY1 + sport.opexY1, 0);
   const totalEbitda = pnlSummaries.reduce((sum, sport) => sum + sport.ebitdaY1, 0);
   const activeSports = sports.filter((sport) => sport.isActive).length;
+  const draftsNeedingReview = aiDrafts.filter((draft) => draft.status === "needs_review").length;
+  const postedDrafts = aiDrafts.filter((draft) => draft.status === "posted").length;
+  const mediaDrafts = aiDrafts.filter((draft) => draft.targetKind === "fsp_sport_media_kit").length;
+  const sponsorshipDrafts = aiDrafts.filter((draft) => draft.targetKind === "fsp_sport_sponsorship_document").length;
 
   return (
     <div className="page-grid">
@@ -101,6 +110,82 @@ export default async function FspSportsPage(): Promise<React.ReactElement> {
         <article className={`metric-card ${totalEbitda >= 0 ? "accent-good" : "accent-risk"}`}>
           <div className="metric-topline"><span className="metric-label">Y1 EBITDA</span></div>
           <div className="metric-value">{fmt(totalEbitda)}</div>
+        </article>
+      </section>
+
+      <section className="grid-two">
+        <article className="card">
+          <div className="card-title-row">
+            <div>
+              <span className="section-kicker">AI source intake</span>
+              <h3>Sports documents waiting for approval</h3>
+            </div>
+            <span className="badge">{aiDrafts.length} recent drafts</span>
+          </div>
+          <div className="mini-metric-grid">
+            <div className="mini-metric">
+              <span>Needs preview</span>
+              <strong>{draftsNeedingReview}</strong>
+            </div>
+            <div className="mini-metric">
+              <span>Posted</span>
+              <strong>{postedDrafts}</strong>
+            </div>
+            <div className="mini-metric">
+              <span>Media kits</span>
+              <strong>{mediaDrafts}</strong>
+            </div>
+            <div className="mini-metric">
+              <span>Sponsorship docs</span>
+              <strong>{sponsorshipDrafts}</strong>
+            </div>
+          </div>
+        </article>
+
+        <article className="card">
+          <div className="card-title-row">
+            <div>
+              <span className="section-kicker">Recent AI drafts</span>
+              <h3>Approval queue by sport</h3>
+            </div>
+          </div>
+          {aiDrafts.length === 0 ? (
+            <p className="muted">Open a sport cockpit to upload a media kit, sponsorship deck, contract, or budget support document.</p>
+          ) : (
+            <div className="table-wrapper clean-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Target</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {aiDrafts.slice(0, 5).map((draft) => {
+                    const sport = sports.find((entry) => entry.id === draft.targetEntityId);
+                    const href = sport
+                      ? `/fsp/sports/${sport.sportCode}?tab=overview&aiDraftId=${draft.id}`
+                      : `/documents/FSP?aiDraftId=${draft.id}`;
+
+                    return (
+                      <tr key={draft.id}>
+                        <td>{draft.sourceName}</td>
+                        <td>{draft.targetKind.replace(/_/g, " ")}</td>
+                        <td><span className="pill">{draft.status.replace(/_/g, " ")}</span></td>
+                        <td>
+                          <Link className="ghost-link" href={href as Route}>
+                            Open preview
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </article>
       </section>
 
