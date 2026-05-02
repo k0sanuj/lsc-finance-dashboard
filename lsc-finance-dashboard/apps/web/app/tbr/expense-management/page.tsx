@@ -107,6 +107,10 @@ export default async function ExpenseManagementPage({
 
   const status = params?.status ?? null;
   const message = params?.message ?? null;
+  const overBudgetCount = queue.filter((row) => row.budgetSignal === "above_budget").length;
+  const closeToBudgetCount = queue.filter((row) => row.budgetSignal === "close_to_budget").length;
+  const noRuleCount = queue.filter((row) => row.budgetSignal === "no_rule").length;
+  const cleanCount = queue.filter((row) => row.budgetSignal === "below_budget").length;
 
   return (
     <div className="page-grid">
@@ -140,6 +144,37 @@ export default async function ExpenseManagementPage({
             </article>
           );
         })}
+      </section>
+
+      <section className="stats-grid compact-stats">
+        <article className="metric-card accent-risk">
+          <div className="metric-topline">
+            <span className="metric-label">Over budget</span>
+          </div>
+          <div className="metric-value">{overBudgetCount}</div>
+          <span className="metric-subvalue">Open reports requiring override or clarification.</span>
+        </article>
+        <article className="metric-card accent-warn">
+          <div className="metric-topline">
+            <span className="metric-label">Close to budget</span>
+          </div>
+          <div className="metric-value">{closeToBudgetCount}</div>
+          <span className="metric-subvalue">Reports finance should inspect before approval.</span>
+        </article>
+        <article className="metric-card accent-accent">
+          <div className="metric-topline">
+            <span className="metric-label">No budget rule</span>
+          </div>
+          <div className="metric-value">{noRuleCount}</div>
+          <span className="metric-subvalue">Reports missing a race/category budget match.</span>
+        </article>
+        <article className="metric-card accent-good">
+          <div className="metric-topline">
+            <span className="metric-label">Clean</span>
+          </div>
+          <div className="metric-value">{cleanCount}</div>
+          <span className="metric-subvalue">Reports currently below matched budget thresholds.</span>
+        </article>
       </section>
 
       <section className="card compact-section-card">

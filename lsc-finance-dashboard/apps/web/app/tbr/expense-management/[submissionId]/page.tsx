@@ -478,13 +478,76 @@ export default async function ExpenseSubmissionDetailPage({
             </div>
             {item.description ? <p className="table-note">{item.description}</p> : null}
 
-            <p className="table-note">
-              Budget:{" "}
-              <span className={`pill signal-pill signal-${item.budgetStatusTone}`}>
-                {item.budgetStatusLabel}
-              </span>{" "}
-              {item.budgetApprovedAmount ?? "No rule"} — {item.budgetVariance ?? "N/A"}
-            </p>
+            <section className="grid-two compact-grid">
+              <div className="compact-section-card">
+                <div className="card-title-row compact-card-title-row">
+                  <div>
+                    <span className="section-kicker">Source evidence</span>
+                    <h4>{item.sourceDocumentName}</h4>
+                  </div>
+                  {item.aiIntakeDraftId ? <span className="pill">AI linked</span> : <span className="pill subtle-pill">Manual</span>}
+                </div>
+                {item.sourcePreviewDataUrl && item.sourcePreviewMimeType?.startsWith("image/") ? (
+                  <img
+                    alt={`Receipt preview for ${item.merchantName}`}
+                    src={item.sourcePreviewDataUrl}
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      display: "block",
+                      maxHeight: 260,
+                      maxWidth: "100%",
+                      objectFit: "contain",
+                    }}
+                  />
+                ) : (
+                  <p className="table-note">
+                    {item.aiIntakeDraftId
+                      ? `AI draft ${item.aiIntakeDraftId} supplied the mapped fields for this item.`
+                      : "No receipt preview is attached to this item."}
+                  </p>
+                )}
+              </div>
+
+              <div className="compact-section-card">
+                <div className="card-title-row compact-card-title-row">
+                  <div>
+                    <span className="section-kicker">Extracted fields and budget</span>
+                    <h4>Finance review inputs</h4>
+                  </div>
+                  <span className={`pill signal-pill signal-${item.budgetStatusTone}`}>
+                    {item.budgetStatusLabel}
+                  </span>
+                </div>
+                <div className="mini-metric-grid">
+                  <div className="mini-metric">
+                    <span>AI target</span>
+                    <strong>{item.aiTargetKind?.replace(/_/g, " ") ?? "Not AI-linked"}</strong>
+                  </div>
+                  <div className="mini-metric">
+                    <span>AI category</span>
+                    <strong>{item.aiCategory || item.category}</strong>
+                  </div>
+                  <div className="mini-metric">
+                    <span>Paid by</span>
+                    <strong>{item.paidBy || submission.submitter}</strong>
+                  </div>
+                  <div className="mini-metric">
+                    <span>Currency</span>
+                    <strong>{item.currencyCode}</strong>
+                  </div>
+                  <div className="mini-metric">
+                    <span>Approved budget</span>
+                    <strong>{item.budgetApprovedAmount ?? "No rule"}</strong>
+                  </div>
+                  <div className="mini-metric">
+                    <span>Variance</span>
+                    <strong>{item.budgetVariance ?? "N/A"}</strong>
+                  </div>
+                </div>
+                {item.budgetNotes ? <p className="table-note">{item.budgetNotes}</p> : null}
+              </div>
+            </section>
 
             <section className="grid-two">
               <article className="card">

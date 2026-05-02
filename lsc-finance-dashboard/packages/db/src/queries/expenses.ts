@@ -1,5 +1,6 @@
 import "server-only";
 
+import { resolveDocumentPreview } from "../document-storage";
 import { queryRows } from "../query";
 import {
   formatBudgetSignalLabel,
@@ -76,12 +77,20 @@ export type ExpenseSubmissionItemDetail = {
   merchantName: string;
   expenseDate: string;
   amount: string;
+  currencyCode: string;
   category: string;
   team: string;
   description: string;
   splitMethod: string;
   splitCount: string;
   linkedExpenseId: string | null;
+  sourceDocumentName: string;
+  sourcePreviewDataUrl: string | null;
+  sourcePreviewMimeType: string | null;
+  aiIntakeDraftId: string | null;
+  aiTargetKind: string | null;
+  aiCategory: string | null;
+  paidBy: string | null;
   budgetStatusKey: string;
   budgetStatusLabel: string;
   budgetStatusTone: string;
@@ -161,6 +170,7 @@ export type ExpenseSubmissionItemSource = {
   id: string;
   merchant_name: string | null;
   expense_date: string | null;
+  currency_code: string;
   amount: string;
   category_name: string | null;
   team_name: string | null;
@@ -168,6 +178,9 @@ export type ExpenseSubmissionItemSource = {
   split_method: string;
   split_count: string;
   linked_expense_id: string | null;
+  source_document_name: string | null;
+  source_document_metadata: Record<string, unknown> | null;
+  ai_summary: Record<string, unknown> | null;
   budget_signal: string;
   rule_kind: string | null;
   unit_label: string | null;
@@ -420,6 +433,7 @@ export async function getExpenseSubmissionItems(submissionId: string) {
        esi.id,
        esi.merchant_name,
        esi.expense_date::text,
+       esi.currency_code,
        esi.amount::text,
        cc.name as category_name,
        t.team_name,
@@ -427,6 +441,9 @@ export async function getExpenseSubmissionItems(submissionId: string) {
        esi.split_method::text,
        esi.split_count::text,
        esi.linked_expense_id::text,
+       sd.source_name as source_document_name,
+       sd.metadata as source_document_metadata,
+       esi.ai_summary,
        case
          when rbr.id is null then 'no_rule'
          when esi.amount > rbr.approved_amount_usd then 'above_budget'
@@ -443,6 +460,7 @@ export async function getExpenseSubmissionItems(submissionId: string) {
      join expense_submissions es on es.id = esi.submission_id
      left join cost_categories cc on cc.id = esi.cost_category_id
      left join app_teams t on t.id = esi.team_id
+     left join source_documents sd on sd.id = esi.source_document_id
      left join race_budget_rules rbr
        on rbr.race_event_id = es.race_event_id
       and rbr.cost_category_id = esi.cost_category_id
@@ -482,21 +500,35 @@ export async function getExpenseSubmissionItems(submissionId: string) {
     splitsByItem.set(split.expense_submission_item_id, existing);
   }
 
-  return itemRows.map((row) => {
+  return Promise.all(itemRows.map(async (row) => {
     const variance =
       row.approved_amount_usd !== null ? Number(row.amount) - Number(row.approved_amount_usd) : null;
+    const preview = await resolveDocumentPreview(row.source_document_metadata);
+    const aiSummary = row.ai_summary ?? {};
+    const aiIntakeDraftId = typeof aiSummary.aiIntakeDraftId === "string" ? aiSummary.aiIntakeDraftId : null;
+    const aiTargetKind = typeof aiSummary.targetKind === "string" ? aiSummary.targetKind : null;
+    const aiCategory = typeof aiSummary.category === "string" ? aiSummary.category : null;
+    const paidBy = typeof aiSummary.paidBy === "string" ? aiSummary.paidBy : null;
 
     return {
       id: row.id,
       merchantName: row.merchant_name ?? "Unknown merchant",
       expenseDate: row.expense_date ? formatDateLabel(row.expense_date) : "No date",
       amount: formatCurrency(row.amount),
+      currencyCode: row.currency_code,
       category: row.category_name ?? "Uncategorized",
       team: row.team_name ?? "No team",
       description: row.description ?? "No description",
       splitMethod: row.split_method,
       splitCount: row.split_count,
       linkedExpenseId: row.linked_expense_id,
+      sourceDocumentName: row.source_document_name ?? "No source document linked",
+      sourcePreviewDataUrl: preview.previewDataUrl,
+      sourcePreviewMimeType: preview.previewMimeType,
+      aiIntakeDraftId,
+      aiTargetKind,
+      aiCategory,
+      paidBy,
       budgetStatusKey: row.budget_signal,
       budgetStatusLabel: formatBudgetSignalLabel(row.budget_signal),
       budgetStatusTone: formatBudgetSignalTone(row.budget_signal),
@@ -509,7 +541,7 @@ export async function getExpenseSubmissionItems(submissionId: string) {
       budgetNotes: row.rule_notes ?? null,
       splits: splitsByItem.get(row.id) ?? []
     };
-  }) satisfies ExpenseSubmissionItemDetail[];
+  })) satisfies Promise<ExpenseSubmissionItemDetail[]>;
 }
 
 export async function getMyExpenseSubmissions(appUserId: string, raceId?: string) {
