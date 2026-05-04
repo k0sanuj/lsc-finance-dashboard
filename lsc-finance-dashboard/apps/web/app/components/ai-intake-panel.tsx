@@ -37,6 +37,8 @@ type AIIntakePanelProps = {
   targetEntityId?: string;
   notePlaceholder?: string;
   textPlaceholder?: string;
+  uploadAccept?: string;
+  uploadCapture?: "environment" | "user";
   variant?: "card" | "plain";
 };
 
@@ -52,6 +54,8 @@ export function AIIntakePanel({
   targetEntityId,
   notePlaceholder = "Add context for entity, race, period, payee, or assumptions.",
   textPlaceholder = "Paste invoice text, contract terms, receipt details, or payroll/vendor support notes.",
+  uploadAccept,
+  uploadCapture,
   variant = "card",
 }: AIIntakePanelProps) {
   const options = targetOptions?.length ? targetOptions : [{ value: defaultTargetKind, label: "Selected intake" }];
@@ -90,7 +94,7 @@ export function AIIntakePanel({
 
           <label className="field">
             <span>Upload</span>
-            <input name="document" type="file" />
+            <input accept={uploadAccept} capture={uploadCapture} name="document" type="file" />
           </label>
 
           <label className="field">

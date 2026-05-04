@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import Link from "next/link";
 import {
   getExpenseApprovalQueue,
@@ -21,6 +22,7 @@ type ExpenseManagementPageProps = {
     raceId?: string;
     submitterId?: string;
     submissionStatus?: string;
+    budgetSignal?: string;
   }>;
 };
 
@@ -34,6 +36,15 @@ const STATUS_OPTIONS = [
   { value: "rejected", label: "Rejected" }
 ] as const;
 
+const BUDGET_SIGNAL_OPTIONS = [
+  { value: "", label: "All budget signals" },
+  { value: "exception", label: "Exceptions" },
+  { value: "above_budget", label: "Over budget" },
+  { value: "close_to_budget", label: "Close to budget" },
+  { value: "no_rule", label: "No budget rule" },
+  { value: "below_budget", label: "Clean" }
+] as const;
+
 export default async function ExpenseManagementPage({
   searchParams
 }: ExpenseManagementPageProps) {
@@ -44,12 +55,14 @@ export default async function ExpenseManagementPage({
     params?.season !== undefined ||
     params?.raceId !== undefined ||
     params?.submitterId !== undefined ||
-    params?.submissionStatus !== undefined;
+    params?.submissionStatus !== undefined ||
+    params?.budgetSignal !== undefined;
 
   let selectedSeason = params?.season ? Number(params.season) : null;
   let selectedRaceId = params?.raceId ?? "";
   const selectedSubmitterId = params?.submitterId ?? "";
   const selectedStatus = params?.submissionStatus ?? "";
+  const selectedBudgetSignal = params?.budgetSignal ?? "";
 
   // Auto-select the next upcoming race when no filters have been applied
   if (!hasAnyFilter) {
@@ -66,7 +79,8 @@ export default async function ExpenseManagementPage({
       seasonYear: Number.isFinite(selectedSeason) ? selectedSeason : null,
       raceEventId: selectedRaceId || null,
       submitterId: selectedSubmitterId || null,
-      submissionStatus: selectedStatus || null
+      submissionStatus: selectedStatus || null,
+      budgetSignal: selectedBudgetSignal || null
     }),
     getExpenseFormOptions(),
     getTbrSeasonSummaries(),
@@ -101,6 +115,9 @@ export default async function ExpenseManagementPage({
   if (selectedStatus) {
     activeFilterQuery.set("submissionStatus", selectedStatus);
   }
+  if (selectedBudgetSignal) {
+    activeFilterQuery.set("budgetSignal", selectedBudgetSignal);
+  }
   const returnPath = activeFilterQuery.toString()
     ? `/tbr/expense-management?${activeFilterQuery.toString()}`
     : "/tbr/expense-management";
@@ -111,6 +128,28 @@ export default async function ExpenseManagementPage({
   const closeToBudgetCount = queue.filter((row) => row.budgetSignal === "close_to_budget").length;
   const noRuleCount = queue.filter((row) => row.budgetSignal === "no_rule").length;
   const cleanCount = queue.filter((row) => row.budgetSignal === "below_budget").length;
+  const submittedCount = queue.filter((row) => row.status === "submitted").length;
+  const inReviewCount = queue.filter((row) => row.status === "in_review").length;
+  const clarificationCount = queue.filter((row) => row.status === "needs_clarification").length;
+  const buildQueueHref = (overrides: { submissionStatus?: string | null; budgetSignal?: string | null }) => {
+    const query = new URLSearchParams(activeFilterQuery);
+    if ("submissionStatus" in overrides) {
+      if (overrides.submissionStatus) {
+        query.set("submissionStatus", overrides.submissionStatus);
+      } else {
+        query.delete("submissionStatus");
+      }
+    }
+    if ("budgetSignal" in overrides) {
+      if (overrides.budgetSignal) {
+        query.set("budgetSignal", overrides.budgetSignal);
+      } else {
+        query.delete("budgetSignal");
+      }
+    }
+    const qs = query.toString();
+    return qs ? `/tbr/expense-management?${qs}` : "/tbr/expense-management";
+  };
 
   return (
     <div className="page-grid">
@@ -144,6 +183,45 @@ export default async function ExpenseManagementPage({
             </article>
           );
         })}
+      </section>
+
+      <section className="review-lane-grid">
+        {[
+          {
+            label: "Exceptions",
+            value: overBudgetCount + closeToBudgetCount + noRuleCount,
+            detail: "Budget signals that need a finance decision.",
+            href: buildQueueHref({ submissionStatus: null, budgetSignal: "exception" }),
+            tone: "risk",
+          },
+          {
+            label: "New",
+            value: submittedCount,
+            detail: "Fresh reports waiting to be opened.",
+            href: buildQueueHref({ submissionStatus: "submitted", budgetSignal: null }),
+            tone: "accent",
+          },
+          {
+            label: "In review",
+            value: inReviewCount,
+            detail: "Reports already picked up by finance.",
+            href: buildQueueHref({ submissionStatus: "in_review", budgetSignal: null }),
+            tone: "brand",
+          },
+          {
+            label: "Returned",
+            value: clarificationCount,
+            detail: "Clarification loops with submitters.",
+            href: buildQueueHref({ submissionStatus: "needs_clarification", budgetSignal: null }),
+            tone: "warn",
+          },
+        ].map((lane) => (
+          <Link className={`review-lane-card ${lane.tone}`} href={lane.href as Route} key={lane.label}>
+            <span className="section-kicker">{lane.label}</span>
+            <strong>{lane.value}</strong>
+            <span>{lane.detail}</span>
+          </Link>
+        ))}
       </section>
 
       <section className="stats-grid compact-stats">
@@ -234,6 +312,16 @@ export default async function ExpenseManagementPage({
               </select>
             </label>
           </div>
+          <label className="field">
+            <span>Budget signal</span>
+            <select defaultValue={selectedBudgetSignal} name="budgetSignal">
+              {BUDGET_SIGNAL_OPTIONS.map((option) => (
+                <option key={option.label} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="actions-row">
             <button className="action-button primary" type="submit">
               Apply filters

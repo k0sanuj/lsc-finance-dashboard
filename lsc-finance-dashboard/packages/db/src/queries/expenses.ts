@@ -116,6 +116,7 @@ export type MyExpenseSubmissionRow = {
   race: string;
   seasonLabel: string;
   submittedAt: string;
+  statusKey: string;
   status: string;
   totalAmount: string;
   itemCount: string;
@@ -290,45 +291,69 @@ export async function getExpenseApprovalQueue(filters?: {
   raceEventId?: string | null;
   submitterId?: string | null;
   submissionStatus?: string | null;
+  budgetSignal?: string | null;
 }) {
   if (getBackend() === "database") {
     const rows = await queryRows<ExpenseQueueSource>(
-      `select
+      `with approval_queue as (
+       select
          es.id,
-       es.submission_title,
-       re.name as race_name,
-       re.season_year,
-       au.full_name as submitter_name,
-       es.submitted_at::text,
-       coalesce(sum(esi.amount), 0)::text as total_amount,
-       es.submission_status,
-       count(esi.id)::text as item_count,
-       coalesce(max(case
-         when rbr.id is null then 0
-         when esi.amount > rbr.approved_amount_usd then 3
-         when esi.amount >= (rbr.approved_amount_usd * rbr.close_threshold_ratio) then 2
-         else 1
-       end), 0)::int as budget_signal_rank,
-       count(rbr.id)::text as matched_budget_count
-       from expense_submissions es
-       join app_users au on au.id = es.submitted_by_user_id
-       left join race_events re on re.id = es.race_event_id
-       left join expense_submission_items esi on esi.submission_id = es.id
-       left join race_budget_rules rbr
-         on rbr.race_event_id = es.race_event_id
-        and rbr.cost_category_id = esi.cost_category_id
-       where ($1::int is null or re.season_year = $1)
-         and ($2::uuid is null or es.race_event_id = $2::uuid)
-         and ($3::uuid is null or es.submitted_by_user_id = $3::uuid)
-         and ($4::text is null or es.submission_status::text = $4)
-       group by es.id, re.name, re.season_year, au.full_name
-       order by es.created_at desc
+         es.submission_title,
+         re.name as race_name,
+         re.season_year,
+         au.full_name as submitter_name,
+         es.submitted_at::text,
+         es.created_at,
+         coalesce(sum(esi.amount), 0)::text as total_amount,
+         es.submission_status,
+         count(esi.id)::text as item_count,
+         coalesce(max(case
+           when rbr.id is null then 0
+           when esi.amount > rbr.approved_amount_usd then 3
+           when esi.amount >= (rbr.approved_amount_usd * rbr.close_threshold_ratio) then 2
+           else 1
+         end), 0)::int as budget_signal_rank,
+         count(rbr.id)::text as matched_budget_count
+         from expense_submissions es
+         join app_users au on au.id = es.submitted_by_user_id
+         left join race_events re on re.id = es.race_event_id
+         left join expense_submission_items esi on esi.submission_id = es.id
+         left join race_budget_rules rbr
+           on rbr.race_event_id = es.race_event_id
+          and rbr.cost_category_id = esi.cost_category_id
+         where ($1::int is null or re.season_year = $1)
+           and ($2::uuid is null or es.race_event_id = $2::uuid)
+           and ($3::uuid is null or es.submitted_by_user_id = $3::uuid)
+           and ($4::text is null or es.submission_status::text = $4)
+         group by es.id, re.name, re.season_year, au.full_name
+       )
+       select
+         id,
+         submission_title,
+         race_name,
+         season_year,
+         submitter_name,
+         submitted_at,
+         total_amount,
+         submission_status,
+         item_count,
+         budget_signal_rank,
+         matched_budget_count
+       from approval_queue
+       where ($5::text is null
+          or ($5::text = 'exception' and budget_signal_rank in (0, 2, 3))
+          or ($5::text = 'above_budget' and budget_signal_rank = 3)
+          or ($5::text = 'close_to_budget' and budget_signal_rank = 2)
+          or ($5::text = 'below_budget' and budget_signal_rank = 1)
+          or ($5::text = 'no_rule' and budget_signal_rank = 0))
+       order by budget_signal_rank desc, created_at desc
        limit 24`,
       [
         filters?.seasonYear ?? null,
         filters?.raceEventId ?? null,
         filters?.submitterId ?? null,
-        filters?.submissionStatus ?? null
+        filters?.submissionStatus ?? null,
+        filters?.budgetSignal ?? null
       ]
     );
 
@@ -591,6 +616,7 @@ export async function getMyExpenseSubmissions(appUserId: string, raceId?: string
     seasonLabel:
       row.season_year !== null ? getSeasonLabel(row.season_year, seasonYears) : "Race not assigned",
     submittedAt: row.submitted_at ? formatDateValue(row.submitted_at) : "Draft",
+    statusKey: row.submission_status,
     status: formatExpenseSubmissionStatusLabel(row.submission_status),
     totalAmount: formatCurrency(row.total_amount),
     itemCount: row.item_count,

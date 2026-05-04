@@ -1620,6 +1620,163 @@ textarea {
   line-height: 1;
 }
 
+.expense-flow-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
+  align-items: stretch;
+}
+
+.expense-flow-card {
+  display: grid;
+  align-content: start;
+}
+
+.expense-flow-steps {
+  display: grid;
+  gap: 10px;
+}
+
+.expense-flow-step {
+  display: grid;
+  grid-template-columns: 34px minmax(90px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.expense-flow-step strong {
+  line-height: 1;
+}
+
+.expense-flow-step > span:last-child {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  text-align: right;
+}
+
+.expense-flow-index {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(31, 93, 132, 0.12);
+  color: var(--brand);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.receipt-wallet-grid,
+.report-tracker-grid,
+.review-lane-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.receipt-wallet-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.report-tracker-grid,
+.review-lane-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.receipt-card,
+.review-lane-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.receipt-card {
+  display: grid;
+  gap: 14px;
+}
+
+.receipt-card-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.review-lane-card {
+  display: grid;
+  gap: 8px;
+  color: var(--ink);
+  border-left: 4px solid var(--line);
+}
+
+.review-lane-card strong {
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--brand);
+}
+
+.review-lane-card span:last-child {
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+.review-lane-card.risk { border-left-color: var(--risk); }
+.review-lane-card.warn { border-left-color: var(--warn); }
+.review-lane-card.brand { border-left-color: var(--brand-2); }
+.review-lane-card.accent { border-left-color: var(--accent); }
+
+.report-tracker-card {
+  display: grid;
+  gap: 14px;
+}
+
+.report-progress {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.report-progress-dot {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(15, 53, 84, 0.1);
+}
+
+.report-progress-dot.active {
+  background: linear-gradient(90deg, var(--brand), var(--brand-2));
+}
+
+.expense-evidence-cockpit {
+  align-items: stretch;
+}
+
+.expense-evidence-preview {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+}
+
+.expense-evidence-placeholder {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  border: 1px dashed var(--line-strong);
+  border-radius: 16px;
+  background: rgba(15, 53, 84, 0.04);
+  color: var(--ink-soft);
+}
+
 .key-value-list {
   display: grid;
   gap: 10px;
@@ -2078,6 +2235,11 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .expense-flow-grid,
+  .expense-evidence-cockpit {
+    grid-template-columns: 1fr;
+  }
+
   .analysis-summary-grid {
     grid-template-columns: 1fr;
   }
@@ -2127,6 +2289,19 @@ textarea {
   .stats-grid,
   .compact-stats {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .receipt-card-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .expense-flow-step {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .expense-flow-step > span:last-child {
+    grid-column: 2;
+    text-align: left;
   }
 
   .workspace-header {

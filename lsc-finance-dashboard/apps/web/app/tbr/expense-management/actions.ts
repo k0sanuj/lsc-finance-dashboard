@@ -741,13 +741,11 @@ export async function approveExpenseSubmissionAction(formData: FormData) {
   const aboveBudgetRows = await queryRowsAdmin<{ id: string }>(
     `select esi.id::text
      from expense_submission_items esi
+     join expense_submissions es on es.id = esi.submission_id
      left join race_budget_rules rbr
-       on rbr.race_event_id = (
-         select race_event_id from expense_submissions where id = $1
-       )
-       and rbr.cost_category = esi.category
-       and rbr.rule_status = 'approved'
-     where esi.expense_submission_id = $1
+       on rbr.race_event_id = es.race_event_id
+      and rbr.cost_category_id = esi.cost_category_id
+     where esi.submission_id = $1
        and rbr.approved_amount_usd is not null
        and esi.amount > rbr.approved_amount_usd`,
     [submissionId]

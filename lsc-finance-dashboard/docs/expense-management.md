@@ -57,9 +57,13 @@ Under TBR, provide:
 - a TBR landing page with `Financial Overview`, `My Expenses`, and `Races`
 - a race browser grouped `season first -> race second`
 - a race-detail user workflow for bill / receipt upload
+- a mobile-first `My Expenses` surface with camera/file receipt capture, AI preview cards, and reimbursement progress tracking
 - bill-to-expense-report grouping inside the race workflow
 - a separate admin review queue
+- an exception-first approval lane that can filter budget exceptions before clean reports
+- side-by-side receipt evidence and mapped finance fields on the review detail page
 - race, season, user, and status filters inside the admin review console
+- budget signal filtering for `exceptions`, `over budget`, `close to budget`, `no rule`, and `clean`
 - race-level budget and per-diem setup inside the admin review console
 - race-budget table with:
   - cost category

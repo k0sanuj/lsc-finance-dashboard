@@ -24,6 +24,22 @@ type MyExpensesPageProps = {
   }>;
 };
 
+function fieldValue(fields: Record<string, string>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = fields[key];
+    if (value) return value;
+  }
+  return "";
+}
+
+function reportStep(statusKey: string) {
+  if (statusKey === "needs_clarification" || statusKey === "rejected") return 1;
+  if (statusKey === "submitted" || statusKey === "in_review") return 2;
+  if (statusKey === "approved") return 3;
+  if (statusKey === "posted") return 4;
+  return 1;
+}
+
 export default async function MyExpensesPage({ searchParams }: MyExpensesPageProps) {
   const session = await requireRole(["super_admin", "finance_admin", "team_member"]);
   const params = searchParams ? await searchParams : undefined;
@@ -53,7 +69,15 @@ export default async function MyExpensesPage({ searchParams }: MyExpensesPagePro
   const postedDrafts = aiDrafts.filter((draft) => draft.status === "posted").length;
   const closedDrafts = aiDrafts.filter((draft) => draft.status === "rejected" || draft.status === "discarded").length;
   const invoiceReadyReports = submissions.filter((submission) => submission.canGenerateInvoice).length;
+  const financeReviewReports = submissions.filter((submission) =>
+    ["submitted", "in_review"].includes(submission.statusKey)
+  ).length;
+  const clarificationReports = submissions.filter((submission) =>
+    ["needs_clarification", "rejected"].includes(submission.statusKey)
+  ).length;
+  const reimbursedReports = submissions.filter((submission) => submission.linkedInvoiceId || submission.statusKey === "posted").length;
   const activeReceiptCards = aiDrafts.slice(0, 4);
+  const latestReports = submissions.slice(0, 4);
 
   return (
     <div className="page-grid">
@@ -108,19 +132,49 @@ export default async function MyExpensesPage({ searchParams }: MyExpensesPagePro
         </article>
       </section>
 
-      <AIIntakePanel
-        companyCode="TBR"
-        defaultTargetKind="expense_receipt"
-        description="Upload a receipt or paste reimbursement details. AI extracts the fields into an editable preview before anything enters the finance queue."
-        notePlaceholder="Example: paid by team member for race travel, food, hotel, logistics, or reimbursement bundle."
-        redirectPath="/tbr/my-expenses"
-        targetOptions={[
-          { value: "expense_receipt", label: "Expense receipt" },
-          { value: "reimbursement_bundle", label: "Reimbursement bundle" },
-        ]}
-        title="AI receipt intake"
-        workflowContext="tbr-my-expenses"
-      />
+      <section className="expense-flow-grid">
+        <article className="card expense-flow-card">
+          <div className="card-title-row">
+            <div>
+              <span className="section-kicker">Expense flow</span>
+              <h3>Receipt to reimbursement</h3>
+            </div>
+            <span className="pill">{submissions.length} reports</span>
+          </div>
+          <div className="expense-flow-steps" aria-label="Expense workflow stages">
+            {[
+              { label: "Capture", value: draftsNeedingReview + postedDrafts, detail: "receipts" },
+              { label: "Preview", value: draftsNeedingReview, detail: "open" },
+              { label: "Fixes", value: clarificationReports, detail: "returned" },
+              { label: "Finance", value: financeReviewReports, detail: "review" },
+              { label: "Invoice", value: invoiceReadyReports, detail: "ready" },
+              { label: "Closed", value: reimbursedReports, detail: "linked" },
+            ].map((step, index) => (
+              <div className="expense-flow-step" key={step.label}>
+                <span className="expense-flow-index">{index + 1}</span>
+                <strong>{step.label}</strong>
+                <span>{step.value} {step.detail}</span>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <AIIntakePanel
+          companyCode="TBR"
+          defaultTargetKind="expense_receipt"
+          description="Upload a receipt or paste reimbursement details. AI extracts the fields into an editable preview before anything enters the finance queue."
+          notePlaceholder="Example: paid by team member for race travel, food, hotel, logistics, or reimbursement bundle."
+          redirectPath="/tbr/my-expenses"
+          targetOptions={[
+            { value: "expense_receipt", label: "Expense receipt" },
+            { value: "reimbursement_bundle", label: "Reimbursement bundle" },
+          ]}
+          title="AI receipt intake"
+          uploadAccept="image/*,application/pdf"
+          uploadCapture="environment"
+          workflowContext="tbr-my-expenses"
+        />
+      </section>
 
       <AIIntakeReviewPanel
         draftId={aiDraftId}
@@ -130,9 +184,9 @@ export default async function MyExpensesPage({ searchParams }: MyExpensesPagePro
       />
 
       {activeReceiptCards.length > 0 ? (
-        <section className="stats-grid compact-stats">
+        <section className="receipt-wallet-grid">
           {activeReceiptCards.map((draft) => (
-            <article className="card compact-section-card" key={draft.id}>
+            <article className="receipt-card" key={draft.id}>
               <div className="card-title-row">
                 <div>
                   <span className="section-kicker">{draft.status.replace(/_/g, " ")}</span>
@@ -140,14 +194,22 @@ export default async function MyExpensesPage({ searchParams }: MyExpensesPagePro
                 </div>
                 <span className="pill">{Math.round(Number(draft.confidence) * 100)}%</span>
               </div>
-              <div className="mini-metric-grid">
+              <div className="receipt-card-fields">
                 <div className="mini-metric">
-                  <span>Target</span>
-                  <strong>{draft.targetKind.replace(/_/g, " ")}</strong>
+                  <span>Merchant</span>
+                  <strong>{fieldValue(draft.previewFields, "merchant_name", "vendor_name", "counterparty_name") || "Review"}</strong>
                 </div>
                 <div className="mini-metric">
-                  <span>Document type</span>
-                  <strong>{draft.detectedDocumentType}</strong>
+                  <span>Amount</span>
+                  <strong>{fieldValue(draft.previewFields, "usd_amount", "total_amount", "amount", "original_amount") || "Review"}</strong>
+                </div>
+                <div className="mini-metric">
+                  <span>Date</span>
+                  <strong>{fieldValue(draft.previewFields, "expense_date", "transaction_date", "document_date", "date") || "Review"}</strong>
+                </div>
+                <div className="mini-metric">
+                  <span>Category</span>
+                  <strong>{fieldValue(draft.previewFields, "category", "cost_category") || draft.targetKind.replace(/_/g, " ")}</strong>
                 </div>
               </div>
               <p className="table-note">{draft.financeInterpretation || draft.proposedTarget}</p>
@@ -156,6 +218,49 @@ export default async function MyExpensesPage({ searchParams }: MyExpensesPagePro
               </Link>
             </article>
           ))}
+        </section>
+      ) : null}
+
+      {latestReports.length > 0 ? (
+        <section className="report-tracker-grid">
+          {latestReports.map((submission) => {
+            const currentStep = reportStep(submission.statusKey);
+            return (
+              <article className="card compact-section-card report-tracker-card" key={submission.id}>
+                <div className="card-title-row">
+                  <div>
+                    <span className="section-kicker">{submission.status}</span>
+                    <h3>{submission.title}</h3>
+                  </div>
+                  <span className="pill">{submission.totalAmount}</span>
+                </div>
+                <div className="report-progress" aria-label={`${submission.title} progress`}>
+                  {[1, 2, 3, 4].map((step) => (
+                    <span
+                      className={step <= currentStep ? "report-progress-dot active" : "report-progress-dot"}
+                      key={step}
+                    />
+                  ))}
+                </div>
+                <div className="mini-metric-grid">
+                  <div className="mini-metric">
+                    <span>Race</span>
+                    <strong>{submission.race}</strong>
+                  </div>
+                  <div className="mini-metric">
+                    <span>Invoice</span>
+                    <strong>
+                      {submission.linkedInvoiceId
+                        ? submission.linkedInvoiceStatus?.replace(/_/g, " ") ?? "Linked"
+                        : submission.canGenerateInvoice
+                          ? "Ready"
+                          : "Pending"}
+                    </strong>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </section>
       ) : null}
 

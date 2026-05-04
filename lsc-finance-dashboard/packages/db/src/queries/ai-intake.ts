@@ -28,6 +28,7 @@ export type AiIntakeQueueRow = {
   submittedBy: string;
   createdAt: string;
   previewAvailable: boolean;
+  previewFields: Record<string, string>;
 };
 
 export type AiIntakeDraftFieldRow = {
@@ -97,6 +98,7 @@ type QueueSource = {
   submitter_name: string | null;
   created_at: string;
   metadata: Record<string, unknown> | null;
+  field_values: Record<string, unknown> | null;
 };
 
 type DetailSource = QueueSource & {
@@ -141,6 +143,10 @@ function normalizeConfidence(value: string | null) {
 }
 
 function rowToQueueRow(row: QueueSource, previewAvailable: boolean): AiIntakeQueueRow {
+  const previewFields = Object.fromEntries(
+    Object.entries(row.field_values ?? {}).map(([key, value]) => [key, stringifyJsonValue(value)])
+  );
+
   return {
     id: row.id,
     companyCode: row.company_code ?? "LSC",
@@ -159,6 +165,7 @@ function rowToQueueRow(row: QueueSource, previewAvailable: boolean): AiIntakeQue
     submittedBy: row.submitter_name ?? "Unknown user",
     createdAt: formatDateLabel(row.created_at),
     previewAvailable,
+    previewFields,
   };
 }
 
@@ -190,11 +197,17 @@ export async function getAiIntakeQueue(options: {
        aid.overall_confidence::text,
        au.full_name as submitter_name,
        aid.created_at::text,
-       sd.metadata
+       sd.metadata,
+       fields.field_values
      from ai_intake_drafts aid
      left join companies c on c.id = aid.company_id
      left join source_documents sd on sd.id = aid.source_document_id
      left join app_users au on au.id = aid.submitted_by_user_id
+     left join lateral (
+       select jsonb_object_agg(aidf.field_key, aidf.preview_value) as field_values
+       from ai_intake_draft_fields aidf
+       where aidf.draft_id = aid.id
+     ) fields on true
      where ($1::uuid is null or aid.submitted_by_user_id = $1::uuid)
        and ($2::text is null or c.code::text = $2::text)
        and ($3::text is null or aid.workflow_context like ($3::text || '%'))

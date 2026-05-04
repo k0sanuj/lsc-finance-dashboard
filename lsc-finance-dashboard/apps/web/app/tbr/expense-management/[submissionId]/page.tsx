@@ -115,6 +115,17 @@ export default async function ExpenseSubmissionDetailPage({
     );
   }
 
+  const overBudgetItemCount = items.filter((item) => item.budgetStatusKey === "above_budget").length;
+  const noRuleItemCount = items.filter((item) => item.budgetStatusKey === "no_rule").length;
+  const aiLinkedItemCount = items.filter((item) => item.aiIntakeDraftId).length;
+  const splitRowCount = items.reduce((total, item) => total + item.splits.length, 0);
+  const priorityItem =
+    items.find((item) => item.budgetStatusKey === "above_budget") ??
+    items.find((item) => item.budgetStatusKey === "no_rule") ??
+    items.find((item) => item.budgetStatusKey === "close_to_budget") ??
+    items[0] ??
+    null;
+
   return (
     <div className="page-grid">
       <section className="hero">
@@ -133,6 +144,37 @@ export default async function ExpenseSubmissionDetailPage({
           <span>{message}</span>
         </section>
       ) : null}
+
+      <section className="stats-grid compact-stats">
+        <article className="metric-card accent-brand">
+          <div className="metric-topline">
+            <span className="metric-label">Items</span>
+          </div>
+          <div className="metric-value">{items.length}</div>
+          <span className="metric-subvalue">{aiLinkedItemCount} AI-linked receipt cards.</span>
+        </article>
+        <article className="metric-card accent-risk">
+          <div className="metric-topline">
+            <span className="metric-label">Over budget</span>
+          </div>
+          <div className="metric-value">{overBudgetItemCount}</div>
+          <span className="metric-subvalue">Requires override note before approval.</span>
+        </article>
+        <article className="metric-card accent-accent">
+          <div className="metric-topline">
+            <span className="metric-label">No rule</span>
+          </div>
+          <div className="metric-value">{noRuleItemCount}</div>
+          <span className="metric-subvalue">Budget lookup did not find a category match.</span>
+        </article>
+        <article className="metric-card accent-good">
+          <div className="metric-topline">
+            <span className="metric-label">Split rows</span>
+          </div>
+          <div className="metric-value">{splitRowCount}</div>
+          <span className="metric-subvalue">Participant allocation rows on this report.</span>
+        </article>
+      </section>
 
       <section className="support-grid">
         <article className="card">
@@ -334,6 +376,75 @@ export default async function ExpenseSubmissionDetailPage({
           </details>
         </article>
       </section>
+
+      {priorityItem ? (
+        <section className="grid-two expense-evidence-cockpit">
+          <article className="card">
+            <div className="card-title-row">
+              <div>
+                <span className="section-kicker">Receipt evidence</span>
+                <h3>{priorityItem.merchantName}</h3>
+              </div>
+              <span className={`pill signal-pill signal-${priorityItem.budgetStatusTone}`}>
+                {priorityItem.budgetStatusLabel}
+              </span>
+            </div>
+            {priorityItem.sourcePreviewDataUrl && priorityItem.sourcePreviewMimeType?.startsWith("image/") ? (
+              <img
+                alt={`Receipt preview for ${priorityItem.merchantName}`}
+                className="expense-evidence-preview"
+                src={priorityItem.sourcePreviewDataUrl}
+              />
+            ) : (
+              <div className="expense-evidence-placeholder">
+                <strong>{priorityItem.sourceDocumentName}</strong>
+                <span>
+                  {priorityItem.aiIntakeDraftId
+                    ? `AI draft ${priorityItem.aiIntakeDraftId} supplied this item.`
+                    : "No preview image attached."}
+                </span>
+              </div>
+            )}
+          </article>
+
+          <article className="card">
+            <div className="card-title-row">
+              <div>
+                <span className="section-kicker">Mapped fields</span>
+                <h3>Finance inputs</h3>
+              </div>
+              {priorityItem.aiIntakeDraftId ? <span className="pill">AI linked</span> : <span className="pill subtle-pill">Manual</span>}
+            </div>
+            <div className="mini-metric-grid">
+              <div className="mini-metric">
+                <span>Amount</span>
+                <strong>{priorityItem.amount}</strong>
+              </div>
+              <div className="mini-metric">
+                <span>Date</span>
+                <strong>{priorityItem.expenseDate}</strong>
+              </div>
+              <div className="mini-metric">
+                <span>Category</span>
+                <strong>{priorityItem.aiCategory || priorityItem.category}</strong>
+              </div>
+              <div className="mini-metric">
+                <span>Paid by</span>
+                <strong>{priorityItem.paidBy || submission.submitter}</strong>
+              </div>
+              <div className="mini-metric">
+                <span>Budget</span>
+                <strong>{priorityItem.budgetApprovedAmount ?? "No rule"}</strong>
+              </div>
+              <div className="mini-metric">
+                <span>Variance</span>
+                <strong>{priorityItem.budgetVariance ?? "N/A"}</strong>
+              </div>
+            </div>
+            {priorityItem.description ? <p className="table-note">{priorityItem.description}</p> : null}
+          </article>
+        </section>
+      ) : null}
 
       <section>
         <article className="card">
