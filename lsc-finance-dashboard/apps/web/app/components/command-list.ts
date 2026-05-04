@@ -55,7 +55,8 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
   { id: "nav-employees-xtz", label: "Employees (XTZ)", group: "People", href: "/employees?company=XTZ" },
   { id: "nav-salary-tbr", label: "Salary Payable (TBR)", group: "People", href: "/salary-payable?company=TBR" },
   { id: "nav-salary-xtz", label: "Salary Payable (XTZ)", group: "People", href: "/salary-payable?company=XTZ" },
-  { id: "nav-payroll-invoices", label: "XTZ Invoice Generator", group: "People", href: "/payroll-invoices", keywords: "payroll invoice" },
+  { id: "nav-payroll-invoices", label: "XTZ Invoice Dashboard", group: "People", href: "/payroll-invoices", keywords: "payroll invoice dashboard register" },
+  { id: "nav-payroll-invoice-generator", label: "Generate XTZ Invoice", group: "People", href: "/payroll-invoices/generator", keywords: "payroll invoice generate" },
   { id: "nav-gig-workers", label: "Gig Workers", group: "People", href: "/gig-workers", keywords: "contractors freelancers" },
 
   // ── XTZ India ──

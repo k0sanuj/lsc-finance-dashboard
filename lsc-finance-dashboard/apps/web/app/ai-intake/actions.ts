@@ -611,6 +611,16 @@ function parseCurrency(value: string, fallback = "USD") {
   return match?.[0] ?? fallback;
 }
 
+function normalizeXtzInvoiceSection(value: string) {
+  const normalized = value.toLowerCase().replace(/[\s-]+/g, "_");
+  if (normalized.includes("software")) return "software_expense";
+  if (normalized.includes("reimburs") || normalized.includes("receipt")) return "reimbursement";
+  if (normalized.includes("payroll") || normalized.includes("salary")) return "payroll";
+  if (normalized.includes("provision") || normalized.includes("estimate")) return "provision";
+  if (normalized.includes("mdg") || normalized.includes("vendor")) return "mdg_fees";
+  return "other";
+}
+
 function parseDate(value: string) {
   if (!value) return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
@@ -1184,8 +1194,107 @@ async function postXtzSupport(client: PoolClient, draft: DraftRow, fields: Draft
   const description = pick(lookup, "description", "document_description", "purpose") ||
     `${vendor || "XTZ support"} document`;
   const amount = parseAmount(pick(lookup, "amount", "total_amount", "invoice_amount"));
+  const quantity = parseAmount(pick(lookup, "quantity", "qty")) || 1;
+  const unitPrice = parseAmount(pick(lookup, "unit_price", "rate", "price")) || amount || 0;
+  const lineAmount = Number((quantity * unitPrice).toFixed(2));
   const currency = parseCurrency(pick(lookup, "currency_code", "currency"), "INR");
   const month = monthStart(pick(lookup, "payroll_month", "expense_month", "issue_date", "document_date"));
+  const referenceNote = pick(lookup, "reference_note", "invoice_number", "notes");
+
+  if (draft.target_entity_type === "payroll_invoice" && draft.target_entity_id) {
+    const { rows: invoiceRows } = await client.query<{ status: string }>(
+      `select status::text
+       from payroll_invoices
+       where id = $1::uuid
+       for update`,
+      [draft.target_entity_id]
+    );
+    const status = invoiceRows[0]?.status;
+    if (!status) throw new Error("Target invoice was not found.");
+    if (status !== "generated") {
+      throw new Error("AI-posted invoice items can only be added to generated invoices.");
+    }
+
+    const { rows: orderRows } = await client.query<{ display_order: number }>(
+      `select coalesce(max(display_order), 0) + 10 as display_order
+       from payroll_invoice_items
+       where payroll_invoice_id = $1::uuid`,
+      [draft.target_entity_id]
+    );
+    const postedAmount = lineAmount || amount;
+    const { rows } = await client.query<{ id: string }>(
+      `insert into payroll_invoice_items (
+         payroll_invoice_id,
+         section,
+         description,
+         vendor_name,
+         quantity,
+         unit_price,
+         amount,
+         original_amount,
+         original_currency,
+         fx_rate,
+         source_document_id,
+         reference_note,
+         is_provision,
+         display_order,
+         ai_intake_draft_id
+       )
+       values (
+         $1::uuid,
+         $2::xtz_invoice_section,
+         $3,
+         $4,
+         $5,
+         $6,
+         $7,
+         $8,
+         $9,
+         1,
+         $10,
+         $11,
+         $12,
+         $13,
+         $14::uuid
+       )
+       returning id`,
+      [
+        draft.target_entity_id,
+        normalizeXtzInvoiceSection(section || description),
+        description,
+        vendor || null,
+        quantity,
+        unitPrice,
+        postedAmount,
+        amount || postedAmount,
+        currency,
+        draft.source_document_id,
+        referenceNote || `Created from approved AI intake draft ${draft.id}.`,
+        section.includes("provision"),
+        orderRows[0]?.display_order ?? 10,
+        draft.id,
+      ]
+    );
+    await client.query(
+      `with totals as (
+         select coalesce(sum(amount), 0)::numeric(14,2) as subtotal
+         from payroll_invoice_items
+         where payroll_invoice_id = $1::uuid
+       )
+       update payroll_invoices pi
+       set subtotal = totals.subtotal,
+           total_amount = (totals.subtotal + pi.tax_amount)::numeric(14,2),
+           updated_at = now()
+       from totals
+       where pi.id = $1::uuid`,
+      [draft.target_entity_id]
+    );
+    return [{
+      targetTable: "payroll_invoice_items",
+      targetId: rows[0]?.id ?? null,
+      summary: "Posted approved XTZ support as a generated invoice line item.",
+    }];
+  }
 
   if (section.includes("software")) {
     const { rows } = await client.query<{ id: string }>(

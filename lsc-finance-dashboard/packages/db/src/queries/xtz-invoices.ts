@@ -68,6 +68,16 @@ export type XtzInvoiceSection =
   | "software_expense"
   | "other";
 
+export type XtzInvoiceStatus = "draft" | "generated" | "sent" | "paid" | "void";
+
+export type XtzInvoiceFilters = {
+  search?: string | null;
+  month?: string | null;
+  status?: string | null;
+  includeVoided?: boolean;
+  limit?: number;
+};
+
 export type XtzInvoiceHeaderRow = {
   id: string;
   invoiceNumber: string;
@@ -84,6 +94,12 @@ export type XtzInvoiceHeaderRow = {
   status: string;
   paymentMethod: string;
   notes: string;
+  voidedAt: string | null;
+  voidReason: string | null;
+  clonedFromInvoiceId: string | null;
+  canEdit: boolean;
+  canVoid: boolean;
+  canClone: boolean;
   issuerLegalName: string;
   issuerGstin: string;
   issuerCin: string;
@@ -112,13 +128,128 @@ export type XtzInvoiceItemRow = {
   fxRate: number | null;
   vendorName: string | null;
   referenceNote: string | null;
+  sourceDocumentId: string | null;
+  aiIntakeDraftId: string | null;
   isProvision: boolean;
   displayOrder: number;
   employeeName: string | null;
 };
 
-export async function getXtzInvoices(): Promise<XtzInvoiceHeaderRow[]> {
+function normalizeMonthFilter(month?: string | null) {
+  if (!month) return null;
+  return month.length === 7 ? `${month}-01` : month;
+}
+
+function mapInvoiceHeader(r: {
+  id: string;
+  invoice_number: string;
+  invoice_date: string;
+  payroll_month: string;
+  from_company: string;
+  to_company: string;
+  subtotal: string;
+  tax_amount: string;
+  total_amount: string;
+  currency_code: string;
+  status: string;
+  payment_method: string | null;
+  notes: string | null;
+  voided_at: string | null;
+  void_reason: string | null;
+  cloned_from_invoice_id: string | null;
+  issuer_legal_name: string | null;
+  issuer_gstin: string | null;
+  issuer_cin: string | null;
+  issuer_pan: string | null;
+  issuer_address: string | null;
+  bank_name: string | null;
+  bank_account_number: string | null;
+  bank_ifsc: string | null;
+  bank_swift: string | null;
+  bank_ad_code: string | null;
+  bank_branch: string | null;
+  bank_branch_address: string | null;
+  recipient_legal_name: string | null;
+  recipient_address: string | null;
+}): XtzInvoiceHeaderRow {
+  return {
+    id: r.id,
+    invoiceNumber: r.invoice_number,
+    invoiceDate: formatDateLabel(r.invoice_date),
+    invoiceDateRaw: r.invoice_date,
+    payrollMonth: new Date(r.payroll_month).toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric"
+    }),
+    payrollMonthRaw: r.payroll_month,
+    fromCompany: r.from_company,
+    toCompany: r.to_company,
+    subtotal: Number(r.subtotal),
+    taxAmount: Number(r.tax_amount),
+    totalAmount: Number(r.total_amount),
+    currency: r.currency_code,
+    status: r.status,
+    paymentMethod: r.payment_method ?? "",
+    notes: r.notes ?? "",
+    voidedAt: r.voided_at,
+    voidReason: r.void_reason,
+    clonedFromInvoiceId: r.cloned_from_invoice_id,
+    canEdit: r.status === "generated",
+    canVoid: r.status === "generated" || r.status === "sent",
+    canClone: r.status !== "void",
+    issuerLegalName: r.issuer_legal_name ?? XTZ_ISSUER.legalName,
+    issuerGstin: r.issuer_gstin ?? XTZ_ISSUER.gstin,
+    issuerCin: r.issuer_cin ?? XTZ_ISSUER.cin,
+    issuerPan: r.issuer_pan ?? XTZ_ISSUER.pan,
+    issuerAddress: r.issuer_address ?? XTZ_ISSUER.address,
+    bankName: r.bank_name ?? XTZ_ISSUER.bank.name,
+    bankAccountNumber: r.bank_account_number ?? XTZ_ISSUER.bank.accountNumber,
+    bankIfsc: r.bank_ifsc ?? XTZ_ISSUER.bank.ifsc,
+    bankSwift: r.bank_swift ?? XTZ_ISSUER.bank.swift,
+    bankAdCode: r.bank_ad_code ?? XTZ_ISSUER.bank.adCode,
+    bankBranch: r.bank_branch ?? XTZ_ISSUER.bank.branch,
+    bankBranchAddress: r.bank_branch_address ?? XTZ_ISSUER.bank.branchAddress,
+    recipientLegalName: r.recipient_legal_name ?? XTE_RECIPIENT.legalName,
+    recipientAddress: r.recipient_address ?? XTE_RECIPIENT.address
+  };
+}
+
+export async function getXtzInvoices(filters: XtzInvoiceFilters = {}): Promise<XtzInvoiceHeaderRow[]> {
   if (getBackend() !== "database") return [];
+
+  const where: string[] = [];
+  const values: unknown[] = [];
+
+  if (!filters.includeVoided) {
+    where.push("pi.status::text <> 'void'");
+  }
+
+  const month = normalizeMonthFilter(filters.month);
+  if (month) {
+    values.push(month);
+    where.push(`pi.payroll_month = $${values.length}::date`);
+  }
+
+  const status = filters.status && filters.status !== "all" ? filters.status : null;
+  if (status) {
+    values.push(status);
+    where.push(`pi.status::text = $${values.length}`);
+  }
+
+  const search = filters.search?.trim();
+  if (search) {
+    values.push(`%${search}%`);
+    where.push(`(
+      pi.invoice_number ilike $${values.length}
+      or coalesce(pi.issuer_legal_name, '') ilike $${values.length}
+      or coalesce(pi.recipient_legal_name, '') ilike $${values.length}
+      or coalesce(pi.notes, '') ilike $${values.length}
+    )`);
+  }
+
+  const limit = filters.limit && filters.limit > 0 ? Math.min(filters.limit, 250) : null;
+  const limitClause = limit ? `limit ${limit}` : "";
+  const whereClause = where.length ? `where ${where.join(" and ")}` : "";
 
   const rows = await queryRows<{
     id: string;
@@ -134,6 +265,9 @@ export async function getXtzInvoices(): Promise<XtzInvoiceHeaderRow[]> {
     status: string;
     payment_method: string | null;
     notes: string | null;
+    voided_at: string | null;
+    void_reason: string | null;
+    cloned_from_invoice_id: string | null;
     issuer_legal_name: string | null;
     issuer_gstin: string | null;
     issuer_cin: string | null;
@@ -153,6 +287,7 @@ export async function getXtzInvoices(): Promise<XtzInvoiceHeaderRow[]> {
             fc.name as from_company, tc.name as to_company,
             pi.subtotal, pi.tax_amount, pi.total_amount,
             pi.currency_code, pi.status, pi.payment_method, pi.notes,
+            pi.voided_at::text, pi.void_reason, pi.cloned_from_invoice_id::text,
             pi.issuer_legal_name, pi.issuer_gstin, pi.issuer_cin, pi.issuer_pan,
             pi.issuer_address, pi.bank_name, pi.bank_account_number, pi.bank_ifsc,
             pi.bank_swift, pi.bank_ad_code, pi.bank_branch, pi.bank_branch_address,
@@ -160,43 +295,13 @@ export async function getXtzInvoices(): Promise<XtzInvoiceHeaderRow[]> {
      from payroll_invoices pi
      join companies fc on fc.id = pi.from_company_id
      join companies tc on tc.id = pi.to_company_id
-     order by pi.invoice_date desc, pi.invoice_number desc`
+     ${whereClause}
+     order by pi.invoice_date desc, pi.invoice_number desc
+     ${limitClause}`,
+    values
   );
 
-  return rows.map((r) => ({
-    id: r.id,
-    invoiceNumber: r.invoice_number,
-    invoiceDate: formatDateLabel(r.invoice_date),
-    invoiceDateRaw: r.invoice_date,
-    payrollMonth: new Date(r.payroll_month).toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric"
-    }),
-    payrollMonthRaw: r.payroll_month,
-    fromCompany: r.from_company,
-    toCompany: r.to_company,
-    subtotal: Number(r.subtotal),
-    taxAmount: Number(r.tax_amount),
-    totalAmount: Number(r.total_amount),
-    currency: r.currency_code,
-    status: r.status,
-    paymentMethod: r.payment_method ?? "",
-    notes: r.notes ?? "",
-    issuerLegalName: r.issuer_legal_name ?? XTZ_ISSUER.legalName,
-    issuerGstin: r.issuer_gstin ?? XTZ_ISSUER.gstin,
-    issuerCin: r.issuer_cin ?? XTZ_ISSUER.cin,
-    issuerPan: r.issuer_pan ?? XTZ_ISSUER.pan,
-    issuerAddress: r.issuer_address ?? XTZ_ISSUER.address,
-    bankName: r.bank_name ?? XTZ_ISSUER.bank.name,
-    bankAccountNumber: r.bank_account_number ?? XTZ_ISSUER.bank.accountNumber,
-    bankIfsc: r.bank_ifsc ?? XTZ_ISSUER.bank.ifsc,
-    bankSwift: r.bank_swift ?? XTZ_ISSUER.bank.swift,
-    bankAdCode: r.bank_ad_code ?? XTZ_ISSUER.bank.adCode,
-    bankBranch: r.bank_branch ?? XTZ_ISSUER.bank.branch,
-    bankBranchAddress: r.bank_branch_address ?? XTZ_ISSUER.bank.branchAddress,
-    recipientLegalName: r.recipient_legal_name ?? XTE_RECIPIENT.legalName,
-    recipientAddress: r.recipient_address ?? XTE_RECIPIENT.address
-  }));
+  return rows.map(mapInvoiceHeader);
 }
 
 export async function getXtzInvoiceById(invoiceId: string): Promise<{
@@ -205,8 +310,55 @@ export async function getXtzInvoiceById(invoiceId: string): Promise<{
 } | null> {
   if (getBackend() !== "database") return null;
 
-  const headers = await getXtzInvoices();
-  const header = headers.find((h) => h.id === invoiceId);
+  const headerRows = await queryRows<{
+    id: string;
+    invoice_number: string;
+    invoice_date: string;
+    payroll_month: string;
+    from_company: string;
+    to_company: string;
+    subtotal: string;
+    tax_amount: string;
+    total_amount: string;
+    currency_code: string;
+    status: string;
+    payment_method: string | null;
+    notes: string | null;
+    voided_at: string | null;
+    void_reason: string | null;
+    cloned_from_invoice_id: string | null;
+    issuer_legal_name: string | null;
+    issuer_gstin: string | null;
+    issuer_cin: string | null;
+    issuer_pan: string | null;
+    issuer_address: string | null;
+    bank_name: string | null;
+    bank_account_number: string | null;
+    bank_ifsc: string | null;
+    bank_swift: string | null;
+    bank_ad_code: string | null;
+    bank_branch: string | null;
+    bank_branch_address: string | null;
+    recipient_legal_name: string | null;
+    recipient_address: string | null;
+  }>(
+    `select pi.id, pi.invoice_number, pi.invoice_date::text, pi.payroll_month::text,
+            fc.name as from_company, tc.name as to_company,
+            pi.subtotal, pi.tax_amount, pi.total_amount,
+            pi.currency_code, pi.status::text, pi.payment_method, pi.notes,
+            pi.voided_at::text, pi.void_reason, pi.cloned_from_invoice_id::text,
+            pi.issuer_legal_name, pi.issuer_gstin, pi.issuer_cin, pi.issuer_pan,
+            pi.issuer_address, pi.bank_name, pi.bank_account_number, pi.bank_ifsc,
+            pi.bank_swift, pi.bank_ad_code, pi.bank_branch, pi.bank_branch_address,
+            pi.recipient_legal_name, pi.recipient_address
+     from payroll_invoices pi
+     join companies fc on fc.id = pi.from_company_id
+     join companies tc on tc.id = pi.to_company_id
+     where pi.id = $1::uuid
+     limit 1`,
+    [invoiceId]
+  );
+  const header = headerRows[0] ? mapInvoiceHeader(headerRows[0]) : null;
   if (!header) return null;
 
   const items = await queryRows<{
@@ -221,13 +373,16 @@ export async function getXtzInvoiceById(invoiceId: string): Promise<{
     fx_rate: string | null;
     vendor_name: string | null;
     reference_note: string | null;
+    source_document_id: string | null;
+    ai_intake_draft_id: string | null;
     is_provision: boolean;
     display_order: string;
     employee_name: string | null;
   }>(
     `select pii.id, pii.section, pii.description, pii.quantity::text, pii.unit_price,
             pii.amount, pii.original_amount, pii.original_currency, pii.fx_rate,
-            pii.vendor_name, pii.reference_note, pii.is_provision,
+            pii.vendor_name, pii.reference_note, pii.source_document_id::text,
+            pii.ai_intake_draft_id::text, pii.is_provision,
             pii.display_order::text, e.full_name as employee_name
      from payroll_invoice_items pii
      left join employees e on e.id = pii.employee_id
@@ -259,6 +414,8 @@ export async function getXtzInvoiceById(invoiceId: string): Promise<{
       fxRate: r.fx_rate != null ? Number(r.fx_rate) : null,
       vendorName: r.vendor_name,
       referenceNote: r.reference_note,
+      sourceDocumentId: r.source_document_id,
+      aiIntakeDraftId: r.ai_intake_draft_id,
       isProvision: r.is_provision,
       displayOrder: Number(r.display_order),
       employeeName: r.employee_name
@@ -269,22 +426,31 @@ export async function getXtzInvoiceById(invoiceId: string): Promise<{
 export type XtzInvoiceSummary = {
   totalInvoices: number;
   totalInvoicedUsd: number;
+  activeInvoices: number;
+  voidCount: number;
+  generatedCount: number;
+  sentCount: number;
   paidCount: number;
   pendingCount: number;
   latestInvoice: XtzInvoiceHeaderRow | null;
 };
 
 export async function getXtzInvoiceSummary(): Promise<XtzInvoiceSummary> {
-  const invoices = await getXtzInvoices();
-  const usdInvoices = invoices.filter((i) => i.currency === "USD");
+  const invoices = await getXtzInvoices({ includeVoided: true });
+  const activeInvoices = invoices.filter((i) => i.status !== "void");
+  const usdInvoices = activeInvoices.filter((i) => i.currency === "USD");
   return {
     totalInvoices: invoices.length,
     totalInvoicedUsd: usdInvoices.reduce((s, i) => s + i.totalAmount, 0),
-    paidCount: invoices.filter((i) => i.status === "paid").length,
-    pendingCount: invoices.filter(
-      (i) => i.status !== "paid" && i.status !== "cancelled"
+    activeInvoices: activeInvoices.length,
+    voidCount: invoices.filter((i) => i.status === "void").length,
+    generatedCount: activeInvoices.filter((i) => i.status === "generated").length,
+    sentCount: activeInvoices.filter((i) => i.status === "sent").length,
+    paidCount: activeInvoices.filter((i) => i.status === "paid").length,
+    pendingCount: activeInvoices.filter(
+      (i) => i.status === "generated" || i.status === "sent"
     ).length,
-    latestInvoice: invoices[0] ?? null
+    latestInvoice: activeInvoices[0] ?? null
   };
 }
 

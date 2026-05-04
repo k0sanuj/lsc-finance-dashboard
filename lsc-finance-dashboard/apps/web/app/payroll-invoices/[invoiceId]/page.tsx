@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { requireRole } from "../../../lib/auth";
 import { getXtzInvoiceById } from "@lsc/db";
 import type { XtzInvoiceItemRow } from "@lsc/db";
-import { updateInvoiceStatusAction } from "../actions";
+import { cloneInvoiceAction, voidInvoiceAction } from "../actions";
 import { PrintButton, DownloadPdfButton } from "../../components/print-button";
+import { SubmitButton } from "../../components/submit-button";
 
 const fmt = (n: number, currency: string): string =>
   n.toLocaleString("en-US", {
@@ -85,6 +86,19 @@ export default async function InvoiceDetailPage({ params, searchParams }: PagePr
           </p>
         </div>
         <div className="inline-actions">
+          {header.canEdit ? (
+            <Link className="action-button primary" href={`/payroll-invoices/${header.id}/edit` as Route}>
+              Edit generated invoice
+            </Link>
+          ) : null}
+          {header.canClone ? (
+            <form action={cloneInvoiceAction}>
+              <input type="hidden" name="invoiceId" value={header.id} />
+              <SubmitButton variant="secondary" pendingLabel="Cloning…">
+                Clone revision
+              </SubmitButton>
+            </form>
+          ) : null}
           <DownloadPdfButton invoiceId={header.id} />
           <PrintButton />
         </div>
@@ -95,6 +109,31 @@ export default async function InvoiceDetailPage({ params, searchParams }: PagePr
           <strong>{status === "error" ? "Error" : "Saved"}</strong>
           <span>{message}</span>
         </section>
+      ) : null}
+
+      {header.status === "void" ? (
+        <section className="notice error no-print">
+          <strong>Void invoice</strong>
+          <span>{header.voidReason || "This invoice is preserved for audit and excluded from the active dashboard by default."}</span>
+        </section>
+      ) : header.canVoid ? (
+        <details className="card no-print">
+          <summary className="muted">Void this invoice</summary>
+          <form action={voidInvoiceAction} className="stack-form compact-form" style={{ marginTop: 12 }}>
+            <input type="hidden" name="invoiceId" value={header.id} />
+            <label className="field">
+              <span>Void reason</span>
+              <input name="voidReason" placeholder="Why is this invoice being voided?" required />
+            </label>
+            <SubmitButton
+              variant="secondary"
+              pendingLabel="Voiding…"
+              confirmMessage="Void this invoice and unlock source staging rows? The record will stay in history."
+            >
+              Void invoice
+            </SubmitButton>
+          </form>
+        </details>
       ) : null}
 
       {/* ── Printable invoice ─────────────────────────────── */}

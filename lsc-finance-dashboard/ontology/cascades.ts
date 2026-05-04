@@ -49,6 +49,11 @@ export type CascadeTrigger =
   | "employee:status:changed"
   | "payroll-invoice:generated"
   | "payroll-invoice:deleted"
+  | "payroll-invoice:voided"
+  | "payroll-invoice:cloned"
+  | "payroll-invoice:edited"
+  | "payroll-invoice:item-saved"
+  | "payroll-invoice:item-removed"
   // Gig worker ops
   | "gig-payout:generated"
   | "gig-payout:processed"
