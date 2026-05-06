@@ -582,7 +582,7 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
                     <th>Date</th>
                     <th>Gate</th>
                     <th>Status</th>
-                    <th>Actions</th>
+                    <th>Billing control</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -859,7 +859,7 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
                       <th>Race</th>
                       <th>Gate</th>
                       <th>Status</th>
-                      <th>Actions</th>
+                      <th>Tranche control</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1014,7 +1014,7 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
                     <th>Invoiced</th>
                     <th>Due</th>
                     <th>Status</th>
-                    <th>Actions</th>
+                    <th>Collection control</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -180,8 +180,7 @@ export default async function PayrollInvoiceDashboardPage({ searchParams }: Page
                 <th>Issuer / recipient</th>
                 <th>Total</th>
                 <th>Status</th>
-                <th>Lifecycle</th>
-                <th>Actions</th>
+                <th>Invoice controls</th>
               </tr>
             </thead>
             <tbody>
@@ -211,19 +210,8 @@ export default async function PayrollInvoiceDashboardPage({ searchParams }: Page
                       <span className="muted">{invoice.currency}</span>
                     </td>
                     <td>
-                      <span className={`pill ${statusPill(invoice.status)}`}>
-                        {invoice.status}
-                      </span>
-                      {invoice.voidReason ? (
-                        <>
-                          <br />
-                          <span className="muted">{invoice.voidReason}</span>
-                        </>
-                      ) : null}
-                    </td>
-                    <td>
                       {invoice.status !== "void" && invoice.status !== "paid" ? (
-                        <form action={updateInvoiceStatusAction}>
+                        <form action={updateInvoiceStatusAction} className="status-cell-form">
                           <input type="hidden" name="invoiceId" value={invoice.id} />
                           <AutoFormSelect
                             name="newStatus"
@@ -237,8 +225,16 @@ export default async function PayrollInvoiceDashboardPage({ searchParams }: Page
                           />
                         </form>
                       ) : (
-                        <span className="muted">locked</span>
+                        <span className={`pill ${statusPill(invoice.status)}`}>
+                          {invoice.status}
+                        </span>
                       )}
+                      {invoice.voidReason ? (
+                        <>
+                          <br />
+                          <span className="muted">{invoice.voidReason}</span>
+                        </>
+                      ) : null}
                     </td>
                     <td>
                       <div className="inline-actions">
@@ -289,7 +285,7 @@ export default async function PayrollInvoiceDashboardPage({ searchParams }: Page
                 ))
               ) : (
                 <tr>
-                  <td className="muted" colSpan={7}>
+                  <td className="muted" colSpan={6}>
                     No invoices match these filters.
                   </td>
                 </tr>

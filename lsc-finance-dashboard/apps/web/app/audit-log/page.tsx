@@ -146,7 +146,7 @@ export default async function AuditLogPage({
                     <th>Entity</th>
                     <th>Entity ID</th>
                     <th>Trigger</th>
-                    <th>Action</th>
+                    <th>Mutation</th>
                     <th>Agent</th>
                     <th>Performed by</th>
                     <th>Cascade actions</th>

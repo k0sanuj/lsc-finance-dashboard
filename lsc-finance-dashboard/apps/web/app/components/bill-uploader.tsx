@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FileAttachField } from "./inline-table-controls";
 
 type ParsedBill = {
   vendor: string;
@@ -103,12 +104,14 @@ export function BillUploader({
         <strong>{label}</strong>
         <span className="muted">{helperText}</span>
       </div>
-      <input
-        type="file"
+      <FileAttachField
         accept="image/*,application/pdf"
+        ariaLabel="Attach bill or receipt for parsing"
         disabled={busy}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
+        label="Attach bill or receipt"
+        name="bill"
+        onFilesSelected={(event) => {
+          const f = event.currentTarget.files?.[0];
           if (f) void handleFile(f);
         }}
       />

@@ -1,4 +1,5 @@
 import { createAiIntakeDraftAction } from "../ai-intake/actions";
+import { FileAttachField } from "./inline-table-controls";
 import type { VisibleEntityCode } from "../lib/entities";
 
 export type AiIntakeTargetKind =
@@ -92,10 +93,16 @@ export function AIIntakePanel({
             <input name="targetKind" type="hidden" value={defaultTargetKind} />
           )}
 
-          <label className="field">
+          <div className="field">
             <span>Upload</span>
-            <input accept={uploadAccept} capture={uploadCapture} name="document" type="file" />
-          </label>
+            <FileAttachField
+              accept={uploadAccept}
+              ariaLabel="Attach source document"
+              capture={uploadCapture}
+              label="Attach source document"
+              name="document"
+            />
+          </div>
 
           <label className="field">
             <span>Type or paste</span>

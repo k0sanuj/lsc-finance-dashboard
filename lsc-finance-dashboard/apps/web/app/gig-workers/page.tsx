@@ -206,7 +206,7 @@ export default async function GigWorkersPage({ searchParams }: GigWorkersPagePro
                   <th>Method</th>
                   <th>Status</th>
                   <th>Paid</th>
-                  <th>Actions</th>
+                  <th>Payout controls</th>
                 </tr>
               </thead>
               <tbody>

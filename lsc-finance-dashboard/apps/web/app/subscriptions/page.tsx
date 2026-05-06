@@ -442,7 +442,7 @@ export default async function SubscriptionsPage({ searchParams }: SubscriptionsP
                   <th>Alert Type</th>
                   <th>Message</th>
                   <th>Triggered</th>
-                  <th>Actions</th>
+                  <th>Alert control</th>
                 </tr>
               </thead>
               <tbody>

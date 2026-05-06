@@ -1,6 +1,7 @@
 import { requireRole } from "../../lib/auth";
 import { getEmployees, getFxRatesForDisplay } from "@lsc/db";
 import { EmptyState } from "../components/empty-state";
+import { AutoSubmitSelect } from "../components/inline-table-controls";
 import { RowHighlight } from "../components/row-highlight";
 import { SubmitButton } from "../components/submit-button";
 import {
@@ -49,13 +50,6 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
   const totalPayroll = employees
     .filter((e) => e.status === "active")
     .reduce((sum, e) => sum + e.rawBaseSalary, 0);
-
-  function statusPillClass(s: string): string {
-    if (s === "active") return "signal-pill signal-good";
-    if (s === "on leave" || s === "notice period") return "signal-pill signal-warn";
-    if (s === "terminated") return "signal-pill signal-risk";
-    return "pill";
-  }
 
   return (
     <div className="page-grid">
@@ -226,8 +220,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
                 <th>Type</th>
                 <th>Salary</th>
                 <th>Status</th>
-                <th>Update salary</th>
-                <th>Change status</th>
+                <th>Salary editor</th>
               </tr>
             </thead>
             <tbody>
@@ -246,7 +239,22 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
                       <span className="muted">{emp.salaryCurrency}/mo</span>
                     </td>
                     <td>
-                      <span className={statusPillClass(emp.status)}>{emp.status}</span>
+                      <form action={updateEmployeeStatusAction} className="status-cell-form">
+                        <input type="hidden" name="employeeId" value={emp.id} />
+                        <input type="hidden" name="company" value={company} />
+                        <AutoSubmitSelect
+                          ariaLabel={`Update status for ${emp.fullName}`}
+                          className="table-select status-inline-select"
+                          defaultValue={emp.status.replace(/ /g, "_")}
+                          name="newStatus"
+                          options={[
+                            { value: "active", label: "Active" },
+                            { value: "on_leave", label: "On leave" },
+                            { value: "notice_period", label: "Notice" },
+                            { value: "terminated", label: "Terminated" }
+                          ]}
+                        />
+                      </form>
                     </td>
                     <td>
                       <form action={updateSalaryAction} className="inline-actions">
@@ -269,25 +277,11 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
                         <button className="action-button secondary" type="submit">Set</button>
                       </form>
                     </td>
-                    <td>
-                      <form action={updateEmployeeStatusAction} className="inline-actions">
-                        <input type="hidden" name="employeeId" value={emp.id} />
-                        <input type="hidden" name="company" value={company} />
-                        <select name="newStatus" defaultValue="" aria-label="Employee status">
-                          <option value="" disabled>Change...</option>
-                          <option value="active">Active</option>
-                          <option value="on_leave">On leave</option>
-                          <option value="notice_period">Notice</option>
-                          <option value="terminated">Terminated</option>
-                        </select>
-                        <button className="action-button secondary" type="submit">Set</button>
-                      </form>
-                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={10} style={{ padding: 0 }}>
+                  <td colSpan={9} style={{ padding: 0 }}>
                     <EmptyState
                       title={`No employees for ${company}`}
                       description="Open the 'Add employee' section above to register a new hire. Employees sync to the payroll generator automatically."

@@ -330,7 +330,7 @@ export default async function InvoiceHubPage({ searchParams }: InvoiceHubPagePro
                 <th>Due</th>
                 <th>Amount</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th>Posting decision</th>
               </tr>
             </thead>
             <tbody>

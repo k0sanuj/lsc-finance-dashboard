@@ -378,7 +378,7 @@ export default async function ExpenseManagementPage({
                     <th>Label</th>
                     <th>Approved (USD)</th>
                     <th>Threshold</th>
-                    <th>Action</th>
+                    <th>Remove</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -455,7 +455,7 @@ export default async function ExpenseManagementPage({
                 <th>Total</th>
                 <th>Budget signal</th>
                 <th>Status</th>
-                <th>Action</th>
+                <th>Review</th>
               </tr>
             </thead>
             <tbody>

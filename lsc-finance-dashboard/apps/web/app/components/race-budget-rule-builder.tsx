@@ -7,6 +7,7 @@ import {
   type RaceBudgetAnalysisState
 } from "../tbr/expense-management/actions";
 import { FormButton } from "../documents/form-button";
+import { FileAttachField } from "./inline-table-controls";
 
 type BudgetCategoryOption = {
   id: string;
@@ -250,10 +251,15 @@ export function RaceBudgetRuleBuilder({ raceEventId, raceLabel, categories, retu
         <form action={analyzeAction} className="stack-form">
           <input name="raceLabel" type="hidden" value={raceLabel} />
           <input name="categoriesJson" type="hidden" value={categoriesJson} />
-          <label className="field">
+          <div className="field">
             <span>Upload document</span>
-            <input name="document" type="file" required />
-          </label>
+            <FileAttachField
+              ariaLabel="Attach per-diem or budget document"
+              label="Attach budget document"
+              name="document"
+              required
+            />
+          </div>
           <label className="field">
             <span>Note</span>
             <textarea name="documentNote" placeholder="E.g.: Doha approved per diems and transport caps." rows={2} />

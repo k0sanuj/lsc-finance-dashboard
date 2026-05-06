@@ -281,7 +281,7 @@ export default async function XtzExpensesPage({ searchParams }: XtzExpensesPageP
                   <th>Brand</th>
                   <th>Date</th>
                   <th>Status</th>
-                  <th>Actions</th>
+                  <th>Review decision</th>
                 </tr>
               </thead>
               <tbody>

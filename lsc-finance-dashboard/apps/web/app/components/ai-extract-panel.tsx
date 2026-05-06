@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
+import { FileAttachField } from "./inline-table-controls";
 
 /**
  * Drop-in panel: upload a document, POST to an /api/analyze/* endpoint, and
@@ -171,11 +172,13 @@ export default function AIExtractPanel({
         {hint ? <span className="muted text-xs">{hint}</span> : null}
       </div>
       <div className="ai-extract-controls">
-        <input
-          type="file"
+        <FileAttachField
           accept={accept}
-          ref={fileInputRef}
+          ariaLabel="Attach source document for AI extraction"
           disabled={pending}
+          inputRef={fileInputRef}
+          label="Attach source"
+          name="document"
         />
         <button
           className="action-button primary"

@@ -348,7 +348,7 @@ export default async function MyExpensesPage({ searchParams }: MyExpensesPagePro
                   <th>Target</th>
                   <th>Status</th>
                   <th>Confidence</th>
-                  <th>Action</th>
+                  <th>Preview</th>
                 </tr>
               </thead>
               <tbody>

@@ -445,7 +445,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                 <th>Description</th>
                 <th>Amount</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th>Remove</th>
               </tr>
             </thead>
             <tbody>
@@ -572,7 +572,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                 <th>Vendor</th>
                 <th>Amount</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th>Remove</th>
               </tr>
             </thead>
             <tbody>
@@ -712,7 +712,7 @@ export default async function PayrollInvoicesPage({ searchParams }: PageProps) {
                 <th>Vendor</th>
                 <th>Amount</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th>Remove</th>
               </tr>
             </thead>
             <tbody>

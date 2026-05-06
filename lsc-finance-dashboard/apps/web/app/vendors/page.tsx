@@ -204,7 +204,7 @@ export default async function VendorsPage() {
                 <th>IFSC / IBAN</th>
                 <th>SWIFT</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th>Vendor control</th>
               </tr>
             </thead>
             <tbody>

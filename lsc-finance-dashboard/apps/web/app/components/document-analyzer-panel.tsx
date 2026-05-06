@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CameraCapture } from "./camera-capture";
+import { FileAttachField } from "./inline-table-controls";
 import type { VisibleEntityCode } from "../lib/entities";
 
 type ExtractedField = {
@@ -164,10 +165,16 @@ export function DocumentAnalyzerPanel({
         <form onSubmit={handleUpload} className="stack-form compact-form">
           <p>{description}</p>
           <section className="intake-section">
-            <label className="field">
+            <div className="field">
               <span>{allowMultiple ? "Drop invoice files (single or multiple)" : "Upload document"}</span>
-              <input multiple={allowMultiple} name="document" type="file" required />
-            </label>
+              <FileAttachField
+                ariaLabel="Attach document for AI analysis"
+                label={allowMultiple ? "Attach invoice files" : "Attach document"}
+                multiple={allowMultiple}
+                name="document"
+                required
+              />
+            </div>
             <label className="field">
               <span>Notes for AI (mention reimbursement, who paid, race context, etc.)</span>
               <textarea name="documentNote" rows={2} placeholder={notePlaceholder} />

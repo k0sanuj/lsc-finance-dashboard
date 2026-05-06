@@ -17,6 +17,7 @@ import { BudgetVarianceTable } from "../../../components/budget-variance-table";
 import { AIIntakePanel } from "../../../components/ai-intake-panel";
 import { AIIntakeReviewPanel } from "../../../components/ai-intake-review-panel";
 import { EmptyState } from "../../../components/empty-state";
+import { FileAttachField } from "../../../components/inline-table-controls";
 import { HorizontalMetricBars, formatCompactCurrency } from "../../../components/dashboard-charts";
 import {
   addPnlLineItemAction, updatePnlLineItemAction, deletePnlLineItemAction,
@@ -612,7 +613,7 @@ async function PnlSummaryTab({ sportId, sportCode }: { sportId: string; sportCod
                       <th className="text-right">Y1 Budget</th>
                       <th className="text-right">Y2 Budget</th>
                       <th className="text-right">Y3 Budget</th>
-                      <th>Actions</th>
+                      <th>Remove</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -767,7 +768,7 @@ async function SponsorshipTab({ sportId, sportCode }: { sportId: string; sportCo
                   <th className="text-right">Y3</th>
                   <th>Contract</th>
                   <th>Payment</th>
-                  <th>Actions</th>
+                  <th>Sponsorship controls</th>
                 </tr>
               </thead>
               <tbody>
@@ -883,10 +884,15 @@ async function SponsorshipTab({ sportId, sportCode }: { sportId: string; sportCo
                           >
                             <input type="hidden" name="sponsorshipId" value={r.id} />
                             <input type="hidden" name="sport" value={sportCode} />
-                            <label className="field">
+                            <div className="field">
                               <span>Upload / replace contract</span>
-                              <input name="contract" type="file" accept="application/pdf,image/*,.doc,.docx" />
-                            </label>
+                              <FileAttachField
+                                accept="application/pdf,image/*,.doc,.docx"
+                                ariaLabel="Attach sponsorship contract"
+                                label={r.documentId ? "Replace contract" : "Attach contract"}
+                                name="contract"
+                              />
+                            </div>
                             <div className="form-actions mt-sm">
                               <button className="btn-inline" type="submit">Link contract</button>
                               {r.documentId ? (
@@ -1192,7 +1198,7 @@ async function MediaRevenueTab({
                   <th className="text-right">Brand split</th>
                   <th className="text-right">Annual cost</th>
                   <th className="text-right">Est. annual value</th>
-                  <th>Actions</th>
+                  <th>Remove</th>
                 </tr>
               </thead>
               <tbody>

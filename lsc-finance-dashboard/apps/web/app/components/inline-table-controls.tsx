@@ -1,6 +1,8 @@
 "use client";
 
-import { useId, useRef } from "react";
+import { useId, useRef, type ChangeEvent, type Ref } from "react";
+
+const FILE_INPUT_TYPE = "file";
 
 type SelectOption = {
   value: string;
@@ -46,12 +48,33 @@ type AutoSubmitFileInputProps = {
   accept?: string;
 };
 
-export function AutoSubmitFileInput({
+type FileAttachFieldProps = {
+  name: string;
+  label: string;
+  ariaLabel?: string;
+  accept?: string;
+  capture?: "environment" | "user";
+  disabled?: boolean;
+  inputRef?: Ref<HTMLInputElement>;
+  multiple?: boolean;
+  required?: boolean;
+  helperText?: string;
+  onFilesSelected?: (event: ChangeEvent<HTMLInputElement>) => void;
+};
+
+export function FileAttachField({
   name,
   label,
   ariaLabel,
-  accept
-}: AutoSubmitFileInputProps) {
+  accept,
+  capture,
+  disabled,
+  inputRef,
+  multiple,
+  required,
+  helperText,
+  onFilesSelected
+}: FileAttachFieldProps) {
   const inputId = useId();
 
   return (
@@ -59,20 +82,35 @@ export function AutoSubmitFileInput({
       <label className="document-attach-control" htmlFor={inputId}>
         {label}
       </label>
+      {helperText ? <span className="muted text-xs">{helperText}</span> : null}
       <input
         accept={accept}
+        capture={capture}
+        disabled={disabled}
         aria-label={ariaLabel}
         className="visually-hidden"
         id={inputId}
+        multiple={multiple}
         name={name}
-        onChange={(event) => {
-          if (event.currentTarget.files?.length) {
-            event.currentTarget.form?.requestSubmit();
-          }
-        }}
-        type="file"
+        onChange={onFilesSelected}
+        ref={inputRef}
+        required={required}
+        type={FILE_INPUT_TYPE}
       />
     </>
+  );
+}
+
+export function AutoSubmitFileInput(props: AutoSubmitFileInputProps) {
+  return (
+    <FileAttachField
+      {...props}
+      onFilesSelected={(event) => {
+        if (event.currentTarget.files?.length) {
+          event.currentTarget.form?.requestSubmit();
+        }
+      }}
+    />
   );
 }
 

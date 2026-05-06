@@ -159,7 +159,7 @@ export default async function FspSportsPage(): Promise<React.ReactElement> {
                     <th>Source</th>
                     <th>Target</th>
                     <th>Status</th>
-                    <th>Action</th>
+                    <th>Preview</th>
                   </tr>
                 </thead>
                 <tbody>
