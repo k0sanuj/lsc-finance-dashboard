@@ -19,6 +19,7 @@
     "import:csv": "node scripts/import-csv.mjs",
     "import:xlsx": "node scripts/import-xlsx.mjs",
     "normalize:e1-payables": "node scripts/normalize-e1-payables.mjs",
+    "attach:e1-s2-invoices": "node scripts/attach-e1-s2-invoices.mjs",
     "normalize:race-expenses": "node scripts/normalize-race-expenses.mjs",
     "normalize:tbr-season-finance": "node scripts/normalize-tbr-season-finance.mjs",
     "normalize:revenue": "node scripts/normalize-revenue.mjs",

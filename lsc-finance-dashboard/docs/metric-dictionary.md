@@ -287,5 +287,5 @@ Formula:
 
 Approved revenue rules:
 
-- Season 1 includes `USD 150,000` sponsorship revenue from `Classic Car Club Manhattan`
+- Season 1 includes `USD 250,000` sponsorship revenue from `Classic Car Club Manhattan`
 - Season 2 includes `EUR 100,000` prize money, preserved in EUR and converted to USD for reporting

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { resolveDocumentPreview } from "../document-storage";
 import { queryRows } from "../query";
 import { formatCurrency, getBackend } from "./shared";
 
@@ -112,8 +113,18 @@ export type TbrE1InvoiceTrackerRow = {
   documentCount: number;
   sourceDocumentId: string | null;
   sourceDocumentName: string | null;
+  sourcePreviewDataUrl: string | null;
+  sourcePreviewMimeType: string | null;
   notes: string | null;
   primaryItem: string | null;
+  documents: TbrE1InvoiceDocument[];
+};
+
+export type TbrE1InvoiceDocument = {
+  sourceDocumentId: string;
+  sourceDocumentName: string;
+  previewDataUrl: string | null;
+  previewMimeType: string | null;
 };
 
 export type TbrOverallPnlRow = TbrFinanceSeason & {
@@ -240,8 +251,14 @@ type E1InvoiceTrackerSource = {
   document_count: number | string;
   source_document_id: string | null;
   source_document_name: string | null;
+  source_document_metadata: Record<string, unknown> | null;
   notes: string | null;
   primary_item: string | null;
+  document_refs: Array<{
+    sourceDocumentId?: string | null;
+    sourceDocumentName?: string | null;
+    metadata?: Record<string, unknown> | null;
+  }> | null;
 };
 
 type OverallRow = SeasonRow & {
@@ -296,6 +313,24 @@ function defaultSeasonCode(seasons: readonly TbrFinanceSeason[]) {
     .filter((season) => season.status !== "planning")
     .sort((left, right) => right.seasonNumber - left.seasonNumber);
   return completedWithData[0]?.seasonCode ?? seasons[0]?.seasonCode ?? "S2";
+}
+
+function invoiceDocumentRefs(row: E1InvoiceTrackerSource) {
+  const refs = Array.isArray(row.document_refs)
+    ? row.document_refs.filter((ref) => ref?.sourceDocumentId)
+    : [];
+
+  if (refs.length > 0) return refs;
+
+  if (!row.source_document_id) return [];
+
+  return [
+    {
+      sourceDocumentId: row.source_document_id,
+      sourceDocumentName: row.source_document_name,
+      metadata: row.source_document_metadata
+    }
+  ];
 }
 
 export async function getTbrFinanceSeasons(): Promise<TbrFinanceSeason[]> {
@@ -527,8 +562,10 @@ export async function getTbrE1AccountingDashboard(selectedSeasonCode?: string) {
          document_count,
          source_document_id::text,
          source_document_name,
+         source_document_metadata,
          notes,
-         primary_item
+         primary_item,
+         document_refs
        from tbr_e1_invoice_tracker_by_season
        where season_code = $1
        order by
@@ -573,31 +610,50 @@ export async function getTbrE1AccountingDashboard(selectedSeasonCode?: string) {
     )
   ]);
 
+  const invoiceTracker = await Promise.all(trackerRows.map(async (row) => {
+    const total = numeric(row.total_amount_usd);
+    const due = numeric(row.due_amount_usd);
+    const documents = await Promise.all(
+      invoiceDocumentRefs(row).map(async (ref) => {
+        const preview = await resolveDocumentPreview(ref.metadata);
+
+        return {
+          sourceDocumentId: String(ref.sourceDocumentId),
+          sourceDocumentName: ref.sourceDocumentName ?? "Invoice document",
+          previewDataUrl: preview.previewDataUrl,
+          previewMimeType: preview.previewMimeType
+        } satisfies TbrE1InvoiceDocument;
+      })
+    );
+    const primaryDocument = documents[0] ?? null;
+
+    return {
+      seasonCode: row.season_code,
+      invoiceNumber: row.invoice_number ?? "No invoice",
+      invoiceNumberRaw: row.invoice_number,
+      lineCount: Number(row.line_count),
+      rollupStatus: row.rollup_status,
+      totalAmountUsd: total,
+      dueAmountUsd: due,
+      totalAmount: formatCurrency(total),
+      dueAmount: formatCurrency(due),
+      documentCount: Number(row.document_count),
+      sourceDocumentId: primaryDocument?.sourceDocumentId ?? row.source_document_id,
+      sourceDocumentName: primaryDocument?.sourceDocumentName ?? row.source_document_name,
+      sourcePreviewDataUrl: primaryDocument?.previewDataUrl ?? null,
+      sourcePreviewMimeType: primaryDocument?.previewMimeType ?? null,
+      notes: row.notes,
+      primaryItem: row.primary_item,
+      documents
+    } satisfies TbrE1InvoiceTrackerRow;
+  }));
+
   return {
     seasons,
     selectedSeasonCode: resolvedSeasonCode ?? "S2",
     summary: summaries.find((row) => row.seasonCode === resolvedSeasonCode) ?? null,
     summaries,
-    invoiceTracker: trackerRows.map((row) => {
-      const total = numeric(row.total_amount_usd);
-      const due = numeric(row.due_amount_usd);
-      return {
-        seasonCode: row.season_code,
-        invoiceNumber: row.invoice_number ?? "No invoice",
-        invoiceNumberRaw: row.invoice_number,
-        lineCount: Number(row.line_count),
-        rollupStatus: row.rollup_status,
-        totalAmountUsd: total,
-        dueAmountUsd: due,
-        totalAmount: formatCurrency(total),
-        dueAmount: formatCurrency(due),
-        documentCount: Number(row.document_count),
-        sourceDocumentId: row.source_document_id,
-        sourceDocumentName: row.source_document_name,
-        notes: row.notes,
-        primaryItem: row.primary_item
-      };
-    }),
+    invoiceTracker,
     lines: lineRows.map((row) => {
       const sourceAmount = numeric(row.source_amount);
       const amount = numeric(row.reporting_amount_usd);

@@ -29,8 +29,8 @@ const DOCUMENT_BLUEPRINTS = [
       {
         key: "contract_value_usd",
         label: "Contract Value",
-        extractedValue: "$150,000",
-        normalizedValue: "150000",
+        extractedValue: "$250,000",
+        normalizedValue: "250000",
         confidence: 0.97,
         approvalStatus: "approved",
         targetTable: "contracts",

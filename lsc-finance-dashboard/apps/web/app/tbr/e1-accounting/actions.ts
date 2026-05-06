@@ -368,6 +368,24 @@ export async function attachTbrE1InvoiceDocumentAction(formData: FormData) {
       [sourceDocumentId, companyId, session.id, upload.name, workflowContext, note]
     );
 
+    await client.query(
+      `insert into tbr_e1_invoice_documents (
+         season_id,
+         invoice_number,
+         source_document_id,
+         linked_by_user_id,
+         notes
+       )
+       select ts.id, $2, $3, $4, $5
+       from tbr_seasons ts
+       where ts.season_code = $1
+       on conflict (season_id, invoice_number, source_document_id)
+       do update set
+         linked_by_user_id = excluded.linked_by_user_id,
+         notes = coalesce(excluded.notes, tbr_e1_invoice_documents.notes)`,
+      [seasonCode, invoiceNumber, sourceDocumentId, session.id, note]
+    );
+
     const linkedRows = await client.query<{ id: string }>(
       `update tbr_e1_accounting_lines
        set source_document_id = $3,

@@ -82,11 +82,11 @@ function getDocumentStorageBackend() {
 }
 
 function isPreviewableMimeType(mimeType: string) {
-  return mimeType.startsWith("image/");
+  return mimeType.startsWith("image/") || mimeType === "application/pdf";
 }
 
 function buildInlinePreviewDataUrl(buffer: Buffer, mimeType: string) {
-  if (!mimeType.startsWith("image/")) {
+  if (!isPreviewableMimeType(mimeType)) {
     return null;
   }
 

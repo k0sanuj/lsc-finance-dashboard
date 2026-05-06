@@ -7,7 +7,8 @@ import {
 } from "../../components/dashboard-charts";
 import {
   AutoSubmitFileInput,
-  AutoSubmitSelect
+  AutoSubmitSelect,
+  DocumentPreviewButton
 } from "../../components/inline-table-controls";
 import { requireRole } from "../../../lib/auth";
 import {
@@ -262,10 +263,17 @@ export default async function TbrE1AccountingPage({ searchParams }: PageProps) {
                   <td>{invoice.totalAmount}</td>
                   <td>{invoice.dueAmount}</td>
                   <td className="document-cell">
-                    {invoice.sourceDocumentName ? (
-                      <Link className="document-link" href={documentHref(invoice.sourceDocumentId)}>
-                        {invoice.sourceDocumentName}
-                      </Link>
+                    {invoice.documents.length > 0 ? (
+                      <div className="document-link-list">
+                        {invoice.documents.map((document) => (
+                          <DocumentPreviewButton
+                            documentName={document.sourceDocumentName}
+                            key={document.sourceDocumentId}
+                            previewDataUrl={document.previewDataUrl}
+                            previewMimeType={document.previewMimeType}
+                          />
+                        ))}
+                      </div>
                     ) : (
                       <form action={attachTbrE1InvoiceDocumentAction} className="document-attach-form">
                         <input type="hidden" name="seasonCode" value={data.selectedSeasonCode} />
@@ -278,6 +286,11 @@ export default async function TbrE1AccountingPage({ searchParams }: PageProps) {
                         />
                       </form>
                     )}
+                    {invoice.sourceDocumentName && invoice.documents.length === 0 ? (
+                      <Link className="document-link" href={documentHref(invoice.sourceDocumentId)}>
+                        {invoice.sourceDocumentName}
+                      </Link>
+                    ) : null}
                     {invoice.documentCount > 1 ? (
                       <span className="pill subtle-pill">{invoice.documentCount} linked</span>
                     ) : null}

@@ -11,11 +11,11 @@ const SPONSOR_RULE = {
   sponsorName: "Classic Car Club Manhattan",
   contractName: "Season 1 Sponsorship",
   revenueType: "sponsorship",
-  amountUsd: 150000,
+  amountUsd: 250000,
   currencyCode: "USD",
   recognitionDate: "2024-02-02",
   notes:
-    "User-provided business rule: recognize USD 150,000 sponsorship revenue from Classic Car Club Manhattan in Season 1 only."
+    "User-provided business rule: recognize USD 250,000 sponsorship revenue from Classic Car Club Manhattan in Season 1 only."
 };
 
 const EUR_USD_RATE = 1.1571;
@@ -261,14 +261,14 @@ async function clearRevenueRows(client) {
   );
 
   await client.query(
-    `delete from invoices
+    `delete from revenue_records
      where source_document_id in (
        select id from source_documents where source_system = 'business_rule'
      )`
   );
 
   await client.query(
-    `delete from revenue_records
+    `delete from invoices
      where source_document_id in (
        select id from source_documents where source_system = 'business_rule'
      )`
@@ -449,7 +449,7 @@ async function main() {
       sponsorOrCustomerId: sponsorCounterpartyId,
       ownerId: sponsorOwnerId,
       sourceDocumentId: sponsorSourceDocumentId,
-      invoiceNumber: "CCCM-S1-150000",
+      invoiceNumber: "CCCM-S1-250000",
       issueDate: SPONSOR_RULE.recognitionDate,
       currencyCode: SPONSOR_RULE.currencyCode,
       totalAmount: SPONSOR_RULE.amountUsd,

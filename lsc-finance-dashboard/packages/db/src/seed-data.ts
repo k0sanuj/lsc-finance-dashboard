@@ -108,7 +108,7 @@ export const documentExtractedFields = [
   },
   {
     field: "Contract Value",
-    proposedValue: "$150,000",
+    proposedValue: "$250,000",
     confidence: "0.95",
     approval: "approved"
   },
