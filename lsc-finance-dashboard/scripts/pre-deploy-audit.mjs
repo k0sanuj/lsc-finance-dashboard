@@ -439,7 +439,7 @@ async function auditQueryFunctions() {
 
     // getTbrE1AccountingDashboard equivalent
     const e1SeasonRes = await pool.query(`
-      SELECT season_code, season_year, line_count, gross_e1_amount_usd
+      SELECT season_code, season_year, status, line_count, gross_e1_amount_usd
       FROM tbr_e1_accounting_status_by_season
       ORDER BY season_number
     `);
