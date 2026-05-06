@@ -39,15 +39,15 @@ export async function addDealAction(formData: FormData) {
   }
 
   const inserted = await queryRowsAdmin<{ id: string }>(
-    `INSERT INTO deals
+    `INSERT INTO deal_pipeline
        (deal_name, deal_type, department, deal_owner, deal_value, revenue_type,
         stage, expected_close_date, risk_level, sport_vertical, next_action,
         action_owner, notes, at_risk, last_activity_date)
-     VALUES ($1, $2, $3, $4, $5::numeric, $6, $7, $8::date, $9, $10, $11, $12, $13, false, now())
+     VALUES ($1, $2, $3, $4, $5::numeric, $6, $7::deal_stage, $8::date, $9::deal_risk_level, $10, $11, $12, $13, false, now())
      RETURNING id`,
     [
       dealName,
-      dealType || null,
+      dealType || "Other",
       department,
       dealOwner,
       dealValue,
@@ -91,12 +91,12 @@ export async function updateDealStageAction(formData: FormData) {
   }
 
   const before = await queryRowsAdmin<{ stage: string }>(
-    `SELECT stage FROM deals WHERE id = $1`,
+    `SELECT stage::text as stage FROM deal_pipeline WHERE id = $1`,
     [dealId]
   );
 
   await executeAdmin(
-    `UPDATE deals SET stage = $2, last_activity_date = now(), updated_at = now() WHERE id = $1`,
+    `UPDATE deal_pipeline SET stage = $2::deal_stage, last_activity_date = now(), updated_at = now() WHERE id = $1`,
     [dealId, newStage]
   );
 
@@ -126,10 +126,10 @@ export async function updateDealRiskAction(formData: FormData) {
     redirectToPipeline("error", "Deal ID and risk level are required.");
   }
 
-  const atRisk = riskLevel === "high" || riskLevel === "critical";
+  const atRisk = riskLevel === "high";
 
   await executeAdmin(
-    `UPDATE deals SET risk_level = $2, at_risk = $3, last_activity_date = now(), updated_at = now() WHERE id = $1`,
+    `UPDATE deal_pipeline SET risk_level = $2::deal_risk_level, at_risk = $3, last_activity_date = now(), updated_at = now() WHERE id = $1`,
     [dealId, riskLevel, atRisk]
   );
 

@@ -163,7 +163,7 @@ export async function getDeals(filters?: DealQueryFilters): Promise<DealRow[]> {
     return result;
   }
 
-  const conditions: string[] = ["d.deleted_at IS NULL"];
+  const conditions: string[] = [];
   const values: unknown[] = [];
   let idx = 1;
 
@@ -173,12 +173,12 @@ export async function getDeals(filters?: DealQueryFilters): Promise<DealRow[]> {
     idx++;
   }
   if (filters?.stage) {
-    conditions.push(`d.stage = $${idx}`);
+    conditions.push(`d.stage = $${idx}::deal_stage`);
     values.push(filters.stage);
     idx++;
   }
   if (filters?.riskLevel) {
-    conditions.push(`d.risk_level = $${idx}`);
+    conditions.push(`d.risk_level = $${idx}::deal_risk_level`);
     values.push(filters.riskLevel);
     idx++;
   }
@@ -188,8 +188,8 @@ export async function getDeals(filters?: DealQueryFilters): Promise<DealRow[]> {
             d.deal_value::text, d.stage, d.expected_close_date::text,
             d.risk_level, d.next_action, d.action_owner, d.at_risk,
             d.sport_vertical, d.created_at::text
-     FROM deals d
-     WHERE ${conditions.join(" AND ")}
+     FROM deal_pipeline d
+     ${conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""}
      ORDER BY d.deal_value DESC NULLS LAST`,
     values
   );
@@ -244,16 +244,16 @@ export async function getDealPipelineSummary(): Promise<DealPipelineSummary> {
               COUNT(*)::text AS deal_count,
               COUNT(*) FILTER (WHERE at_risk = true)::text AS at_risk_count,
               COUNT(*) FILTER (WHERE stage = 'won')::text AS won_count
-       FROM deals WHERE deleted_at IS NULL`
+       FROM deal_pipeline`
     ),
     queryRows<StageAgg>(
       `SELECT stage, COUNT(*)::text AS count, COALESCE(SUM(deal_value), 0)::text AS total_value
-       FROM deals WHERE deleted_at IS NULL
+       FROM deal_pipeline
        GROUP BY stage ORDER BY total_value DESC`
     ),
     queryRows<DeptAgg>(
       `SELECT department, COUNT(*)::text AS count, COALESCE(SUM(deal_value), 0)::text AS total_value
-       FROM deals WHERE deleted_at IS NULL
+       FROM deal_pipeline
        GROUP BY department ORDER BY total_value DESC`
     ),
   ]);

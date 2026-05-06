@@ -26,11 +26,11 @@ const CHECKLIST_CATEGORIES = [
 ];
 
 const SPORT_CODES = [
-  { code: "paddle", label: "Paddle" },
-  { code: "pickleball", label: "Pickleball" },
-  { code: "teqball", label: "Teqball" },
-  { code: "drone_racing", label: "Drone Racing" },
-  { code: "e_sports", label: "E-Sports" }
+  { code: "basketball", label: "Basketball" },
+  { code: "bowling", label: "Bowling" },
+  { code: "squash", label: "Squash" },
+  { code: "world_pong", label: "World Pong" },
+  { code: "foundation", label: "Foundation Events" }
 ];
 
 function varianceAccent(variance: string): string {

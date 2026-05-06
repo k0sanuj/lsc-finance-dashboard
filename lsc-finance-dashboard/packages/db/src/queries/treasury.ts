@@ -57,7 +57,7 @@ export async function getTreasuryProjections(companyCode?: string): Promise<Trea
        coalesce(tp.expected_inflows, 0)::numeric(14,2)::text as expected_inflows,
        coalesce(tp.net_position, 0)::numeric(14,2)::text as net_position,
        tp.projection_type,
-       coalesce(tp.currency, 'USD') as currency
+       coalesce(tp.currency_code, 'USD') as currency
      from treasury_projections tp
      ${whereClause}
      order by tp.projection_date desc`,

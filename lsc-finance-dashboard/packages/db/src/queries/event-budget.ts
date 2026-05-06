@@ -99,12 +99,12 @@ export async function getFspEvents(sportId?: string): Promise<FspEventRow[]> {
   if (getBackend() !== "database") return [];
 
   const where = sportId
-    ? "where e.sport_id = $1"
+    ? "where e.sport_id::text = $1 or fs.sport_code::text = $1"
     : "";
   const params = sportId ? [sportId] : [];
 
   const rows = await queryRows<FspEventSource>(
-    `select e.id, fs.sport_name, e.event_name, e.city,
+    `select e.id, fs.display_name as sport_name, e.event_name, e.city,
             e.venue_name, e.event_date::text, e.status,
             e.total_budget::text, e.total_actual::text, e.currency_code
      from fsp_events e

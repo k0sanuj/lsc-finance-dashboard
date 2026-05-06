@@ -21,6 +21,7 @@ export async function addProjectionAction(formData: FormData) {
   const expectedInflows = clean(formData.get("expectedInflows")) || "0";
   const projectionType = clean(formData.get("projectionType")) || "30_day";
   const currency = clean(formData.get("currency")) || "USD";
+  const companyCode = clean(formData.get("companyCode")) || "LSC";
 
   if (!projectionDate) {
     redirect("/treasury?status=error&message=Projection+date+is+required." as Route);
@@ -31,10 +32,10 @@ export async function addProjectionAction(formData: FormData) {
 
   const inserted = await queryRowsAdmin<{ id: string }>(
     `insert into treasury_projections
-       (projection_date, projected_balance, committed_outflows, expected_inflows, net_position, projection_type, currency)
-     values ($1::date, $2::numeric, $3::numeric, $4::numeric, $5::numeric, $6, $7)
+       (company_id, projection_date, projected_balance, committed_outflows, expected_inflows, net_position, projection_type, currency_code)
+     values ((select id from companies where code = $1::company_code), $2::date, $3::numeric, $4::numeric, $5::numeric, $6::numeric, $7, $8)
      returning id`,
-    [projectionDate, projectedBalance, committedOutflows, expectedInflows, netPosition, projectionType, currency]
+    [companyCode, projectionDate, projectedBalance, committedOutflows, expectedInflows, netPosition, projectionType, currency]
   );
 
   const projectionId = inserted[0]?.id;
@@ -44,7 +45,7 @@ export async function addProjectionAction(formData: FormData) {
       entityType: "treasury_projection",
       entityId: projectionId,
       action: "create",
-      after: { projectionDate, projectedBalance, committedOutflows, expectedInflows, netPosition, projectionType, currency },
+      after: { companyCode, projectionDate, projectedBalance, committedOutflows, expectedInflows, netPosition, projectionType, currency },
       performedBy: session.id,
       agentId: "treasury-agent",
     });

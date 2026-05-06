@@ -129,6 +129,7 @@ export default async function TreasuryPage({ searchParams }: TreasuryPageProps) 
           </div>
         </div>
         <form action={addProjectionAction}>
+          <input name="companyCode" type="hidden" value="LSC" />
           <div className="form-grid">
             <label className="field">
               <span>Projection date</span>

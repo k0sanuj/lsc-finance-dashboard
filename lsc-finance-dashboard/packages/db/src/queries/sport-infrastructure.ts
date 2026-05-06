@@ -51,7 +51,7 @@ export async function getSportInfrastructure(sportId?: string): Promise<Infrastr
   }>(
     `select
        si.id,
-       fs.sport_name,
+       fs.display_name as sport_name,
        si.component,
        si.critical_requirement,
        si.what_to_check,
@@ -99,7 +99,7 @@ export async function getBroadcastSpecs(sportId?: string): Promise<BroadcastSpec
   }>(
     `select
        bs.id,
-       fs.sport_name,
+       fs.display_name as sport_name,
        bs.category,
        bs.spec_name,
        bs.technical_requirement,

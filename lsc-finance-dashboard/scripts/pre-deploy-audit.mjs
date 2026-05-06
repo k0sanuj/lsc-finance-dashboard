@@ -456,6 +456,43 @@ async function auditQueryFunctions() {
       fail("getTbrE1AccountingDashboard: missing E1 seasons or ledger rows");
     }
 
+    // Shared finance control routes that should render even with empty tables
+    await pool.query(`
+      SELECT e.id, fs.display_name as sport_name, e.event_name, e.city,
+             e.venue_name, e.event_date::text, e.status,
+             e.total_budget::text, e.total_actual::text, e.currency_code
+      FROM fsp_events e
+      JOIN fsp_sports fs ON fs.id = e.sport_id
+      ORDER BY e.event_date DESC NULLS LAST, e.created_at DESC
+      LIMIT 5
+    `);
+    ok("getFspEvents: query shape matches current FSP schema");
+
+    await pool.query(`
+      SELECT d.id, d.deal_name, d.deal_type, d.department, d.deal_owner,
+             d.deal_value::text, d.stage::text, d.expected_close_date::text,
+             d.risk_level::text, d.next_action, d.action_owner, d.at_risk,
+             d.sport_vertical, d.created_at::text
+      FROM deal_pipeline d
+      ORDER BY d.deal_value DESC NULLS LAST
+      LIMIT 5
+    `);
+    ok("getDeals: query shape matches current deal_pipeline schema");
+
+    await pool.query(`
+      SELECT tp.id, tp.projection_date::text,
+             coalesce(tp.projected_balance, 0)::numeric(14,2)::text as projected_balance,
+             coalesce(tp.committed_outflows, 0)::numeric(14,2)::text as committed_outflows,
+             coalesce(tp.expected_inflows, 0)::numeric(14,2)::text as expected_inflows,
+             coalesce(tp.net_position, 0)::numeric(14,2)::text as net_position,
+             tp.projection_type,
+             coalesce(tp.currency_code, 'USD') as currency
+      FROM treasury_projections tp
+      ORDER BY tp.projection_date DESC
+      LIMIT 5
+    `);
+    ok("getTreasuryProjections: query shape matches current treasury schema");
+
   } catch (err) {
     fail(`Query function error: ${err.message}`);
   } finally {

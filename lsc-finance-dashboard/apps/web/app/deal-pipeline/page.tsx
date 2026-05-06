@@ -41,7 +41,7 @@ const DEAL_TYPES = [
   "Other",
 ] as const;
 
-const RISK_LEVELS = ["low", "medium", "high", "critical"] as const;
+const RISK_LEVELS = ["low", "medium", "high"] as const;
 
 function stagePillClass(stage: string): string {
   switch (stage) {
@@ -69,7 +69,6 @@ function riskPillClass(risk: string): string {
     case "medium":
       return "signal-pill signal-warn";
     case "high":
-    case "critical":
       return "signal-pill signal-risk";
     default:
       return "subtle-pill";
