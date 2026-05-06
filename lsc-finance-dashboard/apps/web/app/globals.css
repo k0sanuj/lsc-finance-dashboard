@@ -2894,6 +2894,33 @@ textarea {
   border-color: var(--brand-2);
 }
 
+.e1-inline-form {
+  margin-top: 0;
+  gap: 6px;
+  align-items: center;
+}
+
+.e1-inline-form .table-input {
+  min-width: 120px;
+}
+
+.e1-inline-form input[type="file"] {
+  max-width: 210px;
+}
+
+.note-row td {
+  background: rgba(241, 245, 249, 0.62);
+  border-top: 0;
+}
+
+.note-row .field {
+  margin: 0;
+}
+
+.note-row textarea {
+  min-height: 72px;
+}
+
 .currency-input {
   display: inline-flex;
   align-items: center;

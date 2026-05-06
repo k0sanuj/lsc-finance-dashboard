@@ -81,14 +81,38 @@ export type TbrE1Line = {
   lineType: string;
   pnlTreatment: string;
   overlapCategoryKey: string | null;
+  sourceAmount: number;
+  sourceCurrency: string;
+  fxRate: number;
   reportingAmountUsd: number;
+  dueAmountSource: number;
   dueAmountReportingUsd: number;
+  sourceAmountDisplay: string;
   amount: string;
+  dueAmountSourceDisplay: string;
   dueAmount: string;
   overlapGroupE1Amount: string;
   overlapGroupBaseline: string;
   overlapGroupVariance: string;
   comments: string | null;
+  sourceDocumentId: string | null;
+  sourceDocumentName: string | null;
+};
+
+export type TbrE1InvoiceTrackerRow = {
+  seasonCode: string;
+  invoiceNumber: string;
+  invoiceNumberRaw: string | null;
+  lineCount: number;
+  rollupStatus: string;
+  totalAmountUsd: number;
+  dueAmountUsd: number;
+  totalAmount: string;
+  dueAmount: string;
+  documentCount: number;
+  sourceDocumentId: string | null;
+  sourceDocumentName: string | null;
+  notes: string | null;
 };
 
 export type TbrOverallPnlRow = TbrFinanceSeason & {
@@ -191,12 +215,31 @@ type E1LineRow = {
   line_type: string;
   pnl_treatment: string;
   overlap_category_key: string | null;
+  source_amount: string | null;
+  source_currency: string;
+  fx_rate: string;
   reporting_amount_usd: string;
+  due_amount_source: string | null;
   due_amount_reporting_usd: string;
   overlap_group_e1_amount_usd: string;
   overlap_group_baseline_usd: string;
   overlap_group_variance_usd: string;
   comments: string | null;
+  source_document_id: string | null;
+  source_document_name: string | null;
+};
+
+type E1InvoiceTrackerSource = {
+  season_code: string;
+  invoice_number: string | null;
+  line_count: number | string;
+  total_amount_usd: string;
+  due_amount_usd: string;
+  rollup_status: string;
+  document_count: number | string;
+  source_document_id: string | null;
+  source_document_name: string | null;
+  notes: string | null;
 };
 
 type OverallRow = SeasonRow & {
@@ -224,6 +267,15 @@ type ReconciliationGroupRow = {
 function numeric(value: string | number | null | undefined) {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatCurrencyCode(value: number | string | null | undefined, currencyCode: string | null | undefined) {
+  const currency = /^[A-Z]{3}$/.test(currencyCode ?? "") ? currencyCode as string : "USD";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0
+  }).format(numeric(value));
 }
 
 function normalizeSeason(row: SeasonRow): TbrFinanceSeason {
@@ -397,6 +449,7 @@ export async function getTbrE1AccountingDashboard(selectedSeasonCode?: string) {
       selectedSeasonCode: selectedSeasonCode ?? "S2",
       summary: null as TbrE1StatusSummary | null,
       summaries: [] as TbrE1StatusSummary[],
+      invoiceTracker: [] as TbrE1InvoiceTrackerRow[],
       lines: [] as TbrE1Line[]
     };
   }
@@ -460,7 +513,35 @@ export async function getTbrE1AccountingDashboard(selectedSeasonCode?: string) {
       ? selectedSeasonCode
       : defaultSeasonCode(seasons);
 
-  const lineRows = await queryRows<E1LineRow>(
+  const [trackerRows, lineRows] = await Promise.all([
+    queryRows<E1InvoiceTrackerSource>(
+      `select
+         season_code,
+         invoice_number,
+         line_count,
+         total_amount_usd,
+         due_amount_usd,
+         rollup_status,
+         document_count,
+         source_document_id::text,
+         source_document_name,
+         notes
+       from tbr_e1_invoice_tracker_by_season
+       where season_code = $1
+       order by
+         case rollup_status
+           when 'due' then 1
+           when 'unpaid' then 2
+           when 'partially_paid' then 3
+           when 'issued' then 4
+           when 'pending_review' then 5
+           when 'paid' then 6
+           else 7
+         end,
+         invoice_number nulls last`,
+      [resolvedSeasonCode]
+    ),
+    queryRows<E1LineRow>(
     `select
        e1_line_id,
        season_code,
@@ -470,25 +551,53 @@ export async function getTbrE1AccountingDashboard(selectedSeasonCode?: string) {
        line_type,
        pnl_treatment,
        overlap_category_key,
+       source_amount,
+       source_currency,
+       fx_rate,
        reporting_amount_usd,
+       due_amount_source,
        due_amount_reporting_usd,
        overlap_group_e1_amount_usd,
        overlap_group_baseline_usd,
        overlap_group_variance_usd,
-       comments
+       comments,
+       source_document_id::text,
+       source_document_name
      from tbr_e1_reconciliation_view
      where season_code = $1
      order by invoice_number nulls last, item`,
     [resolvedSeasonCode]
-  );
+    )
+  ]);
 
   return {
     seasons,
     selectedSeasonCode: resolvedSeasonCode ?? "S2",
     summary: summaries.find((row) => row.seasonCode === resolvedSeasonCode) ?? null,
     summaries,
+    invoiceTracker: trackerRows.map((row) => {
+      const total = numeric(row.total_amount_usd);
+      const due = numeric(row.due_amount_usd);
+      return {
+        seasonCode: row.season_code,
+        invoiceNumber: row.invoice_number ?? "No invoice",
+        invoiceNumberRaw: row.invoice_number,
+        lineCount: Number(row.line_count),
+        rollupStatus: row.rollup_status,
+        totalAmountUsd: total,
+        dueAmountUsd: due,
+        totalAmount: formatCurrency(total),
+        dueAmount: formatCurrency(due),
+        documentCount: Number(row.document_count),
+        sourceDocumentId: row.source_document_id,
+        sourceDocumentName: row.source_document_name,
+        notes: row.notes
+      };
+    }),
     lines: lineRows.map((row) => {
+      const sourceAmount = numeric(row.source_amount);
       const amount = numeric(row.reporting_amount_usd);
+      const dueSource = numeric(row.due_amount_source);
       const dueAmount = numeric(row.due_amount_reporting_usd);
       return {
         e1LineId: row.e1_line_id,
@@ -499,14 +608,22 @@ export async function getTbrE1AccountingDashboard(selectedSeasonCode?: string) {
         lineType: row.line_type,
         pnlTreatment: row.pnl_treatment,
         overlapCategoryKey: row.overlap_category_key,
+        sourceAmount,
+        sourceCurrency: row.source_currency,
+        fxRate: numeric(row.fx_rate),
         reportingAmountUsd: amount,
+        dueAmountSource: dueSource,
         dueAmountReportingUsd: dueAmount,
+        sourceAmountDisplay: formatCurrencyCode(sourceAmount, row.source_currency),
         amount: formatCurrency(amount),
+        dueAmountSourceDisplay: formatCurrencyCode(dueSource, row.source_currency),
         dueAmount: formatCurrency(dueAmount),
         overlapGroupE1Amount: formatCurrency(row.overlap_group_e1_amount_usd),
         overlapGroupBaseline: formatCurrency(row.overlap_group_baseline_usd),
         overlapGroupVariance: formatCurrency(row.overlap_group_variance_usd),
-        comments: row.comments
+        comments: row.comments,
+        sourceDocumentId: row.source_document_id,
+        sourceDocumentName: row.source_document_name
       };
     })
   };

@@ -78,13 +78,27 @@ async function getDbCostCategories(): Promise<CostCategoryRow[]> {
     category_name: string;
     total_amount: string;
   }>(
-    `select cc.name as category_name, coalesce(sum(e.amount), 0)::text as total_amount
-     from cost_categories cc
-     left join expenses e on e.cost_category_id = cc.id and e.expense_status in ('approved', 'paid')
-     join companies c on c.id = cc.company_id
-     where c.code = 'TBR'
-     group by cc.name
-     order by cc.name`
+    `with expense_costs as (
+       select cc.name as category_name, coalesce(sum(e.amount), 0) as total_amount
+       from cost_categories cc
+       left join expenses e on e.cost_category_id = cc.id and e.expense_status in ('approved', 'paid')
+       join companies c on c.id = cc.company_id
+       where c.code = 'TBR'
+       group by cc.name
+     ),
+     e1_costs as (
+       select cost_category_name as category_name, coalesce(sum(reporting_amount_usd), 0) as total_amount
+       from tbr_e1_cost_module_lines
+       group by cost_category_name
+     )
+     select category_name, coalesce(sum(total_amount), 0)::text as total_amount
+     from (
+       select * from expense_costs
+       union all
+       select * from e1_costs
+     ) costs
+     group by category_name
+     order by category_name`
   );
 
   if (rows.length === 0) {
@@ -120,27 +134,42 @@ export async function getTbrSeasonCostCategories(seasonYear: number) {
       category_name: string;
       total_amount: string;
     }>(
-      `select
-         cc.name as category_name,
-         coalesce(sum(e.amount), 0)::text as total_amount
-       from cost_categories cc
-       join companies c on c.id = cc.company_id
-       left join expenses e
-         on e.cost_category_id = cc.id
-        and e.expense_status in ('approved', 'paid')
-       left join race_events re on re.id = e.race_event_id
-       where c.code = 'TBR'
-         and re.season_year = $1
-       group by cc.name
-       having coalesce(sum(e.amount), 0) > 0
-       order by coalesce(sum(e.amount), 0) desc, cc.name`,
+      `with expense_costs as (
+         select
+           cc.name as category_name,
+           coalesce(sum(e.amount), 0) as total_amount
+         from cost_categories cc
+         join companies c on c.id = cc.company_id
+         left join expenses e
+           on e.cost_category_id = cc.id
+          and e.expense_status in ('approved', 'paid')
+         left join race_events re on re.id = e.race_event_id
+         where c.code = 'TBR'
+           and re.season_year = $1
+         group by cc.name
+       ),
+       e1_costs as (
+         select cost_category_name as category_name, coalesce(sum(reporting_amount_usd), 0) as total_amount
+         from tbr_e1_cost_module_lines
+         where season_year = $1
+         group by cost_category_name
+       )
+       select category_name, coalesce(sum(total_amount), 0)::text as total_amount
+       from (
+         select * from expense_costs
+         union all
+         select * from e1_costs
+       ) costs
+       group by category_name
+       having coalesce(sum(total_amount), 0) > 0
+       order by coalesce(sum(total_amount), 0) desc, category_name`,
       [seasonYear]
     );
 
     return rows.map((row: CostCategoryRowSource) => ({
       name: row.category_name,
       amount: formatCurrency(row.total_amount),
-      description: `Approved reimbursement cost inside Season ${seasonYear}.`
+      description: `Approved expense and E1 invoice cost inside Season ${seasonYear}.`
     })) satisfies CostCategoryRow[];
   }
 

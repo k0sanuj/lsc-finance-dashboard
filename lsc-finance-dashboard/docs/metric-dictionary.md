@@ -219,13 +219,39 @@ Revenue attributable to a race minus costs attributable to that race, if race-le
 
 Definition:
 
-Season-level operating cost baseline from approved top-table ranges in `TBR Financial Plan_ 2024-25.xlsx` and controlled manual Season 3 entries.
+Season-level operating cost baseline from approved top-table ranges in `TBR Financial Plan_ 2024-25.xlsx` and controlled manual Season 3 entries. It is a control/baseline source, not proof of individual vendor invoice settlement.
 
 Notes:
 
 - stored in `tbr_operating_expense_lines`
 - reported in USD while preserving original amount, original currency, FX rate, and FX source
 - does not represent transaction-level proof in the generic `expenses` ledger
+
+### E1 Invoice Cost
+
+Definition:
+
+E1 accounting rows from the E1 invoice tracker that are active payable/cost evidence.
+
+Included statuses:
+
+- paid
+- issued
+- partially paid
+- due
+- unpaid
+
+Excluded statuses:
+
+- pending review
+- source check
+- not applicable
+- void
+
+Notes:
+
+- Costs module visibility may include E1 invoice cost rows for operational invoice tracking.
+- Overall TBR P&L must still apply the approved variance-only policy for E1 overlaps, so E1 invoice cost visibility must not imply double counting in Overall P&L.
 
 ### TBR E1 Incremental Cost
 

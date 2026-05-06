@@ -83,6 +83,9 @@ export type CascadeTrigger =
   | "team:member:assigned"
   // TBR season finance control tables
   | "tbr-finance:operating-line-saved"
+  | "tbr-e1:line-updated"
+  | "tbr-e1:invoice-status-updated"
+  | "tbr-e1:invoice-document-attached"
   // Document intake (HITL)
   | "document:posted"
   // AI ingestion
@@ -160,6 +163,29 @@ export const CASCADE_RULES: CascadeRule[] = [
       { type: "refresh-company-metrics", description: "Refresh TBR finance summary surfaces" },
       { type: "refresh-race-cost-summary", description: "Refresh TBR season operating rollups" },
       { type: "write-audit-log", description: "Record manual TBR operating finance change" },
+    ],
+  },
+  {
+    trigger: "tbr-e1:line-updated",
+    actions: [
+      { type: "refresh-company-metrics", description: "Refresh E1-derived cost and finance surfaces" },
+      { type: "refresh-race-cost-summary", description: "Refresh TBR costs that include E1 invoice rows" },
+      { type: "write-audit-log", description: "Record E1 accounting row edit" },
+    ],
+  },
+  {
+    trigger: "tbr-e1:invoice-status-updated",
+    actions: [
+      { type: "refresh-company-metrics", description: "Refresh E1-derived cost and finance surfaces" },
+      { type: "refresh-payments-due", description: "Refresh invoice-status dependent payable surfaces" },
+      { type: "write-audit-log", description: "Record E1 invoice status update" },
+    ],
+  },
+  {
+    trigger: "tbr-e1:invoice-document-attached",
+    actions: [
+      { type: "refresh-race-cost-summary", description: "Refresh document-backed cost review surfaces" },
+      { type: "write-audit-log", description: "Record E1 invoice document lineage" },
     ],
   },
   {

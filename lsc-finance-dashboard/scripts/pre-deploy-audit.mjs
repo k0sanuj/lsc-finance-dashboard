@@ -188,6 +188,8 @@ async function auditDatabase() {
       "tbr_race_cost_summary",
       "tbr_e1_accounting_status_by_season",
       "tbr_e1_reconciliation_view",
+      "tbr_e1_invoice_tracker_by_season",
+      "tbr_e1_cost_module_lines",
       "tbr_overall_pnl_by_season"
     ];
     for (const view of views) {
@@ -444,16 +446,30 @@ async function auditQueryFunctions() {
       ORDER BY season_number
     `);
     const e1LineRes = await pool.query(`
-      SELECT e1_line_id, season_code, invoice_number, item, reporting_amount_usd
+      SELECT e1_line_id, season_code, invoice_number, item, reporting_amount_usd, source_document_id
       FROM tbr_e1_reconciliation_view
       WHERE season_code = $1
       ORDER BY invoice_number NULLS LAST, item
       LIMIT 5
     `, ["S2"]);
-    if (e1SeasonRes.rows.length >= 3 && e1LineRes.rows.length > 0) {
-      ok(`getTbrE1AccountingDashboard: ${e1SeasonRes.rows.length} seasons, ${e1LineRes.rows.length} sample rows`);
+    const e1TrackerRes = await pool.query(`
+      SELECT invoice_number, rollup_status, total_amount_usd, document_count
+      FROM tbr_e1_invoice_tracker_by_season
+      WHERE season_code = $1
+      ORDER BY invoice_number NULLS LAST
+      LIMIT 5
+    `, ["S2"]);
+    const e1CostRes = await pool.query(`
+      SELECT cost_category_name, sum(reporting_amount_usd)::numeric(14,2)::text as amount
+      FROM tbr_e1_cost_module_lines
+      GROUP BY cost_category_name
+      ORDER BY cost_category_name
+      LIMIT 5
+    `);
+    if (e1SeasonRes.rows.length >= 3 && e1LineRes.rows.length > 0 && e1TrackerRes.rows.length > 0 && e1CostRes.rows.length > 0) {
+      ok(`getTbrE1AccountingDashboard: ${e1SeasonRes.rows.length} seasons, ${e1LineRes.rows.length} sample rows, ${e1TrackerRes.rows.length} invoice groups`);
     } else {
-      fail("getTbrE1AccountingDashboard: missing E1 seasons or ledger rows");
+      fail("getTbrE1AccountingDashboard: missing E1 seasons, ledger rows, invoice tracker, or cost bridge rows");
     }
 
     // Shared finance control routes that should render even with empty tables

@@ -152,6 +152,12 @@ Represents a season-control operating expense line from the TBR Financial Plan o
 
 Represents an E1 invoice, credit note, due item, contingent item, or explicit source check from the E1 payment summary workbook.
 
+E1 accounting lines can be edited from the platform after import. The row remains the canonical E1 control record, and platform edits must preserve source amount, currency, USD reporting amount, invoice status, P&L treatment, notes, and source document lineage.
+
+### TbrE1InvoiceTracker
+
+Represents a derived invoice-level dashboard grouped from `TbrE1AccountingLine` records by season and invoice number. It is not a duplicate ledger. Updating invoice status updates the underlying E1 rows, and cost-facing surfaces consume derived E1 cost views from those rows.
+
 ### TbrE1OperatingReconciliationLink
 
 Represents the link between E1 accounting rows and matching operating expense baseline categories so that Overall P&L can apply the variance-only policy without double counting.
@@ -179,7 +185,9 @@ Represents the link between E1 accounting rows and matching operating expense ba
 - AI intake posting events preserve the bridge from approved preview fields to canonical records
 - TBR seasons have many operating expense control lines
 - TBR seasons have many E1 accounting lines
+- E1 accounting lines group into derived invoice tracker rows by season and invoice number
 - E1 accounting lines may reconcile to operating expense baseline lines by category, race, and source-document lineage
+- E1 accounting lines may link to invoice source documents through `source_documents`
 
 ## Data Layers
 
