@@ -242,10 +242,11 @@ select
   coalesce(sum(abs(e1.reporting_amount_usd)) filter (where e1.pnl_treatment = 'overlap_variance'), 0)::numeric(14,2) as overlap_visible_amount_usd,
   coalesce(sum(abs(e1.reporting_amount_usd)) filter (where e1.pnl_treatment = 'incremental'), 0)::numeric(14,2) as incremental_visible_amount_usd,
   count(*) filter (where e1.pnl_treatment like 'excluded_%')::integer as excluded_line_count,
-  count(*) filter (where e1.pnl_treatment = 'pending_review')::integer as pending_review_count
+  count(*) filter (where e1.pnl_treatment = 'pending_review')::integer as pending_review_count,
+  ts.season_year
 from tbr_seasons ts
 left join tbr_e1_accounting_lines e1 on e1.season_id = ts.id
-group by ts.id, ts.season_code, ts.season_number, ts.season_label;
+group by ts.id, ts.season_code, ts.season_number, ts.season_year, ts.season_label;
 
 create or replace view tbr_e1_reconciliation_view as
 with overlap_groups as (

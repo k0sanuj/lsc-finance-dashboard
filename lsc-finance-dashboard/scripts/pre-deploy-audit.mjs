@@ -181,7 +181,15 @@ async function auditDatabase() {
     ok(`AI intake drafts: ${aiDraftRes.rows[0]?.cnt}`);
 
     // Views exist
-    const views = ["consolidated_company_metrics", "monthly_financial_summary", "payments_due", "tbr_race_cost_summary"];
+    const views = [
+      "consolidated_company_metrics",
+      "monthly_financial_summary",
+      "payments_due",
+      "tbr_race_cost_summary",
+      "tbr_e1_accounting_status_by_season",
+      "tbr_e1_reconciliation_view",
+      "tbr_overall_pnl_by_season"
+    ];
     for (const view of views) {
       try {
         await pool.query(`SELECT 1 FROM ${view} LIMIT 1`);
@@ -278,6 +286,9 @@ function auditRoutes() {
     "app/tbr/expense-management/[submissionId]/page.tsx",
     "app/tbr/invoice-hub/page.tsx",
     "app/tbr/team-management/page.tsx",
+    "app/tbr/operating-expenses/page.tsx",
+    "app/tbr/e1-accounting/page.tsx",
+    "app/tbr/overall-pnl/page.tsx",
     "app/costs/page.tsx",
     "app/costs/[company]/page.tsx",
     "app/payments/page.tsx",
@@ -425,6 +436,25 @@ async function auditQueryFunctions() {
     const raceOptRes = await pool.query("SELECT count(*)::int as cnt FROM race_events WHERE season_year IS NOT NULL");
     const userOptRes = await pool.query("SELECT count(*)::int as cnt FROM app_users WHERE is_active = true");
     ok(`getExpenseFormOptions: ${raceOptRes.rows[0]?.cnt} races, ${userOptRes.rows[0]?.cnt} users`);
+
+    // getTbrE1AccountingDashboard equivalent
+    const e1SeasonRes = await pool.query(`
+      SELECT season_code, season_year, line_count, gross_e1_amount_usd
+      FROM tbr_e1_accounting_status_by_season
+      ORDER BY season_number
+    `);
+    const e1LineRes = await pool.query(`
+      SELECT e1_line_id, season_code, invoice_number, item, reporting_amount_usd
+      FROM tbr_e1_reconciliation_view
+      WHERE season_code = $1
+      ORDER BY invoice_number NULLS LAST, item
+      LIMIT 5
+    `, ["S2"]);
+    if (e1SeasonRes.rows.length >= 3 && e1LineRes.rows.length > 0) {
+      ok(`getTbrE1AccountingDashboard: ${e1SeasonRes.rows.length} seasons, ${e1LineRes.rows.length} sample rows`);
+    } else {
+      fail("getTbrE1AccountingDashboard: missing E1 seasons or ledger rows");
+    }
 
   } catch (err) {
     fail(`Query function error: ${err.message}`);
