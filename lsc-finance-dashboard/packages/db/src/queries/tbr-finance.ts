@@ -113,6 +113,7 @@ export type TbrE1InvoiceTrackerRow = {
   sourceDocumentId: string | null;
   sourceDocumentName: string | null;
   notes: string | null;
+  primaryItem: string | null;
 };
 
 export type TbrOverallPnlRow = TbrFinanceSeason & {
@@ -240,6 +241,7 @@ type E1InvoiceTrackerSource = {
   source_document_id: string | null;
   source_document_name: string | null;
   notes: string | null;
+  primary_item: string | null;
 };
 
 type OverallRow = SeasonRow & {
@@ -525,7 +527,8 @@ export async function getTbrE1AccountingDashboard(selectedSeasonCode?: string) {
          document_count,
          source_document_id::text,
          source_document_name,
-         notes
+         notes,
+         primary_item
        from tbr_e1_invoice_tracker_by_season
        where season_code = $1
        order by
@@ -591,7 +594,8 @@ export async function getTbrE1AccountingDashboard(selectedSeasonCode?: string) {
         documentCount: Number(row.document_count),
         sourceDocumentId: row.source_document_id,
         sourceDocumentName: row.source_document_name,
-        notes: row.notes
+        notes: row.notes,
+        primaryItem: row.primary_item
       };
     }),
     lines: lineRows.map((row) => {

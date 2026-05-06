@@ -5,6 +5,10 @@ import {
   HorizontalMetricBars,
   type HorizontalBarRow
 } from "../../components/dashboard-charts";
+import {
+  AutoSubmitFileInput,
+  AutoSubmitSelect
+} from "../../components/inline-table-controls";
 import { requireRole } from "../../../lib/auth";
 import {
   attachTbrE1InvoiceDocumentAction,
@@ -73,6 +77,14 @@ function statusTone(value: string) {
   if (value === "issued" || value === "pending_review") return "warn-pill";
   if (value === "void" || value === "not_applicable") return "risk-pill";
   return "";
+}
+
+function documentHref(sourceDocumentId: string | null) {
+  const params = new URLSearchParams({ view: "vendor-invoices" });
+  if (sourceDocumentId) {
+    params.set("sourceDocumentId", sourceDocumentId);
+  }
+  return `/documents/TBR?${params.toString()}`;
 }
 
 export default async function TbrE1AccountingPage({ searchParams }: PageProps) {
@@ -207,76 +219,74 @@ export default async function TbrE1AccountingPage({ searchParams }: PageProps) {
           <table>
             <thead>
               <tr>
-                <th>Invoice</th>
+                <th>Invoice / description</th>
                 <th>Status</th>
                 <th>Amount</th>
                 <th>Due</th>
-                <th>Rows</th>
                 <th>Documents</th>
-                <th>Update status</th>
-                <th>Add document</th>
               </tr>
             </thead>
             <tbody>
               {data.invoiceTracker.map((invoice) => (
                 <tr key={`${invoice.seasonCode}-${invoice.invoiceNumber}`}>
-                  <td>
-                    <strong>{invoice.invoiceNumber}</strong>
-                    {invoice.notes ? <span className="table-note">{invoice.notes}</span> : null}
+                  <td className="primary-record-cell">
+                    <div className="record-title-row">
+                      <strong className="record-title">{invoice.invoiceNumber}</strong>
+                      {invoice.lineCount > 1 ? (
+                        <span className="pill subtle-pill">{invoice.lineCount} lines</span>
+                      ) : null}
+                    </div>
+                    <span className="record-subtitle">
+                      {invoice.primaryItem ?? invoice.notes ?? "No invoice description loaded"}
+                    </span>
+                    {invoice.notes && invoice.primaryItem && invoice.notes !== invoice.primaryItem ? (
+                      <span className="table-note compact-note">{invoice.notes}</span>
+                    ) : null}
                   </td>
                   <td>
-                    <span className={`pill ${statusTone(invoice.rollupStatus)}`}>
-                      {label(invoice.rollupStatus)}
-                    </span>
+                    <form action={updateTbrE1InvoiceStatusAction} className="status-cell-form">
+                      <input type="hidden" name="seasonCode" value={data.selectedSeasonCode} />
+                      <input type="hidden" name="invoiceNumber" value={invoice.invoiceNumberRaw ?? ""} />
+                      <AutoSubmitSelect
+                        ariaLabel={`Update status for ${invoice.invoiceNumber}`}
+                        className={`table-select status-inline-select ${statusTone(invoice.rollupStatus)}`}
+                        defaultValue={invoice.rollupStatus}
+                        name="normalizedStatus"
+                        options={STATUS_OPTIONS.filter((value) => value !== "source_check").map((value) => ({
+                          value,
+                          label: optionLabel(value)
+                        }))}
+                      />
+                    </form>
                   </td>
                   <td>{invoice.totalAmount}</td>
                   <td>{invoice.dueAmount}</td>
-                  <td>{invoice.lineCount}</td>
-                  <td>
+                  <td className="document-cell">
                     {invoice.sourceDocumentName ? (
-                      <span className="table-note">{invoice.sourceDocumentName}</span>
+                      <Link className="document-link" href={documentHref(invoice.sourceDocumentId)}>
+                        {invoice.sourceDocumentName}
+                      </Link>
                     ) : (
-                      <span className="table-note">No document attached</span>
+                      <form action={attachTbrE1InvoiceDocumentAction} className="document-attach-form">
+                        <input type="hidden" name="seasonCode" value={data.selectedSeasonCode} />
+                        <input type="hidden" name="invoiceNumber" value={invoice.invoiceNumberRaw ?? ""} />
+                        <AutoSubmitFileInput
+                          accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx"
+                          ariaLabel={`Attach document for ${invoice.invoiceNumber}`}
+                          label="Attach document"
+                          name="document"
+                        />
+                      </form>
                     )}
-                    <span className="pill subtle-pill">{invoice.documentCount} linked</span>
-                  </td>
-                  <td>
-                    <form action={updateTbrE1InvoiceStatusAction} className="inline-actions e1-inline-form">
-                      <input type="hidden" name="seasonCode" value={data.selectedSeasonCode} />
-                      <input type="hidden" name="invoiceNumber" value={invoice.invoiceNumberRaw ?? ""} />
-                      <select className="table-select" name="normalizedStatus" defaultValue={invoice.rollupStatus}>
-                        {STATUS_OPTIONS.filter((value) => value !== "source_check").map((value) => (
-                          <option key={value} value={value}>{optionLabel(value)}</option>
-                        ))}
-                      </select>
-                      <input
-                        className="table-input"
-                        name="statusNote"
-                        placeholder="Status note"
-                        aria-label={`Status note for ${invoice.invoiceNumber}`}
-                      />
-                      <button className="action-button compact-button" type="submit">Update</button>
-                    </form>
-                  </td>
-                  <td>
-                    <form action={attachTbrE1InvoiceDocumentAction} className="inline-actions e1-inline-form">
-                      <input type="hidden" name="seasonCode" value={data.selectedSeasonCode} />
-                      <input type="hidden" name="invoiceNumber" value={invoice.invoiceNumberRaw ?? ""} />
-                      <input className="table-input" type="file" name="document" accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" />
-                      <input
-                        className="table-input"
-                        name="documentNote"
-                        placeholder="Document note"
-                        aria-label={`Document note for ${invoice.invoiceNumber}`}
-                      />
-                      <button className="action-button compact-button" type="submit">Attach</button>
-                    </form>
+                    {invoice.documentCount > 1 ? (
+                      <span className="pill subtle-pill">{invoice.documentCount} linked</span>
+                    ) : null}
                   </td>
                 </tr>
               ))}
               {data.invoiceTracker.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>No invoice groups are loaded for this season yet.</td>
+                  <td colSpan={5}>No invoice groups are loaded for this season yet.</td>
                 </tr>
               ) : null}
             </tbody>

@@ -100,7 +100,8 @@ select
   (array_agg(distinct e1.source_document_id) filter (where e1.source_document_id is not null))[1] as source_document_id,
   max(sd.source_name) filter (where sd.id is not null) as source_document_name,
   string_agg(distinct nullif(e1.comments, ''), E'\n') as notes,
-  max(e1.updated_at) as latest_line_updated_at
+  max(e1.updated_at) as latest_line_updated_at,
+  (array_agg(e1.item order by abs(e1.reporting_amount_usd) desc nulls last, e1.item))[1] as primary_item
 from tbr_e1_accounting_lines e1
 join tbr_seasons ts on ts.id = e1.season_id
 left join source_documents sd on sd.id = e1.source_document_id

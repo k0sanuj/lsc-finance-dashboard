@@ -8,6 +8,7 @@
     "deploy:preview": "node scripts/deploy-preview.mjs",
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web typecheck",
+    "audit:table-ux": "node scripts/audit-table-ux.mjs",
     "test:fsp-ai-intake": "node scripts/test-fsp-ai-intake-workflow.mjs",
     "test:xtz-invoice-workflow": "node scripts/test-xtz-invoice-workflow.mjs",
     "db:apply": "node scripts/apply-sql.mjs sql/001_initial_schema.sql sql/002_derived_views.sql sql/003_seed_reference_data.sql sql/005_document_intelligence.sql sql/006_contract_source_document.sql sql/007_auth_and_teams.sql sql/010_document_intake_events.sql",
