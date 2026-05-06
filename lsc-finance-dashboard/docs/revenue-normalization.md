@@ -26,7 +26,7 @@ Used for:
 
 ## Explicit Rules
 
-1. Season 1 sponsorship revenue is `USD 100,000` from `Classic Car Club Manhattan`.
+1. Season 1 sponsorship revenue is `USD 150,000` from `Classic Car Club Manhattan`.
 2. No additional sponsorship revenue is recognized after Season 1 in this first-pass rule set.
 3. Season 2 prize pool revenue of `EUR 100,000` is recognized on `2025-11-09`, after Miami.
 4. Prize money is normalized to `USD 115,710.00` using ECB EUR/USD reference rate `1.1571` for `2025-11-10`, which is the nearest working day after `2025-11-09`.

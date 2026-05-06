@@ -214,3 +214,52 @@ Includes:
 Definition:
 
 Revenue attributable to a race minus costs attributable to that race, if race-level revenue attribution is available and approved.
+
+### TBR Operating Baseline
+
+Definition:
+
+Season-level operating cost baseline from approved top-table ranges in `TBR Financial Plan_ 2024-25.xlsx` and controlled manual Season 3 entries.
+
+Notes:
+
+- stored in `tbr_operating_expense_lines`
+- reported in USD while preserving original amount, original currency, FX rate, and FX source
+- does not represent transaction-level proof in the generic `expenses` ledger
+
+### TBR E1 Incremental Cost
+
+Definition:
+
+Confirmed E1 accounting obligations that are not matched to the TBR operating baseline and are not explicitly duplicate, inapplicable, contingent, credit-only, or source-check rows.
+
+### TBR E1 Overlap Variance
+
+Definition:
+
+For E1 rows matched to an operating baseline category, the positive amount by which confirmed E1 obligations exceed the matched baseline.
+
+Formula:
+
+`max(confirmed matched E1 amount - matched operating baseline amount, 0)`
+
+Notes:
+
+- matched baseline still counts once in operating baseline
+- matched E1 rows remain visible in E1 Accounting and reconciliation views
+- negative variance does not reduce the baseline in Overall P&L
+
+### TBR Overall P&L
+
+Definition:
+
+Season-level P&L from recognized TBR revenue minus TBR operating baseline, positive E1 overlap variance, and non-overlapping confirmed E1 incremental cost.
+
+Formula:
+
+`recognized revenue - operating baseline - E1 overlap variance - E1 incremental cost`
+
+Approved revenue rules:
+
+- Season 1 includes `USD 150,000` sponsorship revenue from `Classic Car Club Manhattan`
+- Season 2 includes `EUR 100,000` prize money, preserved in EUR and converted to USD for reporting

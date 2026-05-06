@@ -165,6 +165,15 @@ export default async function TbrPage() {
               Open invoice hub
             </Link>
           </article>
+
+          <article className="tool-card">
+            <span className="section-kicker">Season finance</span>
+            <h3>Overall P&amp;L</h3>
+            <p>Review TBR season P&amp;L with operating baseline, E1 reconciliation, and revenue rules.</p>
+            <Link className="ghost-link" href="/tbr/overall-pnl">
+              Open P&amp;L
+            </Link>
+          </article>
       </section>
 
       <section className="card compact-section-card">

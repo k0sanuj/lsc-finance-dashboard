@@ -19,6 +19,7 @@
     "import:xlsx": "node scripts/import-xlsx.mjs",
     "normalize:e1-payables": "node scripts/normalize-e1-payables.mjs",
     "normalize:race-expenses": "node scripts/normalize-race-expenses.mjs",
+    "normalize:tbr-season-finance": "node scripts/normalize-tbr-season-finance.mjs",
     "normalize:revenue": "node scripts/normalize-revenue.mjs",
     "seed:document-analysis": "node scripts/seed-document-analysis.mjs",
     "auth:bootstrap-admin": "node scripts/bootstrap-admin-user.mjs",
@@ -28,7 +29,8 @@
     "seed:invoice-workflow": "node scripts/seed-invoice-workflow.mjs",
     "db:apply:race-budgets": "node scripts/apply-sql.mjs sql/013_race_budget_rules.sql sql/014_race_budget_rule_units.sql",
     "db:apply:tranches": "node scripts/apply-sql.mjs sql/017_contract_tranches.sql",
-    "seed:contract-tranches": "node scripts/seed-contract-tranches.mjs"
+    "seed:contract-tranches": "node scripts/seed-contract-tranches.mjs",
+    "test:tbr-season-finance": "node scripts/test-tbr-season-finance.mjs"
   },
   "devDependencies": {
     "@types/pg": "^8.18.0",

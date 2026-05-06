@@ -133,6 +133,9 @@ function getTbrNav(): CompanyNav {
       {
         label: "Finance",
         links: [
+          { href: "/tbr/operating-expenses", label: "Operating Expenses", roles: ALL_ADMIN },
+          { href: "/tbr/e1-accounting", label: "E1 Accounting", roles: ALL_ADMIN },
+          { href: "/tbr/overall-pnl", label: "Overall P&L", roles: ALL_ADMIN },
           { href: "/costs/TBR" as Route, label: "Costs", roles: [...ALL_ADMIN, "viewer"] },
           { href: "/payments/TBR" as Route, label: "Payments", roles: ALL_ADMIN },
           { href: "/receivables/TBR" as Route, label: "Receivables", roles: ALL_ADMIN },
@@ -294,6 +297,9 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/tbr/expense-management/")) return "Submission Review";
   if (pathname.startsWith("/tbr/expense-management")) return "Expense Review";
   if (pathname.startsWith("/tbr/invoice-hub")) return "Invoice Hub";
+  if (pathname.startsWith("/tbr/operating-expenses")) return "Operating Expenses";
+  if (pathname.startsWith("/tbr/e1-accounting")) return "E1 Accounting";
+  if (pathname.startsWith("/tbr/overall-pnl")) return "Overall P&L";
   if (pathname.startsWith("/tbr/team-management")) return "Team Management";
   if (pathname.startsWith("/tbr")) return "TBR Overview";
   if (pathname.startsWith("/fsp")) return "FSP";
@@ -354,6 +360,8 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     const labels: Record<string, string> = {
       races: "Races", "my-expenses": "My Expenses", "expense-management": "Expense Review",
       "invoice-hub": "Invoice Hub", "team-management": "Team Management",
+      "operating-expenses": "Operating Expenses", "e1-accounting": "E1 Accounting",
+      "overall-pnl": "Overall P&L",
     };
     if (labels[sub]) crumbs.push({ label: labels[sub] });
   } else if (pathname.startsWith("/costs/")) {

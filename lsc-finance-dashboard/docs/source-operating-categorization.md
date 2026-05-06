@@ -40,8 +40,9 @@ Business meaning:
 
 Canonical direction:
 
-- `invoices`
-- `payments`
+- `tbr_e1_accounting_lines`
+- reconciliation into `tbr_e1_reconciliation_view`
+- optional future posting to `invoices` / `payments` only when backed by invoice proof
 
 ### Race operations reimbursement management
 
@@ -75,7 +76,15 @@ Business meaning:
 Canonical direction:
 
 - validation and control tables first
-- selected totals may later map into finance planning views
+- `tbr_operating_expense_lines`
+- derived finance planning views such as `tbr_operating_expense_summary_by_season` and `tbr_overall_pnl_by_season`
+
+Approved first-pass ranges:
+
+- `Summary Sheets` rows 4-16 as season category summary, with rows 17-18 kept only as source checks
+- `Season 1` rows 5-17 as category/race matrix, with rows 18-19 kept only as source checks
+- `Season 2` rows 3-17 as category/race matrix, with rows 18-19 kept only as source checks
+- ignore dashboard tabs, lower forecast/calculation blocks, `#REF!` rows, notes-only rows, and rows far below the primary matrix
 
 ### Person reconciliation and dues tracking
 

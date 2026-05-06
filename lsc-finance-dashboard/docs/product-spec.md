@@ -12,6 +12,7 @@ The dashboard should:
 
 - present consolidated LSC financial performance
 - provide detailed TBR operating visibility
+- provide dedicated TBR season finance, E1 accounting, and overall P&L reporting
 - support FSP as a future-ready entity in schema and filters
 - track costs, invoices, receivables, and payments
 - track commercial goals and sponsorship progress
@@ -106,6 +107,10 @@ Main sections:
 - user console entry points:
   - my expenses
   - races
+- season finance entry points:
+  - operating expenses
+  - E1 accounting
+  - overall P&L
 - season-wise race browser
 - race-detail workflow for user bill and receipt intake
 - sponsor revenue summary

@@ -81,6 +81,8 @@ export type CascadeTrigger =
   // Team management
   | "team:created"
   | "team:member:assigned"
+  // TBR season finance control tables
+  | "tbr-finance:operating-line-saved"
   // Document intake (HITL)
   | "document:posted"
   // AI ingestion
@@ -150,6 +152,14 @@ export const CASCADE_RULES: CascadeRule[] = [
       { type: "refresh-payments-due", description: "Remove from upcoming payments" },
       { type: "trigger-cash-flow-analyzer", description: "Analyze cash flow impact" },
       { type: "write-audit-log", description: "Record payment settlement" },
+    ],
+  },
+  {
+    trigger: "tbr-finance:operating-line-saved",
+    actions: [
+      { type: "refresh-company-metrics", description: "Refresh TBR finance summary surfaces" },
+      { type: "refresh-race-cost-summary", description: "Refresh TBR season operating rollups" },
+      { type: "write-audit-log", description: "Record manual TBR operating finance change" },
     ],
   },
   {

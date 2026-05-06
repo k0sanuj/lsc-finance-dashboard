@@ -657,6 +657,24 @@ textarea {
   white-space: nowrap;
 }
 
+.pill.warn-pill {
+  border-color: rgba(217, 119, 6, 0.28);
+  background: rgba(245, 158, 11, 0.1);
+  color: #92400e;
+}
+
+.pill.good-pill {
+  border-color: rgba(22, 163, 74, 0.28);
+  background: rgba(22, 163, 74, 0.1);
+  color: #166534;
+}
+
+.pill.risk-pill {
+  border-color: rgba(220, 38, 38, 0.24);
+  background: rgba(220, 38, 38, 0.09);
+  color: #991b1b;
+}
+
 .segment-row {
   display: flex;
   flex-wrap: wrap;
@@ -680,6 +698,43 @@ textarea {
   background: var(--brand);
   border-color: var(--brand);
   color: white;
+}
+
+.finance-entry-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr)) auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.finance-entry-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.finance-entry-form .wide-field {
+  grid-column: span 2;
+}
+
+.pnl-exception-list {
+  display: grid;
+  gap: 10px;
+}
+
+.pnl-exception-row {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.pnl-exception-row:last-child {
+  border-bottom: 0;
 }
 
 .entity-grid,
@@ -2278,6 +2333,15 @@ textarea {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .finance-entry-form,
+  .pnl-exception-row {
+    grid-template-columns: 1fr;
+  }
+
+  .finance-entry-form .wide-field {
+    grid-column: auto;
   }
 
   .table-wrapper,

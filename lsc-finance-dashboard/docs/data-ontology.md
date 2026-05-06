@@ -23,6 +23,7 @@ Examples:
 - LSC
 - TBR
 - FSP
+- XTZ
 
 ### Business Unit
 
@@ -139,6 +140,22 @@ Represents the bridge from an approved AI intake draft to the canonical table an
 
 Represents a specific import operation and preserves operational lineage.
 
+### TbrSeason
+
+Represents a TBR operating season used for season-level financial control, E1 accounting, and overall P&L reporting.
+
+### TbrOperatingExpenseLine
+
+Represents a season-control operating expense line from the TBR Financial Plan or a controlled manual entry. These lines are reporting baselines and control facts; they are not generic transaction-level `expenses` unless separately supported by invoice or reimbursement proof.
+
+### TbrE1AccountingLine
+
+Represents an E1 invoice, credit note, due item, contingent item, or explicit source check from the E1 payment summary workbook.
+
+### TbrE1OperatingReconciliationLink
+
+Represents the link between E1 accounting rows and matching operating expense baseline categories so that Overall P&L can apply the variance-only policy without double counting.
+
 ## Core Relationships
 
 - company has many contracts
@@ -160,6 +177,9 @@ Represents a specific import operation and preserves operational lineage.
 - AI intake draft belongs to a source document and company
 - AI intake draft fields belong to one AI intake draft
 - AI intake posting events preserve the bridge from approved preview fields to canonical records
+- TBR seasons have many operating expense control lines
+- TBR seasons have many E1 accounting lines
+- E1 accounting lines may reconcile to operating expense baseline lines by category, race, and source-document lineage
 
 ## Data Layers
 
@@ -201,6 +221,10 @@ Exposes filtered views, APIs, and page-level read models.
 - ai_intake_posting_events
 - import_batches
 - raw_import_rows
+- tbr_seasons
+- tbr_operating_expense_lines
+- tbr_e1_accounting_lines
+- tbr_e1_operating_reconciliation_links
 
 ## Derived View Candidates
 
@@ -212,10 +236,18 @@ Exposes filtered views, APIs, and page-level read models.
 - tbr_sponsor_revenue_summary
 - commercial_goal_progress
 - partner_performance
+- tbr_operating_expense_summary_by_season
+- tbr_operating_expense_by_race
+- tbr_operating_expense_by_category
+- tbr_e1_accounting_status_by_season
+- tbr_e1_reconciliation_view
+- tbr_overall_pnl_by_season
 
 ## Current Ontology Notes
 
 - TBR is the main active operating entity for v1.
 - FSP should exist in the ontology even if it is mostly unpopulated.
 - Race events are central to TBR reporting and should not be treated as optional tags.
+- TBR Financial Plan summary rows live in season-control tables, not the generic expense ledger.
+- Overall TBR P&L applies a variance-only E1 reconciliation policy: operating baseline counts once, matched E1 overlap rows are visible in E1 Accounting, only positive E1 variance above the matched baseline flows into P&L, and non-overlapping confirmed E1 obligations count as incremental cost.
 - The same sponsor should not be duplicated across sheets if it can be mapped to one canonical sponsor entity.

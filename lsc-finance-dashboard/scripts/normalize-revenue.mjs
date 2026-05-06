@@ -11,11 +11,11 @@ const SPONSOR_RULE = {
   sponsorName: "Classic Car Club Manhattan",
   contractName: "Season 1 Sponsorship",
   revenueType: "sponsorship",
-  amountUsd: 100000,
+  amountUsd: 150000,
   currencyCode: "USD",
   recognitionDate: "2024-02-02",
   notes:
-    "User-provided business rule: recognize USD 100,000 sponsorship revenue from Classic Car Club Manhattan in Season 1 only."
+    "User-provided business rule: recognize USD 150,000 sponsorship revenue from Classic Car Club Manhattan in Season 1 only."
 };
 
 const EUR_USD_RATE = 1.1571;
@@ -73,10 +73,11 @@ function deriveImportUrl() {
   const base = process.env.DATABASE_URL_ADMIN ?? process.env.DATABASE_URL;
   const password = process.env.LSC_IMPORT_RW_PASSWORD;
 
-  if (!base || !password) {
-    throw new Error(
-      "DATABASE_URL_IMPORT or (DATABASE_URL_ADMIN/DATABASE_URL + LSC_IMPORT_RW_PASSWORD) must be set in .env.local."
-    );
+  if (!base) {
+    throw new Error("DATABASE_URL_IMPORT, DATABASE_URL_ADMIN, or DATABASE_URL must be set in .env.local.");
+  }
+  if (!password) {
+    return base;
   }
 
   const roleName = process.env.LSC_IMPORT_RW_ROLE ?? "lsc_import_rw";
@@ -351,9 +352,14 @@ async function insertRevenueRecord(client, params) {
        recognition_date,
        currency_code,
        amount,
+       source_amount,
+       source_currency,
+       fx_rate,
+       fx_source,
+       reporting_amount_usd,
        notes
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8::revenue_type, $9, $10, $11, $12)`,
+     values ($1, $2, $3, $4, $5, $6, $7, $8::revenue_type, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
     [
       params.companyId,
       params.contractId,
@@ -366,6 +372,11 @@ async function insertRevenueRecord(client, params) {
       params.recognitionDate,
       params.currencyCode,
       params.amount,
+      params.sourceAmount ?? params.amount,
+      params.sourceCurrency ?? params.currencyCode,
+      params.fxRate ?? 1,
+      params.fxSource ?? "source_usd",
+      params.reportingAmountUsd ?? params.amount,
       params.notes
     ]
   );
@@ -385,6 +396,7 @@ async function getRaceEventId(client, code) {
 async function main() {
   const projectRoot = process.cwd();
   await loadEnvFile(path.join(projectRoot, ".env.local"));
+  await loadEnvFile(path.join(projectRoot, "apps", "web", ".env.local"));
 
   const client = new Client({ connectionString: deriveImportUrl() });
   await client.connect();
@@ -437,7 +449,7 @@ async function main() {
       sponsorOrCustomerId: sponsorCounterpartyId,
       ownerId: sponsorOwnerId,
       sourceDocumentId: sponsorSourceDocumentId,
-      invoiceNumber: "CCCM-S1-100000",
+      invoiceNumber: "CCCM-S1-150000",
       issueDate: SPONSOR_RULE.recognitionDate,
       currencyCode: SPONSOR_RULE.currencyCode,
       totalAmount: SPONSOR_RULE.amountUsd,
@@ -464,6 +476,11 @@ async function main() {
       recognitionDate: SPONSOR_RULE.recognitionDate,
       currencyCode: SPONSOR_RULE.currencyCode,
       amount: SPONSOR_RULE.amountUsd,
+      sourceAmount: SPONSOR_RULE.amountUsd,
+      sourceCurrency: "USD",
+      fxRate: 1,
+      fxSource: "source_usd",
+      reportingAmountUsd: SPONSOR_RULE.amountUsd,
       notes: SPONSOR_RULE.notes
     });
 
@@ -512,6 +529,11 @@ async function main() {
       recognitionDate: PRIZE_RULE.recognitionDate,
       currencyCode: PRIZE_RULE.currencyCode,
       amount: PRIZE_RULE.amountUsd,
+      sourceAmount: PRIZE_RULE.amountEur,
+      sourceCurrency: "EUR",
+      fxRate: EUR_USD_RATE,
+      fxSource: "ECB 2025-11-10 EUR/USD 1.1571",
+      reportingAmountUsd: PRIZE_RULE.amountUsd,
       notes: PRIZE_RULE.notes
     });
 
