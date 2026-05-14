@@ -32,7 +32,8 @@
     "db:apply:race-budgets": "node scripts/apply-sql.mjs sql/013_race_budget_rules.sql sql/014_race_budget_rule_units.sql",
     "db:apply:tranches": "node scripts/apply-sql.mjs sql/017_contract_tranches.sql",
     "seed:contract-tranches": "node scripts/seed-contract-tranches.mjs",
-    "test:tbr-season-finance": "node scripts/test-tbr-season-finance.mjs"
+    "test:tbr-season-finance": "node scripts/test-tbr-season-finance.mjs",
+    "audit:ai-upload-ux": "node scripts/audit-ai-upload-ux.mjs"
   },
   "devDependencies": {
     "@types/pg": "^8.18.0",

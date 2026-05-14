@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, type ChangeEvent, type Ref } from "react";
+import { useId, useRef, useState, type ChangeEvent, type Ref } from "react";
 
 const FILE_INPUT_TYPE = "file";
 
@@ -76,9 +76,16 @@ export function FileAttachField({
   onFilesSelected
 }: FileAttachFieldProps) {
   const inputId = useId();
+  const [selectedFileNames, setSelectedFileNames] = useState<string[]>([]);
+  const selectedFileLabel =
+    selectedFileNames.length === 0
+      ? null
+      : selectedFileNames.length === 1
+        ? selectedFileNames[0]
+        : `${selectedFileNames.length} documents selected`;
 
   return (
-    <>
+    <div className="file-attach-field">
       <label className="document-attach-control" htmlFor={inputId}>
         {label}
       </label>
@@ -92,12 +99,28 @@ export function FileAttachField({
         id={inputId}
         multiple={multiple}
         name={name}
-        onChange={onFilesSelected}
+        onChange={(event) => {
+          setSelectedFileNames(
+            Array.from(event.currentTarget.files ?? []).map((file) => file.name)
+          );
+          onFilesSelected?.(event);
+        }}
         ref={inputRef}
         required={required}
         type={FILE_INPUT_TYPE}
       />
-    </>
+      {selectedFileLabel ? (
+        <div aria-live="polite" className="selected-file-list">
+          <span className="selected-file-label">Selected</span>
+          <span className="selected-file-name">{selectedFileLabel}</span>
+          {selectedFileNames.length > 1 ? (
+            <span className="selected-file-detail">
+              {selectedFileNames.slice(0, 3).join(", ")}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

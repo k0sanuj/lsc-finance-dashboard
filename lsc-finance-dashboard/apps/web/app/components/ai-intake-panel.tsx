@@ -1,5 +1,6 @@
 import { createAiIntakeDraftAction } from "../ai-intake/actions";
 import { FileAttachField } from "./inline-table-controls";
+import { SubmitButton } from "./submit-button";
 import type { VisibleEntityCode } from "../lib/entities";
 
 export type AiIntakeTargetKind =
@@ -116,9 +117,9 @@ export function AIIntakePanel({
         </section>
 
         <div className="form-actions">
-          <button className="action-button primary" type="submit">
+          <SubmitButton pendingLabel="Extracting...">
             AI extract
-          </button>
+          </SubmitButton>
         </div>
       </form>
     </>

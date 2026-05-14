@@ -2,6 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return {};
+  }
+
   return Object.fromEntries(
     fs
       .readFileSync(filePath, "utf8")
@@ -16,23 +20,45 @@ function loadEnvFile(filePath) {
 }
 
 const cwd = process.cwd();
-const env = loadEnvFile(path.join(cwd, ".env.local"));
+const env = {
+  ...loadEnvFile(path.join(cwd, ".env.local")),
+  ...loadEnvFile(path.join(cwd, "apps", "web", ".env.local")),
+};
 const model = env.GEMINI_MODEL || "gemini-2.5-flash";
 
 if (!env.GEMINI_API_KEY) {
-  throw new Error("GEMINI_API_KEY is missing from .env.local");
+  throw new Error("GEMINI_API_KEY is missing from .env.local or apps/web/.env.local");
 }
 
-const response = await fetch(
-  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`,
-  {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: "Reply with OK" }] }]
-    })
+async function requestGemini() {
+  return fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY.trim()}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: "Reply with OK" }] }]
+      })
+    }
+  );
+}
+
+let response;
+let lastError;
+
+for (let attempt = 0; attempt < 3; attempt += 1) {
+  try {
+    response = await requestGemini();
+    break;
+  } catch (error) {
+    lastError = error;
+    await new Promise((resolve) => setTimeout(resolve, 300 * Math.pow(3, attempt)));
   }
-);
+}
+
+if (!response) {
+  throw lastError;
+}
 
 const text = await response.text();
 console.log(

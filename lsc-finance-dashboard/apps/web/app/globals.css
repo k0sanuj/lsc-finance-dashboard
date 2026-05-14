@@ -3089,6 +3089,51 @@ textarea {
   background: var(--surface-muted);
 }
 
+.file-attach-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.file-attach-field .document-attach-control {
+  width: 100%;
+}
+
+.selected-file-list {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid rgba(22, 163, 74, 0.22);
+  border-radius: 8px;
+  background: rgba(22, 163, 74, 0.07);
+  color: var(--ink);
+  padding: 8px 10px;
+}
+
+.selected-file-label {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.selected-file-name,
+.selected-file-detail {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.selected-file-name {
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.selected-file-detail {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
 .visually-hidden {
   position: absolute !important;
   width: 1px;
