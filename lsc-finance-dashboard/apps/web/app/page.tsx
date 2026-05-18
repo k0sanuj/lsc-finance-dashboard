@@ -1,5 +1,17 @@
 import Link from "next/link";
 import {
+  Banknote,
+  CircleDollarSign,
+  CreditCard,
+  FileStack,
+  Layers3,
+  ReceiptText,
+  Scale,
+  TrendingUp,
+  Trophy,
+  WalletCards
+} from "lucide-react";
+import {
   formatCurrency,
   getEntitySnapshots,
   getFspPnlSummaries,
@@ -12,6 +24,7 @@ import {
   getUpcomingPayments
 } from "@lsc/db";
 import { CashTrendChart, HorizontalMetricBars, formatCompactCurrency, parseCurrency } from "./components/dashboard-charts";
+import { ChartFrame, MetricTile, Panel } from "./components/lsc-blue-primitives";
 import { getEntityMetadata, getVisibleEntities, type VisibleEntityCode } from "./lib/entities";
 
 function metricValue(metrics: Awaited<ReturnType<typeof getOverviewMetrics>>, label: string) {
@@ -102,6 +115,14 @@ export default async function OverviewPage() {
     sublabel: `Y1 revenue ${formatCurrency(sport.revenueY1)}`,
     tone: sport.ebitdaY1 >= 0 ? "good" as const : "risk" as const,
   }));
+  const topMetricTiles = [
+    { label: "Revenue", value: metricValue(overviewMetrics, "Total Revenue"), helper: metricScope(overviewMetrics, "Total Revenue"), icon: TrendingUp, tone: "good" as const },
+    { label: "Cost", value: metricValue(overviewMetrics, "Total Cost"), helper: metricScope(overviewMetrics, "Total Cost"), icon: CircleDollarSign, tone: "ruby" as const },
+    { label: "Margin", value: metricValue(overviewMetrics, "Margin"), helper: "Consolidated profitability", icon: Scale, tone: margin >= 0 ? "good" as const : "ruby" as const },
+    { label: "Cash", value: metricValue(overviewMetrics, "Cash"), helper: metricScope(overviewMetrics, "Cash"), icon: Banknote, tone: "brand" as const },
+    { label: "Receivables", value: metricValue(overviewMetrics, "Receivables"), helper: `${receivablesRows.length} aging buckets`, icon: ReceiptText, tone: "amber" as const },
+    { label: "Upcoming", value: metricValue(overviewMetrics, "Upcoming Payments"), helper: "Open payment timeline", icon: CreditCard, tone: "iris" as const },
+  ];
 
   return (
     <div className="page-grid">
@@ -126,75 +147,105 @@ export default async function OverviewPage() {
         </div>
       </section>
 
-      <section className="entity-grid command-entity-grid">
-        {entities.map((entity) => (
-          <article className={`entity-card ${entity.code.toLowerCase()}`} key={entity.code}>
-            <div className="entity-card-top">
-              <div>
-                <span className="section-kicker">{entity.code}</span>
-                <h3>{entity.label}</h3>
-              </div>
-              <span className="pill">{entity.status}</span>
-            </div>
-            <p>{entity.note}</p>
-            <div className="entity-stats">
-              <div>
-                <span>Revenue</span>
-                <strong>{entity.revenue}</strong>
-              </div>
-              <div>
-                <span>Cost</span>
-                <strong>{entity.cost}</strong>
-              </div>
-              <div>
-                <span>Margin</span>
-                <strong>{entity.margin}</strong>
-              </div>
-            </div>
-            <div className="entity-actions">
-              <Link className="ghost-link" href={entity.homeHref}>
-                Open {entity.shortLabel}
-              </Link>
-            </div>
-          </article>
+      <section className="analytics-kpi-grid">
+        {topMetricTiles.map((tile) => (
+          <MetricTile
+            icon={tile.icon}
+            key={tile.label}
+            label={tile.label}
+            value={tile.value}
+            helper={tile.helper}
+            tone={tile.tone}
+          />
         ))}
       </section>
 
-      <section className="stats-grid compact-stats">
-        {[
-          ["Total Revenue", metricValue(overviewMetrics, "Total Revenue"), "accent-good"],
-          ["Total Cost", metricValue(overviewMetrics, "Total Cost"), "accent-risk"],
-          ["Margin", metricValue(overviewMetrics, "Margin"), margin >= 0 ? "accent-good" : "accent-risk"],
-          ["Cash", metricValue(overviewMetrics, "Cash"), "accent-brand"],
-          ["Receivables", metricValue(overviewMetrics, "Receivables"), "accent-warn"],
-          ["Upcoming Payments", metricValue(overviewMetrics, "Upcoming Payments"), "accent-accent"],
-        ].map(([label, value, accent]) => (
-          <article className={`metric-card ${accent}`} key={label}>
-            <div className="metric-topline">
-              <span className="metric-label">{label}</span>
-            </div>
-            <div className="metric-value">{value}</div>
-            <span className="metric-subvalue">{metricScope(overviewMetrics, label)}</span>
-          </article>
-        ))}
+      <section className="overview-command-grid">
+        <div className="mini-kpi-stack">
+          <MetricTile
+            icon={Layers3}
+            label="Entities"
+            value={entities.length}
+            helper="LSC, TBR, FSP, XTZ"
+            tone="brand"
+          />
+          <MetricTile
+            icon={Trophy}
+            label="TBR Seasons"
+            value={tbrSeasons.length}
+            helper={latestSeason ? latestSeason.seasonLabel : "Season controls"}
+            tone="iris"
+          />
+          <MetricTile
+            icon={FileStack}
+            label="FSP Modules"
+            value={fspSports.length}
+            helper={`${fspWithFinancials.length} with financial data`}
+            tone="amber"
+          />
+          <MetricTile
+            icon={WalletCards}
+            label="XTZ Workers"
+            value={xtzPayoutSummary.activeWorkers || xtzWorkers.filter((worker) => worker.isActive).length}
+            helper="Active payroll/vendor support"
+            tone="slate"
+          />
+        </div>
+
+        <Panel
+          className="overview-primary-panel"
+          title="Consolidated P&L waterfall"
+          subtitle="Revenue, cost, and margin from approved LSC finance metrics."
+          trailing={<span className={insightTone(margin)}>{formatCompactCurrency(margin)}</span>}
+        >
+          <ChartFrame>
+            <HorizontalMetricBars
+              rows={[
+                { label: "Revenue", value: revenue, displayValue: formatCompactCurrency(revenue), tone: "good" },
+                { label: "Cost", value: cost, displayValue: formatCompactCurrency(cost), tone: "risk" },
+                { label: "Margin", value: Math.abs(margin), displayValue: formatCompactCurrency(margin), tone: margin >= 0 ? "good" : "risk" },
+              ]}
+            />
+          </ChartFrame>
+        </Panel>
       </section>
 
       <section className="grid-two portfolio-panels">
         <article className="card">
           <div className="card-title-row">
             <div>
-              <span className="section-kicker">Revenue vs cost</span>
-              <h3>Consolidated position</h3>
+              <span className="section-kicker">Entity ledger</span>
+              <h3>Workspace operating status</h3>
             </div>
-            <span className={insightTone(margin)}>{formatCompactCurrency(margin)}</span>
+            <span className="pill">{entities.length} entities</span>
           </div>
-          <HorizontalMetricBars
-            rows={[
-              { label: "Revenue", value: revenue, displayValue: formatCompactCurrency(revenue), tone: "good" },
-              { label: "Cost", value: cost, displayValue: formatCompactCurrency(cost), tone: "risk" },
-              { label: "Margin", value: Math.abs(margin), displayValue: formatCompactCurrency(margin), tone: margin >= 0 ? "good" : "risk" },
-            ]}
-          />
+          <div className="table-wrapper clean-table compact-ledger-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Entity</th>
+                  <th>Status</th>
+                  <th>Revenue</th>
+                  <th>Cost</th>
+                  <th>Margin</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entities.map((entity) => (
+                  <tr key={entity.code}>
+                    <td>
+                      <Link className="record-title" href={entity.homeHref}>{entity.shortLabel}</Link>
+                      <span className="record-subtitle">{entity.label}</span>
+                    </td>
+                    <td><span className="pill">{entity.status}</span></td>
+                    <td>{entity.revenue}</td>
+                    <td>{entity.cost}</td>
+                    <td><strong>{entity.margin}</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </article>
 
         <article className="card">

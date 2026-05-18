@@ -2,8 +2,25 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useCallback, useEffect, Suspense } from "react";
+import {
+  BarChart3,
+  BrainCircuit,
+  Building2,
+  CircleDollarSign,
+  CreditCard,
+  FileText,
+  FolderOpen,
+  Layers3,
+  LogOut,
+  Menu,
+  Settings2,
+  Trophy,
+  WalletCards,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import type { AppUserRole } from "../lib/auth";
 import { ToastNotice } from "./components/toast-notice";
 import { CommandPalette } from "./components/command-palette";
@@ -52,15 +69,6 @@ const ALL_ROLES: AppUserRole[] = ["super_admin", "finance_admin", "commercial_us
 
 /** Routes that appear in multiple company navs — use ?company= to disambiguate */
 const SHARED_PEOPLE_ROUTES = ["/employees", "/salary-payable"];
-
-/** Routes with /[company] segment (e.g. /costs/TBR, /documents/FSP) */
-const COMPANY_SCOPED_ROUTES = [
-  "/costs",
-  "/payments",
-  "/receivables",
-  "/documents",
-  "/commercial-goals",
-];
 
 /** Map a company code in URL to sidebar section label */
 function companyCodeToLabel(code: string | undefined | null): string | null {
@@ -442,6 +450,150 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
   return crumbs;
 }
 
+type PrimaryNavItem = {
+  href: Route;
+  label: string;
+  icon: LucideIcon;
+  roles: AppUserRole[];
+  isActive: (pathname: string, searchParams: URLSearchParams) => boolean;
+};
+
+const SYSTEM_PATHS = [
+  "/agent-graph",
+  "/workflow-graph",
+  "/messaging",
+  "/audit-reports",
+  "/audit-log",
+  "/qb",
+  "/legal-integration",
+  "/project-checklist",
+];
+
+const PRIMARY_NAV_ITEMS: PrimaryNavItem[] = [
+  {
+    href: "/" as Route,
+    label: "Overview",
+    icon: BarChart3,
+    roles: ALL_ROLES,
+    isActive: (pathname) => pathname === "/",
+  },
+  {
+    href: "/costs/LSC" as Route,
+    label: "LSC",
+    icon: Building2,
+    roles: ALL_ROLES,
+    isActive: (pathname, searchParams) =>
+      pathname.startsWith("/costs/LSC") ||
+      pathname.startsWith("/payments/LSC") ||
+      pathname.startsWith("/receivables/LSC") ||
+      pathname.startsWith("/documents/LSC") ||
+      pathname.startsWith("/commercial-goals/LSC") ||
+      pathname.startsWith("/subscriptions") ||
+      pathname.startsWith("/vendors") ||
+      pathname.startsWith("/treasury") ||
+      pathname.startsWith("/deal-pipeline") ||
+      pathname.startsWith("/event-budgets") ||
+      pathname.startsWith("/cap-table") ||
+      pathname.startsWith("/litigation") ||
+      pathname.startsWith("/tax-filings") ||
+      pathname.startsWith("/arena-ads") ||
+      (pathname.startsWith("/employees") && searchParams.get("company") === "LSC") ||
+      (pathname.startsWith("/salary-payable") && searchParams.get("company") === "LSC"),
+  },
+  {
+    href: "/tbr" as Route,
+    label: "TBR",
+    icon: Trophy,
+    roles: ALL_ROLES,
+    isActive: (pathname) =>
+      pathname.startsWith("/tbr") ||
+      pathname.startsWith("/costs/TBR") ||
+      pathname.startsWith("/payments/TBR") ||
+      pathname.startsWith("/receivables/TBR") ||
+      pathname.startsWith("/documents/TBR") ||
+      pathname.startsWith("/commercial-goals/TBR"),
+  },
+  {
+    href: "/fsp" as Route,
+    label: "FSP",
+    icon: Layers3,
+    roles: ALL_ROLES,
+    isActive: (pathname) =>
+      pathname.startsWith("/fsp") ||
+      pathname.startsWith("/documents/FSP") ||
+      pathname.startsWith("/commercial-goals/FSP"),
+  },
+  {
+    href: "/gig-workers" as Route,
+    label: "XTZ",
+    icon: WalletCards,
+    roles: ALL_ADMIN,
+    isActive: (pathname, searchParams) =>
+      pathname.startsWith("/gig-workers") ||
+      pathname.startsWith("/xtz-expenses") ||
+      pathname.startsWith("/payroll-invoices") ||
+      (pathname.startsWith("/employees") && searchParams.get("company") === "XTZ") ||
+      (pathname.startsWith("/salary-payable") && searchParams.get("company") === "XTZ"),
+  },
+  {
+    href: "/costs/LSC" as Route,
+    label: "Costs",
+    icon: CircleDollarSign,
+    roles: [...ALL_ADMIN, "viewer"],
+    isActive: (pathname) => pathname.startsWith("/costs"),
+  },
+  {
+    href: "/payments/LSC" as Route,
+    label: "Payments",
+    icon: CreditCard,
+    roles: ALL_ADMIN,
+    isActive: (pathname) => pathname.startsWith("/payments") || pathname.startsWith("/treasury"),
+  },
+  {
+    href: "/documents/LSC" as Route,
+    label: "Documents",
+    icon: FolderOpen,
+    roles: ALL_ADMIN,
+    isActive: (pathname) => pathname.startsWith("/documents"),
+  },
+  {
+    href: "/ai-analysis" as Route,
+    label: "AI",
+    icon: BrainCircuit,
+    roles: ALL_ADMIN,
+    isActive: (pathname) =>
+      pathname.startsWith("/ai-analysis") ||
+      pathname.startsWith("/ai-ingest") ||
+      pathname.startsWith("/copilot") ||
+      pathname.startsWith("/analyzers"),
+  },
+  {
+    href: "/agent-graph" as Route,
+    label: "System",
+    icon: Settings2,
+    roles: ALL_ADMIN,
+    isActive: (pathname) => SYSTEM_PATHS.some((path) => pathname.startsWith(path)),
+  },
+];
+
+function getSystemNav(): NavSection[] {
+  return [
+    {
+      label: "System",
+      links: [
+        { href: "/agent-graph" as Route, label: "Agent Graph", roles: ALL_ADMIN },
+        { href: "/agent-graph/dispatcher-status" as Route, label: "Dispatcher Status", roles: ALL_ADMIN },
+        { href: "/workflow-graph" as Route, label: "Workflow Graph", roles: ALL_ADMIN },
+        { href: "/messaging" as Route, label: "Messages", roles: ALL_ADMIN },
+        { href: "/audit-reports" as Route, label: "Audit Reports", roles: ALL_ADMIN },
+        { href: "/audit-log" as Route, label: "Audit Log", roles: ALL_ADMIN },
+        { href: "/qb" as Route, label: "QuickBooks", roles: ALL_ADMIN },
+        { href: "/legal-integration" as Route, label: "Legal Integration", roles: ALL_ADMIN },
+      ],
+    },
+  ];
+}
+
 function getInitials(fullName?: string) {
   if (!fullName) return "LS";
   const parts = fullName.split(/\s+/).map((p) => p.trim()).filter(Boolean);
@@ -450,84 +602,11 @@ function getInitials(fullName?: string) {
 
 function SessionShellInner({ children, user }: SessionShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [expandedCompany, setExpandedCompany] = useState<string | null>(null);
 
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
-
-  // Auto-expand company based on current path + search params.
-  // Priority order (first match wins):
-  //   1. /[company]-scoped routes — use the URL segment (e.g. /documents/FSP → FSP)
-  //   2. Shared people routes — use ?company= query param
-  //   3. XTZ-only routes (/gig-workers, /xtz-expenses, /payroll-invoices)
-  //   4. /fsp/* routes
-  //   5. TBR-exclusive routes (/tbr, /vendors, /subscriptions, /cap-table, etc.)
-  useEffect(() => {
-    // 1. Company-scoped dynamic routes: /costs/FSP, /documents/FSP, etc.
-    const scopedMatch = COMPANY_SCOPED_ROUTES.find((r) => pathname.startsWith(`${r}/`));
-    if (scopedMatch) {
-      const companyCode = pathname.slice(scopedMatch.length + 1).split("/")[0];
-      const label = companyCodeToLabel(companyCode);
-      if (label) {
-        setExpandedCompany(label);
-        return;
-      }
-    }
-
-    // 2. Shared people routes — disambiguate via ?company=
-    const isSharedPeopleRoute = SHARED_PEOPLE_ROUTES.some((r) => pathname.startsWith(r));
-    if (isSharedPeopleRoute) {
-      const companyParam = searchParams.get("company");
-      const label = companyCodeToLabel(companyParam) ?? "XTZ India";
-      setExpandedCompany(label);
-      return;
-    }
-
-    // 3. XTZ-only routes
-    if (
-      pathname.startsWith("/gig-workers") ||
-      pathname.startsWith("/xtz-expenses") ||
-      pathname.startsWith("/payroll-invoices")
-    ) {
-      setExpandedCompany("XTZ India");
-      return;
-    }
-
-    // 4. FSP routes
-    if (pathname.startsWith("/fsp")) {
-      setExpandedCompany("FSP");
-      return;
-    }
-
-    // 5. TBR-exclusive routes
-    if (
-      pathname.startsWith("/tbr")
-    ) {
-      setExpandedCompany("TBR");
-      return;
-    }
-
-    // 6. Shared finance/control routes live under LSC.
-    if (
-      pathname.startsWith("/subscriptions") ||
-      pathname.startsWith("/vendors") ||
-      pathname.startsWith("/cap-table") ||
-      pathname.startsWith("/litigation") ||
-      pathname.startsWith("/arena-ads") ||
-      pathname.startsWith("/tax-filings") ||
-      pathname.startsWith("/deal-pipeline") ||
-      pathname.startsWith("/treasury") ||
-      pathname.startsWith("/event-budgets") ||
-      pathname.startsWith("/ai-ingest") ||
-      pathname.startsWith("/ai-analysis")
-    ) {
-      setExpandedCompany("LSC");
-      return;
-    }
-    // Otherwise: leave current expansion alone (don't force-close on Portfolio pages)
-  }, [pathname, searchParams]);
 
   // Close sidebar on navigation (mobile)
   useEffect(() => {
@@ -548,10 +627,11 @@ function SessionShellInner({ children, user }: SessionShellProps) {
 
   const role = user?.role ?? null;
 
-  // Build company navs based on role
   const companies: CompanyNav[] = role === "team_member"
     ? [getTeamMemberNav()]
     : [getLscNav(), getTbrNav(), getFspNav(), getXtzNav()];
+
+  const visiblePrimaryNav = PRIMARY_NAV_ITEMS.filter((item) => !role || item.roles.includes(role));
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -582,21 +662,45 @@ function SessionShellInner({ children, user }: SessionShellProps) {
     return company.sections.some((s) => s.links.some((l) => isActive(l.href)));
   };
 
-  const toggleCompany = (label: string) => {
-    setExpandedCompany((prev) => (prev === label ? null : label));
+  const breadcrumbs = getBreadcrumbs(pathname);
+  const activeCompany = companies.find(isCompanyActive);
+  const contextSections =
+    activeCompany?.sections ??
+    (role && ALL_ADMIN.includes(role) && SYSTEM_PATHS.some((path) => pathname.startsWith(path))
+      ? getSystemNav()
+      : []);
+  const contextLinks = contextSections
+    .flatMap((section) => section.links)
+    .filter((link) => !role || link.roles.includes(role));
+  const topbarSubtitle = activeCompany
+    ? `${activeCompany.label} workspace · ${contextLinks.length} linked modules`
+    : "4 entities · live finance data · canonical metrics only";
+  const selectedEntity = activeCompany?.label === "XTZ India" ? "XTZ" : activeCompany?.label ?? "LSC";
+  const topbarEntityOptions =
+    role === "team_member"
+      ? [{ value: "TBR", label: "TBR" }]
+      : [
+          { value: "LSC", label: "LSC" },
+          { value: "TBR", label: "TBR" },
+          { value: "FSP", label: "FSP" },
+          { value: "XTZ", label: "XTZ" },
+        ];
+  const entityHomeRoutes: Record<string, Route> = {
+    LSC: "/" as Route,
+    TBR: "/tbr" as Route,
+    FSP: "/fsp" as Route,
+    XTZ: "/gig-workers" as Route,
   };
 
-  const breadcrumbs = getBreadcrumbs(pathname);
-
   return (
-    <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+    <div className="app-shell lsc-blue-shell">
       <button
         className="sidebar-toggle"
         onClick={() => setSidebarOpen((v) => !v)}
         aria-label={sidebarOpen ? "Close navigation" : "Open navigation"}
         type="button"
       >
-        {sidebarOpen ? "\u2715" : "\u2630"}
+        {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
       <div
@@ -605,206 +709,43 @@ function SessionShellInner({ children, user }: SessionShellProps) {
         role="presentation"
       />
 
-      <aside className={`sidebar ${sidebarOpen ? "open" : ""} ${sidebarCollapsed ? "collapsed" : ""}`} aria-label="Main navigation">
-        <div className="brand-block">
-          <div className="brand-row">
-            <div>
-              <span className="brand-kicker">League Sports Co</span>
-              <h1>Finance OS</h1>
-            </div>
-            <button
-              className="sidebar-collapse-btn"
-              onClick={() => setSidebarCollapsed((v) => !v)}
-              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              type="button"
-            >
-              {sidebarCollapsed ? "\u00BB" : "\u00AB"}
-            </button>
-          </div>
-        </div>
+      <aside className={`sidebar rail-sidebar ${sidebarOpen ? "open" : ""}`} aria-label="Main navigation">
+        <Link className="rail-brand" href="/">
+          <span className="rail-brand-mark">LSC</span>
+          <span className="rail-brand-copy">Finance</span>
+        </Link>
 
-        <nav>
-          {/* Portfolio — always visible */}
-          <div className="nav-group">
-            <span className="nav-label">Portfolio</span>
-            <ul className="nav-list">
-              <li className="nav-item">
-                <Link className={pathname === "/" ? "active" : ""} href="/">
-                  Overview
-                </Link>
-              </li>
-              <li className="nav-item">
-                <Link className={isActive("/sports-dashboard") ? "active" : ""} href={"/sports-dashboard" as Route}>
-                  Sports Dashboard
-                </Link>
-              </li>
-              <li className="nav-item">
-                <Link className={isActive("/project-checklist") ? "active" : ""} href={"/project-checklist" as Route}>
-                  Project Checklist
-                </Link>
-              </li>
-              <li className="nav-item">
-                <Link className={isActive("/copilot") ? "active" : ""} href={"/copilot" as Route}>
-                  Finance Copilot
-                </Link>
-              </li>
-              <li className="nav-item">
-                <Link className={isActive("/analyzers") ? "active" : ""} href={"/analyzers" as Route}>
-                  AI Analyzers
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Company sections — expandable */}
-          {companies.map((company) => {
-            const expanded = expandedCompany === company.label;
-            const active = isCompanyActive(company);
-
+        <nav className="rail-nav" aria-label="Primary workspaces">
+          {visiblePrimaryNav.map(({ href, label, icon: Icon, isActive: activeCheck }) => {
+            const active = activeCheck(pathname, searchParams);
             return (
-              <div className="nav-group" key={company.label}>
-                <button
-                  className={`nav-company-toggle ${active ? "active" : ""} ${expanded ? "expanded" : ""}`}
-                  onClick={() => toggleCompany(company.label)}
-                  type="button"
-                  aria-expanded={expanded ? "true" : "false"}
-                >
-                  <span className="nav-company-indicator">{expanded ? "\u25BC" : "\u25B6"}</span>
-                  <span className="nav-company-name">{company.label}</span>
-                  {active && !expanded ? <span className="nav-active-dot" /> : null}
-                </button>
-
-                {expanded && (
-                  <div className="nav-company-content">
-                    {/* Company overview link */}
-                    <ul className="nav-list">
-                      <li className="nav-item">
-                        <Link className={pathname === company.href ? "active" : ""} href={company.href}>
-                          Overview
-                        </Link>
-                      </li>
-                    </ul>
-
-                    {/* Sub-sections */}
-                    {company.sections
-                      .map((section) => ({
-                        ...section,
-                        links: section.links.filter((l) => !role || l.roles.includes(role)),
-                      }))
-                      .filter((section) => section.links.length > 0)
-                      .map((section) => (
-                        <div className="nav-subsection" key={section.label}>
-                          <span className="nav-sublabel">{section.label}</span>
-                          <ul className="nav-sublist">
-                            {section.links.map((link) => {
-                              const [linkPath] = link.href.split("?");
-                              const parentOnPath =
-                                pathname === linkPath ||
-                                pathname.startsWith(`${linkPath}/`);
-                              const showSubLinks =
-                                link.subLinks && link.subLinks.length > 0 && parentOnPath;
-                              return (
-                                <li key={link.href}>
-                                  <Link
-                                    className={isActive(link.href) ? "active" : ""}
-                                    href={link.href}
-                                  >
-                                    {link.label}
-                                  </Link>
-                                  {showSubLinks ? (
-                                    <ul className="nav-subsublist">
-                                      {link.subLinks!.map((sub) => (
-                                        <li key={sub.href}>
-                                          <Link
-                                            className={isActive(sub.href) ? "active" : ""}
-                                            href={sub.href}
-                                          >
-                                            {sub.label}
-                                          </Link>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  ) : null}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
+              <Link
+                aria-current={active ? "page" : undefined}
+                className={`rail-nav-item${active ? " active" : ""}`}
+                href={href}
+                key={label}
+              >
+                <Icon size={17} strokeWidth={2.2} aria-hidden="true" />
+                <span>{label}</span>
+              </Link>
             );
           })}
-
-          {/* System — only for admins */}
-          {role && ALL_ADMIN.includes(role) && (
-            <div className="nav-group">
-              <span className="nav-label">System</span>
-              <ul className="nav-list">
-                <li className="nav-item">
-                  <Link className={isActive("/agent-graph") ? "active" : ""} href="/agent-graph">
-                    Agent Graph
-                  </Link>
-                </li>
-                <li className="nav-item">
-                  <Link className={isActive("/agent-graph/dispatcher-status") ? "active" : ""} href={"/agent-graph/dispatcher-status" as Route}>
-                    Dispatcher Status
-                  </Link>
-                </li>
-                <li className="nav-item">
-                  <Link className={isActive("/workflow-graph") ? "active" : ""} href="/workflow-graph">
-                    Workflow Graph
-                  </Link>
-                </li>
-                <li className="nav-item">
-                  <Link className={isActive("/messaging") ? "active" : ""} href={"/messaging" as Route}>
-                    Cross-Dashboard Messages
-                  </Link>
-                </li>
-                <li className="nav-item">
-                  <Link className={isActive("/audit-reports") ? "active" : ""} href={"/audit-reports" as Route}>
-                    Audit Reports
-                  </Link>
-                </li>
-                <li className="nav-item">
-                  <Link className={isActive("/audit-log") ? "active" : ""} href={"/audit-log" as Route}>
-                    Audit Log
-                  </Link>
-                </li>
-                <li className="nav-item">
-                  <Link className={isActive("/qb") ? "active" : ""} href={"/qb" as Route}>
-                    QuickBooks
-                  </Link>
-                </li>
-                <li className="nav-item">
-                  <Link
-                    className={isActive("/legal-integration") ? "active" : ""}
-                    href={"/legal-integration" as Route}
-                  >
-                    Legal Integration
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          )}
         </nav>
 
-        <div className="sidebar-note">
-          <strong>{user?.fullName ?? "Signed in"}</strong>
-          <span>{user ? `Role: ${user.role.replace(/_/g, " ")}` : "Authenticated operator"}</span>
+        <div className="rail-session">
+          <span className="rail-session-avatar">{getInitials(user?.fullName)}</span>
+          <form action="/logout" method="post">
+            <button className="rail-logout" type="submit" aria-label="Sign out">
+              <LogOut size={16} strokeWidth={2.2} aria-hidden="true" />
+            </button>
+          </form>
         </div>
-        <form action="/logout" method="post">
-          <button className="action-button secondary sidebar-action" type="submit">
-            Sign out
-          </button>
-        </form>
       </aside>
 
       <main className="main" id="main-content">
         <ToastNotice />
         <CommandPalette commands={PALETTE_COMMANDS} />
-        <div className="workspace-topbar">
+        <div className="workspace-topbar lsc-command-topbar">
           <div className="workspace-title-block">
             {breadcrumbs.length > 0 && (
               <nav className="breadcrumb" aria-label="Breadcrumb">
@@ -822,8 +763,27 @@ function SessionShellInner({ children, user }: SessionShellProps) {
               </nav>
             )}
             <strong>{getWorkspaceLabel(pathname)}</strong>
+            <span>{topbarSubtitle}</span>
           </div>
           <div className="topbar-right">
+            <label className="topbar-select">
+              <span>Entity</span>
+              <select
+                aria-label="Entity context"
+                onChange={(event) => router.push(entityHomeRoutes[event.currentTarget.value] ?? "/")}
+                value={selectedEntity}
+              >
+                {topbarEntityOptions.map((entity) => (
+                  <option key={entity.value} value={entity.value}>
+                    {entity.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className="topbar-period">
+              <FileText size={14} strokeWidth={2.2} aria-hidden="true" />
+              Live finance view
+            </span>
             <CmdKTrigger />
             <div className="profile-chip">
               <span className="profile-avatar">{getInitials(user?.fullName)}</span>
@@ -834,6 +794,36 @@ function SessionShellInner({ children, user }: SessionShellProps) {
             </div>
           </div>
         </div>
+        <nav className="mobile-primary-nav" aria-label="Primary workspaces">
+          {visiblePrimaryNav.map(({ href, label, icon: Icon, isActive: activeCheck }) => {
+            const active = activeCheck(pathname, searchParams);
+            return (
+              <Link
+                aria-current={active ? "page" : undefined}
+                className={`mobile-primary-nav-item${active ? " active" : ""}`}
+                href={href}
+                key={label}
+              >
+                <Icon size={16} strokeWidth={2.2} aria-hidden="true" />
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
+        {contextLinks.length > 0 ? (
+          <nav className="workspace-context-nav" aria-label="Workspace modules">
+            {activeCompany ? (
+              <Link className={pathname === activeCompany.href ? "active" : ""} href={activeCompany.href}>
+                {activeCompany.label} overview
+              </Link>
+            ) : null}
+            {contextLinks.map((link) => (
+              <Link className={isActive(link.href) ? "active" : ""} href={link.href} key={link.href}>
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
         {children}
       </main>
     </div>
