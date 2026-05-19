@@ -59,7 +59,7 @@ export const ENTITY_REGISTRY: Record<VisibleEntityCode, EntityMetadata> = {
     legalName: "XTZ India Private Limited",
     country: "India",
     defaultCurrency: "INR",
-    homeHref: "/gig-workers" as Route,
+    homeHref: "/xtz" as Route,
     statusLabel: "Operating",
     modules: ["Payroll", "Gig workers", "Vendor invoices", "Payouts"],
   },

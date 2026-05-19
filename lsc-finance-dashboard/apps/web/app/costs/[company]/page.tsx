@@ -2,16 +2,26 @@ import type { Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  getCostInsights,
+  AlertTriangle,
+  CircleDollarSign,
+  CreditCard,
+  FileStack,
+  Scale,
+  TrendingDown,
+  TrendingUp
+} from "lucide-react";
+import {
   getDocumentAnalysisDetail,
   getDocumentAnalysisQueue,
   getDocumentExtractedFields,
   getDocumentPostingEvents,
-  getEntitySnapshots,
+  getEntityDashboard,
   getTbrRaceCards,
   getTbrSeasonCostCategories,
   getTbrSeasonSummaries
 } from "@lsc/db";
+import { HorizontalComparisonChart, StatusDonutChart, type ChartDatum } from "../../components/lsc-dashboard-charts";
+import { MetricTile, Panel } from "../../components/lsc-blue-primitives";
 import { CompanyWorkspaceShell } from "../../components/company-workspace-shell";
 import { DocumentAnalyzerPanel } from "../../components/document-analyzer-panel";
 import { DocumentAnalysisSummary } from "../../components/document-analysis-summary";
@@ -94,10 +104,8 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
   const status = pageParams?.status ?? null;
   const message = pageParams?.message ?? null;
 
-  const costInsightCompany = companyCode === "FSP" ? "FSP" : "TBR";
-  const [entitySnapshots, costInsights, seasons] = await Promise.all([
-    getEntitySnapshots(),
-    getCostInsights(costInsightCompany),
+  const [entityDashboard, seasons] = await Promise.all([
+    getEntityDashboard(companyCode),
     companyCode === "TBR" ? getTbrSeasonSummaries() : Promise.resolve([])
   ]);
 
@@ -107,8 +115,17 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
     seasons.find((season) => season.seasonYear === selectedSeason) ?? seasons.at(-1) ?? null;
 
   if (companyCode !== "TBR") {
+    const metricIcons = [CircleDollarSign, TrendingDown, Scale, CreditCard, FileStack, AlertTriangle] as const;
+    const costMetricRows = entityDashboard.metrics.filter((metric) =>
+      /cost|invoice|committed|paid|upcoming|payout|scenario|worker|active/i.test(metric.label)
+    );
+    const metrics = costMetricRows.length >= 3 ? costMetricRows : entityDashboard.metrics;
+    const exposureRows: ChartDatum[] = entityDashboard.primaryMix.map((row) => ({ ...row }));
+    const statusRows: ChartDatum[] = entityDashboard.statusMix.map((row) => ({ ...row }));
+    const secondaryRows: ChartDatum[] = entityDashboard.secondaryMix.map((row) => ({ ...row }));
+
     return (
-      <div className="page-grid">
+      <div className="page-grid lsc-dashboard-page">
         <CompanyWorkspaceShell
           basePath="/costs"
           companyCode={companyCode}
@@ -119,27 +136,143 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
           workstreams={workstreams}
         />
 
-        <section className="grid-two">
-          <article className="card placeholder-card">
-            <div className="card-title-row">
-              <div>
-                <span className="section-kicker">Selected company</span>
-                <h3>{formatSharedCompanyName(companyCode)} cost records will appear once canonical costs exist</h3>
-              </div>
-              <span className="badge">Placeholder</span>
-            </div>
-          </article>
-          {costInsights.length > 0 ? (
+        {selectedView === "overview" ? (
+          <>
+            <section className="analytics-kpi-grid">
+              {metrics.slice(0, 6).map((metric, index) => {
+                const Icon = metricIcons[index] ?? CircleDollarSign;
+                return (
+                  <MetricTile
+                    helper={metric.helper}
+                    icon={Icon}
+                    key={metric.label}
+                    label={metric.label}
+                    tone={metric.tone}
+                    value={metric.value}
+                  />
+                );
+              })}
+            </section>
+
+            <section className="lsc-dashboard-two-one-grid">
+              <Panel
+                className="dashboard-chart-panel"
+                title={`${formatSharedCompanyName(companyCode)} cost exposure`}
+                subtitle={entityDashboard.policyNote}
+                trailing={<span className="badge">Backend-derived</span>}
+              >
+                <HorizontalComparisonChart data={exposureRows} height={300} />
+              </Panel>
+
+              <Panel
+                className="dashboard-chart-panel"
+                title="Cost and invoice status mix"
+                subtitle="Committed, paid, scenario, or support state depending on entity policy."
+              >
+                <StatusDonutChart data={statusRows} height={255} />
+              </Panel>
+            </section>
+
+            <section className="lsc-dashboard-two-one-grid">
+              <Panel
+                className="dashboard-chart-panel"
+                title="Operating context"
+                subtitle="Cost dashboard now mirrors the entity command center with backend-routed sources."
+              >
+                <HorizontalComparisonChart data={secondaryRows} height={285} />
+              </Panel>
+
+              <Panel
+                className="dashboard-chart-panel"
+                title="Cost insights"
+                subtitle="Entity-specific guidance from approved services."
+              >
+                <div className="dashboard-signal-list">
+                  {entityDashboard.insights.map((insight) => (
+                    <div className="process-step" key={insight.title}>
+                      <span className={`process-step-index tone-${insight.tone}`}>{insight.tone}</span>
+                      <strong>{insight.title}</strong>
+                      <span className="muted">{insight.summary}</span>
+                    </div>
+                  ))}
+                </div>
+              </Panel>
+            </section>
+          </>
+        ) : null}
+
+        {selectedView === "breakdown" ? (
+          <section className="grid-two">
             <article className="card compact-section-card">
               <div className="card-title-row">
                 <div>
-                  <strong>{costInsights[0].title}</strong>
+                  <span className="section-kicker">Cost / exposure rows</span>
+                  <h3>{formatSharedCompanyName(companyCode)} breakdown</h3>
+                </div>
+                <span className="pill">{exposureRows.length} rows</span>
+              </div>
+              <div className="table-wrapper clean-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Amount</th>
+                      <th>Context</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {exposureRows.map((row) => (
+                      <tr key={row.name}>
+                        <td><strong>{row.name}</strong></td>
+                        <td>{row.displayValue}</td>
+                        <td>{row.sublabel ?? entityDashboard.policyNote}</td>
+                      </tr>
+                    ))}
+                    {exposureRows.length === 0 ? (
+                      <tr>
+                        <td className="muted" colSpan={3}>No backend-derived cost rows are available for this entity yet.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article className="card compact-section-card">
+              <div className="card-title-row">
+                <div>
+                  <span className="section-kicker">Linked modules</span>
+                  <h3>Open source workspaces</h3>
                 </div>
               </div>
-              <span className="muted">{costInsights[0].summary}</span>
+              <div className="card-grid">
+                {entityDashboard.links.map((link) => (
+                  <Link className="card" href={link.href} key={link.href}>
+                    <strong>{link.label}</strong>
+                    <span className="muted">{link.helper}</span>
+                  </Link>
+                ))}
+              </div>
             </article>
-          ) : null}
-        </section>
+          </section>
+        ) : null}
+
+        {selectedView === "analysis" ? (
+          <section className="card compact-section-card">
+            <div className="card-title-row">
+              <div>
+                <span className="section-kicker">Source-backed analysis</span>
+                <h3>{formatSharedCompanyName(companyCode)} cost support</h3>
+              </div>
+              <Link className="ghost-link" href={`/documents/${companyCode}?view=expense-support` as Route}>
+                Open documents
+              </Link>
+            </div>
+            <p className="muted">
+              Cost support should enter through the shared document and AI intake workflow, then post into canonical tables or entity-specific control views.
+            </p>
+          </section>
+        ) : null}
       </div>
     );
   }
@@ -173,12 +306,21 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
   const selectedRace = selectedRaceId
     ? seasonRaceCards.find((race) => race.id === selectedRaceId) ?? null
     : null;
-  const chartCategories = categoryRows.slice(0, 6);
-  const chartRaces = raceRows.slice(0, 6);
-  const categoryMax = Math.max(1, ...chartCategories.map((row) => parseCurrency(row.amount)));
-  const raceMax = Math.max(1, ...chartRaces.map((row) => parseCurrency(row.totalCost)));
-  const reimbursementTotal = raceRows.reduce((sum, row) => sum + parseCurrency(row.reimbursements), 0);
-  const eventInvoiceTotal = raceRows.reduce((sum, row) => sum + parseCurrency(row.eventInvoices), 0);
+  const categoryChartRows: ChartDatum[] = categoryRows.slice(0, 8).map((row) => ({
+    name: row.name,
+    value: parseCurrency(row.amount),
+    displayValue: row.amount,
+    sublabel: row.description,
+    tone: row.name.toLowerCase().includes("spare") ? "ruby" : "brand"
+  }));
+  const raceChartRows: ChartDatum[] = raceRows.slice(0, 8).map((row) => ({
+    name: row.name,
+    value: parseCurrency(row.totalCost),
+    displayValue: row.totalCost,
+    sublabel: `${row.eventInvoices} invoices · ${row.reimbursements} reimbursements`,
+    tone: parseCurrency(row.totalCost) > 0 ? "good" : "slate"
+  }));
+  const tbrMetricIcons = [CircleDollarSign, TrendingDown, Scale, CreditCard, FileStack, AlertTriangle] as const;
   const seasonWideQueue = queue.filter((item) => {
     const workflow = String(item.workflowContext ?? "").toLowerCase();
     return isCostSupportWorkflow(item.workflowContext) && workflow === "costs";
@@ -279,100 +421,49 @@ export default async function CostCompanyPage({ params, searchParams }: CostComp
 
       {selectedView === "overview" ? (
         <>
-          <section className="stats-grid compact-stats">
-            <article className="metric-card">
-              <div className="metric-topline">
-                <span className="metric-label">{selectedSeasonSummary?.seasonLabel ?? `Season ${selectedSeason}`}</span>
-                <span className="badge">Season cost</span>
-              </div>
-              <div className="metric-value">{selectedSeasonSummary?.cost ?? "$0"}</div>
-            </article>
-            <article className="metric-card">
-              <div className="metric-topline">
-                <span className="metric-label">Season revenue</span>
-                <span className="badge">Recognized</span>
-              </div>
-              <div className="metric-value">{selectedSeasonSummary?.revenue ?? "$0"}</div>
-            </article>
-            <article className="metric-card">
-              <div className="metric-topline">
-                <span className="metric-label">Open payables</span>
-                <span className="badge">Season due</span>
-              </div>
-              <div className="metric-value">{selectedSeasonSummary?.openPayables ?? "$0"}</div>
-            </article>
-            <article className="metric-card">
-              <div className="metric-topline">
-                <span className="metric-label">Race count</span>
-                <span className="badge">Season scope</span>
-              </div>
-              <div className="metric-value">{selectedSeasonSummary?.raceCount ?? "0"}</div>
-            </article>
+          <section className="analytics-kpi-grid">
+            {entityDashboard.metrics.slice(0, 6).map((metric, index) => {
+              const Icon = tbrMetricIcons[index] ?? CircleDollarSign;
+              return (
+                <MetricTile
+                  helper={metric.helper}
+                  icon={Icon}
+                  key={metric.label}
+                  label={metric.label}
+                  tone={metric.tone}
+                  value={metric.value}
+                />
+              );
+            })}
           </section>
 
-          <section className="grid-two">
-            <article className="card">
-              <div className="card-title-row">
-                <div>
-                  <span className="section-kicker">Cost charts</span>
-                  <h3>Category concentration</h3>
-                </div>
-                <span className="pill">Top categories</span>
-              </div>
-              <div className="chart-list">
-                {chartCategories.map((row) => (
-                  <div className="chart-row" key={row.name}>
-                    <div className="chart-meta">
-                      <strong>{row.name}</strong>
-                      <span>{row.amount}</span>
-                    </div>
-                    <div className="chart-track">
-                      <div
-                        className="chart-fill"
-                        style={{ width: `${Math.max(8, (parseCurrency(row.amount) / categoryMax) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </article>
+          <section className="lsc-dashboard-two-one-grid">
+            <Panel
+              className="dashboard-chart-panel"
+              title="Category concentration"
+              subtitle="Approved expenses plus E1 cost-module lines inside the selected season."
+              trailing={<span className="pill">{selectedSeasonSummary?.seasonLabel ?? `Season ${selectedSeason}`}</span>}
+            >
+              <StatusDonutChart data={categoryChartRows} height={255} />
+            </Panel>
 
-            <article className="card">
-              <div className="card-title-row">
-                <div>
-                  <span className="section-kicker">Race chart</span>
-                  <h3>Highest race-cost events</h3>
-                </div>
-                <span className="pill">Race totals</span>
-              </div>
-              <div className="chart-list">
-                {chartRaces.map((row) => (
-                  <div className="chart-row" key={row.id}>
-                    <div className="chart-meta">
-                      <strong>{row.name}</strong>
-                      <span>{row.totalCost}</span>
-                    </div>
-                    <div className="chart-track">
-                      <div
-                        className="chart-fill secondary"
-                        style={{ width: `${Math.max(8, (parseCurrency(row.totalCost) / raceMax) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </article>
+            <Panel
+              className="dashboard-chart-panel"
+              title="Race and event cost view"
+              subtitle="Race-linked cost rows stay below the season-level operating baseline."
+            >
+              <HorizontalComparisonChart data={raceChartRows} height={285} />
+            </Panel>
           </section>
 
-          <section className="card">
-            <div className="card-title-row">
-              <div>
-                <strong>{seasonInsight.title}</strong>
-              </div>
-              <span className="pill">Context aware</span>
-            </div>
-            <span className="muted">{seasonInsight.summary}</span>
-          </section>
+          <Panel
+            className="dashboard-chart-panel"
+            title={seasonInsight.title}
+            subtitle={seasonInsight.summary}
+            trailing={<span className="pill">Context aware</span>}
+          >
+            <HorizontalComparisonChart data={entityDashboard.secondaryMix} height={250} />
+          </Panel>
         </>
       ) : null}
 

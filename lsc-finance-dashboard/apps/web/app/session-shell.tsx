@@ -245,6 +245,7 @@ function getFspNav(): CompanyNav {
       {
         label: "Finance",
         links: [
+          { href: "/costs/FSP" as Route, label: "Costs", roles: [...ALL_ADMIN, "viewer"] },
           { href: "/commercial-goals/FSP" as Route, label: "Commercial Goals", roles: ALL_ROLES },
           { href: "/documents/FSP" as Route, label: "Documents", roles: ALL_ADMIN },
           { href: "/fsp/sp-multiplier" as Route, label: "SP Multiplier", roles: ALL_ADMIN },
@@ -256,13 +257,14 @@ function getFspNav(): CompanyNav {
 
 function getXtzNav(): CompanyNav {
   return {
-    href: "/gig-workers" as Route,
+    href: "/xtz" as Route,
     label: "XTZ India",
     roles: ALL_ADMIN,
     sections: [
       {
         label: "People",
         links: [
+          { href: "/costs/XTZ" as Route, label: "Costs", roles: [...ALL_ADMIN, "viewer"] },
           { href: "/employees?company=XTZ" as Route, label: "Employees", roles: ALL_ADMIN },
           { href: "/salary-payable?company=XTZ" as Route, label: "Salary Payable", roles: ALL_ADMIN },
           { href: "/payroll-invoices" as Route, label: "XTZ Invoice Dashboard", roles: ALL_ADMIN },
@@ -310,6 +312,7 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/tbr/overall-pnl")) return "Overall P&L";
   if (pathname.startsWith("/tbr/team-management")) return "Team Management";
   if (pathname.startsWith("/tbr")) return "TBR Overview";
+  if (pathname === "/xtz" || pathname.startsWith("/xtz/")) return "XTZ Overview";
   if (pathname.startsWith("/fsp")) return "FSP";
   if (pathname.startsWith("/commercial-goals")) return "Commercial Goals";
   if (pathname.startsWith("/costs")) return "Costs";
@@ -396,9 +399,11 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
   } else if (pathname.startsWith("/litigation")) {
     crumbs.push({ label: "Finance", href: "/" }, { label: "Litigation & Compliance" });
   } else if (pathname.startsWith("/xtz-expenses")) {
-    crumbs.push({ label: "XTZ India" }, { label: "Expenses" });
+    crumbs.push({ label: "XTZ India", href: "/xtz" }, { label: "Expenses" });
   } else if (pathname.startsWith("/gig-workers")) {
-    crumbs.push({ label: "XTZ India" }, { label: "Gig Workers" });
+    crumbs.push({ label: "XTZ India", href: "/xtz" }, { label: "Gig Workers" });
+  } else if (pathname === "/xtz" || pathname.startsWith("/xtz/")) {
+    crumbs.push({ label: "XTZ India" });
   } else if (pathname.startsWith("/deal-pipeline")) {
     crumbs.push({ label: "Intelligence" }, { label: "Deal Pipeline" });
   } else if (pathname.startsWith("/treasury")) {
@@ -520,17 +525,21 @@ const PRIMARY_NAV_ITEMS: PrimaryNavItem[] = [
     roles: ALL_ROLES,
     isActive: (pathname) =>
       pathname.startsWith("/fsp") ||
+      pathname.startsWith("/costs/FSP") ||
       pathname.startsWith("/documents/FSP") ||
       pathname.startsWith("/commercial-goals/FSP"),
   },
   {
-    href: "/gig-workers" as Route,
+    href: "/xtz" as Route,
     label: "XTZ",
     icon: WalletCards,
     roles: ALL_ADMIN,
     isActive: (pathname, searchParams) =>
+      pathname === "/xtz" ||
+      pathname.startsWith("/xtz/") ||
       pathname.startsWith("/gig-workers") ||
       pathname.startsWith("/xtz-expenses") ||
+      pathname.startsWith("/costs/XTZ") ||
       pathname.startsWith("/payroll-invoices") ||
       (pathname.startsWith("/employees") && searchParams.get("company") === "XTZ") ||
       (pathname.startsWith("/salary-payable") && searchParams.get("company") === "XTZ"),
@@ -689,7 +698,7 @@ function SessionShellInner({ children, user }: SessionShellProps) {
     LSC: "/" as Route,
     TBR: "/tbr" as Route,
     FSP: "/fsp" as Route,
-    XTZ: "/gig-workers" as Route,
+    XTZ: "/xtz" as Route,
   };
 
   return (

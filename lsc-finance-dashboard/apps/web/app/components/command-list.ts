@@ -63,11 +63,14 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
   { id: "nav-gig-workers", label: "Gig Workers", group: "People", href: "/gig-workers", keywords: "contractors freelancers" },
 
   // ── XTZ India ──
+  { id: "nav-xtz", label: "XTZ Overview", group: "XTZ India", href: "/xtz", keywords: "india payroll invoices command center" },
+  { id: "nav-xtz-costs", label: "XTZ Costs", group: "XTZ India", href: "/costs/XTZ", keywords: "india cost invoices payout" },
   { id: "nav-xtz-expenses-submit", label: "Submit Expense (XTZ)", group: "XTZ India", href: "/xtz-expenses?view=submit" },
   { id: "nav-xtz-expenses-review", label: "Expense Review (XTZ)", group: "XTZ India", href: "/xtz-expenses?view=review" },
 
   // ── FSP ──
   { id: "nav-fsp", label: "FSP Overview", group: "FSP", href: "/fsp" },
+  { id: "nav-fsp-costs", label: "FSP Costs", group: "FSP", href: "/costs/FSP", keywords: "scenario sport costs squash" },
   { id: "nav-fsp-sports", label: "All Sports", group: "FSP", href: "/fsp/sports" },
   { id: "nav-fsp-consolidated", label: "FSP Consolidated P&L", group: "FSP", href: "/fsp/consolidated" },
   { id: "nav-fsp-squash", label: "Squash (WPS)", group: "FSP", href: "/fsp/sports/squash" },

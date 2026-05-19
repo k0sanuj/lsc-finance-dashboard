@@ -38,3 +38,4 @@ export * from "./fsp-dashboard";
 export * from "./quickbooks";
 export * from "./legal";
 export * from "./tbr-finance";
+export * from "./entity-dashboard";

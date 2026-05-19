@@ -1,12 +1,10 @@
--- 037_payroll_invoice_financial_metrics.sql
--- Bridge paid payroll invoices into derived finance metrics.
+-- 038_fsp_consolidation_policy.sql
+-- Keep FSP sport scenario/planning values outside the LSC holding rollup.
 --
--- A paid XTZ India -> LSC Dubai payroll invoice is:
--- - an expense/cash outflow for the billed company (to_company_id)
--- - revenue/cash inflow for the issuing company only when it is an internal
---   company-to-company invoice (from_company_id <> to_company_id)
---
--- Legacy XTE company codes are normalized to LSC for reporting.
+-- FSP remains visible as its own entity row. The LSC row consolidates current
+-- approved operating entities only: LSC/Dubai, TBR, and XTZ India. Future FSP
+-- actuals can be promoted through an explicit consolidation gate rather than
+-- being inferred from scenario tables or placeholder planning values.
 
 create or replace view consolidated_company_metrics as
 with normalized_companies as (

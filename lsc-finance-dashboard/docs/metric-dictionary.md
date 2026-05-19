@@ -108,6 +108,31 @@ Definition:
 
 Amounts owed on vendor or operational invoices that are unpaid and due within the selected period.
 
+### XTZ Invoice Commitment
+
+Definition:
+
+Total XTZ India payroll/vendor invoice amount in `generated` or `sent` status.
+
+Finance treatment:
+
+- visible as committed payable pressure for the billed entity
+- not recognized as approved cost
+- not recognized as cash movement
+- becomes approved cost/cash out for the billed entity only when status becomes `paid`
+
+### XTZ Paid Invoice Cost
+
+Definition:
+
+Total XTZ India payroll/vendor invoice amount in `paid` status.
+
+Finance treatment:
+
+- recognized as XTZ India revenue/cash in for intercompany invoices
+- recognized as approved cost/cash out for the billed entity
+- void invoices remain audit/history only
+
 ### Monthly Burn
 
 Definition:
@@ -140,6 +165,18 @@ Initial v1 assumption:
 - for FSP, `recurring subscription revenue / total FSP revenue`
 
 This should remain explicitly labeled as an assumption until approved.
+
+### FSP Scenario P&L
+
+Definition:
+
+Sport-level planning revenue, COGS, OPEX, and EBITDA from FSP sport scenario tables.
+
+Finance treatment:
+
+- visible in FSP overview, FSP sports, FSP consolidated, and FSP cost workspaces
+- excluded from LSC holding-company consolidated finance totals
+- must not be copied into generic `revenue_records` or `expenses` without an explicit approved-actual consolidation gate
 
 ### Sponsor Count
 

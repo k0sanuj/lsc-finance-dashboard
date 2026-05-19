@@ -133,7 +133,7 @@ async function getDbOverviewMetrics(): Promise<OverviewMetric[]> {
        coalesce(sum(approved_expenses), 0)::numeric(14,2)::text as approved_expenses,
        coalesce(sum(margin), 0)::numeric(14,2)::text as margin
      from consolidated_company_metrics
-     where company_code::text in ('LSC', 'TBR', 'FSP', 'XTZ', 'XTE')
+     where company_code::text in ('LSC', 'XTE')
      group by 1`
   );
 
@@ -255,7 +255,7 @@ async function getDbOverviewAnalytics(): Promise<OverviewAnalytics> {
          coalesce(sum(cash_in), 0)::numeric(14,2)::text as cash_in,
          coalesce(sum(cash_out), 0)::numeric(14,2)::text as cash_out
        from monthly_financial_summary
-       where company_code::text in ('LSC', 'TBR', 'FSP', 'XTZ', 'XTE')
+       where company_code::text in ('LSC', 'XTE')
          and month_start is not null
        group by month_start
        order by month_start desc

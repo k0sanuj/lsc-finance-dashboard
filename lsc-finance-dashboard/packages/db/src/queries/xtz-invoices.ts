@@ -1,7 +1,7 @@
 import "server-only";
 
 import { queryRows } from "../query";
-import { formatDateLabel, getBackend } from "./shared";
+import { formatCurrency, formatDateLabel, getBackend } from "./shared";
 
 // Canonical XTZ India issuer & recipient details (single source of truth).
 // These get baked into each invoice header on generation so historical
@@ -445,6 +445,57 @@ export type XtzInvoiceSummary = {
   }>;
 };
 
+export type XtzInvoiceAccrualStatusRow = {
+  status: string;
+  count: number;
+  amountUsd: number;
+  amount: string;
+};
+
+export type XtzInvoiceAccrualRecipientRow = {
+  companyCode: string;
+  companyName: string;
+  generatedUsd: number;
+  sentUsd: number;
+  committedUsd: number;
+  paidUsd: number;
+  voidUsd: number;
+  invoiceCount: number;
+  generated: string;
+  sent: string;
+  committed: string;
+  paid: string;
+  voided: string;
+};
+
+export type XtzInvoiceAccrualSummary = {
+  generatedUsd: number;
+  sentUsd: number;
+  committedUsd: number;
+  paidUsd: number;
+  voidUsd: number;
+  activeUsd: number;
+  generated: string;
+  sent: string;
+  committed: string;
+  paid: string;
+  voided: string;
+  active: string;
+  statusRows: XtzInvoiceAccrualStatusRow[];
+  recipientRows: XtzInvoiceAccrualRecipientRow[];
+  monthlyTrend: Array<{
+    month: string;
+    generatedUsd: number;
+    sentUsd: number;
+    committedUsd: number;
+    paidUsd: number;
+    generated: string;
+    sent: string;
+    committed: string;
+    paid: string;
+  }>;
+};
+
 export async function getXtzInvoiceSummary(): Promise<XtzInvoiceSummary> {
   const invoices = await getXtzInvoices({ includeVoided: true });
   const activeInvoices = invoices.filter((i) => i.status !== "void");
@@ -483,6 +534,190 @@ export async function getXtzInvoiceSummary(): Promise<XtzInvoiceSummary> {
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-6)
       .map(([, row]) => row)
+  };
+}
+
+export async function getXtzInvoiceAccrualSummary(): Promise<XtzInvoiceAccrualSummary> {
+  if (getBackend() !== "database") {
+    return {
+      generatedUsd: 0,
+      sentUsd: 0,
+      committedUsd: 0,
+      paidUsd: 0,
+      voidUsd: 0,
+      activeUsd: 0,
+      generated: formatCurrency(0),
+      sent: formatCurrency(0),
+      committed: formatCurrency(0),
+      paid: formatCurrency(0),
+      voided: formatCurrency(0),
+      active: formatCurrency(0),
+      statusRows: [],
+      recipientRows: [],
+      monthlyTrend: []
+    };
+  }
+
+  const [statusRows, recipientRows, monthlyRows] = await Promise.all([
+    queryRows<{
+      status: string;
+      invoice_count: string;
+      amount_usd: string;
+    }>(
+      `select
+         pi.status::text as status,
+         count(*)::text as invoice_count,
+         coalesce(sum(case when pi.currency_code = 'USD' then pi.total_amount else 0 end), 0)::numeric(14,2)::text as amount_usd
+       from payroll_invoices pi
+       join companies fc on fc.id = pi.from_company_id
+       where fc.code::text = 'XTZ'
+       group by pi.status::text
+       order by
+         case pi.status::text
+           when 'generated' then 1
+           when 'sent' then 2
+           when 'paid' then 3
+           when 'void' then 4
+           else 5
+         end`
+    ),
+    queryRows<{
+      company_code: string;
+      company_name: string;
+      generated_usd: string;
+      sent_usd: string;
+      paid_usd: string;
+      void_usd: string;
+      invoice_count: string;
+    }>(
+      `with normalized_companies as (
+         select
+           id,
+           case when code::text = 'XTE' then 'LSC' else code::text end as company_code,
+           case
+             when code::text in ('LSC', 'XTE') then 'LSC / XTZ Esports Tech Ltd (Dubai)'
+             when code::text = 'TBR' then 'Team Blue Rising'
+             when code::text = 'FSP' then 'Future of Sports'
+             when code::text = 'XTZ' then 'XTZ India'
+             else name
+           end as company_name
+         from companies
+       )
+       select
+         tc.company_code,
+         min(tc.company_name) as company_name,
+         coalesce(sum(case when pi.status::text = 'generated' and pi.currency_code = 'USD' then pi.total_amount else 0 end), 0)::numeric(14,2)::text as generated_usd,
+         coalesce(sum(case when pi.status::text = 'sent' and pi.currency_code = 'USD' then pi.total_amount else 0 end), 0)::numeric(14,2)::text as sent_usd,
+         coalesce(sum(case when pi.status::text = 'paid' and pi.currency_code = 'USD' then pi.total_amount else 0 end), 0)::numeric(14,2)::text as paid_usd,
+         coalesce(sum(case when pi.status::text = 'void' and pi.currency_code = 'USD' then pi.total_amount else 0 end), 0)::numeric(14,2)::text as void_usd,
+         count(*)::text as invoice_count
+       from payroll_invoices pi
+       join normalized_companies fc on fc.id = pi.from_company_id
+       join normalized_companies tc on tc.id = pi.to_company_id
+       where fc.company_code = 'XTZ'
+       group by tc.company_code
+       order by
+         case tc.company_code
+           when 'LSC' then 1
+           when 'TBR' then 2
+           when 'FSP' then 3
+           when 'XTZ' then 4
+           else 5
+         end`
+    ),
+    queryRows<{
+      month_start: string;
+      generated_usd: string;
+      sent_usd: string;
+      paid_usd: string;
+    }>(
+      `select
+         date_trunc('month', coalesce(pi.paid_at::date, pi.invoice_date))::date::text as month_start,
+         coalesce(sum(case when pi.status::text = 'generated' and pi.currency_code = 'USD' then pi.total_amount else 0 end), 0)::numeric(14,2)::text as generated_usd,
+         coalesce(sum(case when pi.status::text = 'sent' and pi.currency_code = 'USD' then pi.total_amount else 0 end), 0)::numeric(14,2)::text as sent_usd,
+         coalesce(sum(case when pi.status::text = 'paid' and pi.currency_code = 'USD' then pi.total_amount else 0 end), 0)::numeric(14,2)::text as paid_usd
+       from payroll_invoices pi
+       join companies fc on fc.id = pi.from_company_id
+       where pi.status::text <> 'void'
+         and fc.code::text = 'XTZ'
+       group by date_trunc('month', coalesce(pi.paid_at::date, pi.invoice_date))::date
+       order by month_start desc
+       limit 8`
+    )
+  ]);
+
+  const status = statusRows.map((row) => {
+    const amountUsd = Number(row.amount_usd);
+    return {
+      status: row.status,
+      count: Number(row.invoice_count),
+      amountUsd,
+      amount: formatCurrency(amountUsd)
+    } satisfies XtzInvoiceAccrualStatusRow;
+  });
+  const generatedUsd = status.find((row) => row.status === "generated")?.amountUsd ?? 0;
+  const sentUsd = status.find((row) => row.status === "sent")?.amountUsd ?? 0;
+  const paidUsd = status.find((row) => row.status === "paid")?.amountUsd ?? 0;
+  const voidUsd = status.find((row) => row.status === "void")?.amountUsd ?? 0;
+  const committedUsd = generatedUsd + sentUsd;
+  const activeUsd = committedUsd + paidUsd;
+
+  return {
+    generatedUsd,
+    sentUsd,
+    committedUsd,
+    paidUsd,
+    voidUsd,
+    activeUsd,
+    generated: formatCurrency(generatedUsd),
+    sent: formatCurrency(sentUsd),
+    committed: formatCurrency(committedUsd),
+    paid: formatCurrency(paidUsd),
+    voided: formatCurrency(voidUsd),
+    active: formatCurrency(activeUsd),
+    statusRows: status,
+    recipientRows: recipientRows.map((row) => {
+      const generated = Number(row.generated_usd);
+      const sent = Number(row.sent_usd);
+      const paid = Number(row.paid_usd);
+      const voided = Number(row.void_usd);
+      const committed = generated + sent;
+      return {
+        companyCode: row.company_code,
+        companyName: row.company_name,
+        generatedUsd: generated,
+        sentUsd: sent,
+        committedUsd: committed,
+        paidUsd: paid,
+        voidUsd: voided,
+        invoiceCount: Number(row.invoice_count),
+        generated: formatCurrency(generated),
+        sent: formatCurrency(sent),
+        committed: formatCurrency(committed),
+        paid: formatCurrency(paid),
+        voided: formatCurrency(voided)
+      } satisfies XtzInvoiceAccrualRecipientRow;
+    }),
+    monthlyTrend: monthlyRows
+      .slice()
+      .reverse()
+      .map((row) => {
+        const generated = Number(row.generated_usd);
+        const sent = Number(row.sent_usd);
+        const paid = Number(row.paid_usd);
+        const committed = generated + sent;
+        return {
+          month: new Date(row.month_start).toLocaleDateString("en-US", { month: "short" }),
+          generatedUsd: generated,
+          sentUsd: sent,
+          committedUsd: committed,
+          paidUsd: paid,
+          generated: formatCurrency(generated),
+          sent: formatCurrency(sent),
+          committed: formatCurrency(committed),
+          paid: formatCurrency(paid)
+        };
+      })
   };
 }
 

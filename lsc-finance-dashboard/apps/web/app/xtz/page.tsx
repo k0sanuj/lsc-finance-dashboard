@@ -1,33 +1,40 @@
 import Link from "next/link";
 import {
-  Bot,
   CircleDollarSign,
+  CreditCard,
   FileStack,
-  Layers3,
-  Scale,
-  TrendingDown,
-  TrendingUp
+  ReceiptText,
+  TrendingUp,
+  Users,
+  WalletCards
 } from "lucide-react";
 import { getEntityDashboard } from "@lsc/db";
 import {
-  FinanceTrendChart,
+  CashMovementChart,
   HorizontalComparisonChart,
   StatusDonutChart,
   type ChartDatum
 } from "../components/lsc-dashboard-charts";
 import { MetricTile, Panel } from "../components/lsc-blue-primitives";
+import { requireRole } from "../../lib/auth";
 
-const metricIcons = [Layers3, FileStack, TrendingUp, TrendingDown, Scale, Bot] as const;
+const metricIcons = [ReceiptText, TrendingUp, FileStack, Users, CreditCard, WalletCards] as const;
 
-export default async function FspPage() {
-  const dashboard = await getEntityDashboard("FSP");
-  const trendRows: ChartDatum[] = dashboard.trend.map((row) => ({ ...row }));
+export default async function XtzPage() {
+  await requireRole(["super_admin", "finance_admin", "viewer"]);
+  const dashboard = await getEntityDashboard("XTZ");
+  const trendRows: ChartDatum[] = dashboard.trend.map((row) => ({
+    ...row,
+    cashIn: row.paid ?? 0,
+    cashOut: 0,
+    net: row.committed ?? 0
+  }));
 
   return (
     <div className="page-grid lsc-dashboard-page">
       <section className="workspace-header command-header">
         <div className="workspace-header-left">
-          <span className="section-kicker">Future of Sports</span>
+          <span className="section-kicker">XTZ India</span>
           <h3>{dashboard.title}</h3>
           <p className="muted">{dashboard.subtitle}</p>
         </div>
@@ -61,26 +68,26 @@ export default async function FspPage() {
       <section className="lsc-dashboard-hero-grid">
         <Panel
           className="dashboard-chart-panel dashboard-primary-chart"
-          title="FSP scenario P&L by year"
-          subtitle="Sport portfolio data is FSP-only and does not roll into LSC consolidated totals."
-          trailing={<span className="badge">Scenario view</span>}
+          title="Invoice accrual ladder"
+          subtitle="Generated/sent invoices are committed; paid invoices become recognized cost/revenue and cash movement."
+          trailing={<span className="badge">Approval controlled</span>}
         >
-          <FinanceTrendChart
-            data={trendRows}
-            height={305}
-            series={[
-              { key: "revenue", label: "Revenue", tone: "good" },
-              { key: "cost", label: "Cost", tone: "ruby" },
-              { key: "margin", label: "EBITDA", tone: "brand" }
-            ]}
-          />
+          <CashMovementChart data={trendRows} height={305} />
+          <div className="lsc-chart-summary-strip">
+            {dashboard.metrics.slice(0, 3).map((metric) => (
+              <span key={metric.label}>
+                <strong>{metric.value}</strong>
+                {metric.label}
+              </span>
+            ))}
+          </div>
         </Panel>
 
         <div className="lsc-dashboard-side-stack">
           {dashboard.insights.map((insight) => (
             <MetricTile
               helper={insight.summary}
-              icon={insight.tone === "amber" ? Bot : insight.tone === "iris" ? Layers3 : Scale}
+              icon={insight.tone === "good" ? TrendingUp : insight.tone === "amber" ? CreditCard : WalletCards}
               key={insight.title}
               label={insight.title}
               tone={insight.tone}
@@ -93,51 +100,51 @@ export default async function FspPage() {
       <section className="lsc-dashboard-two-one-grid">
         <Panel
           className="dashboard-chart-panel"
-          title="Sport asset EBITDA"
-          subtitle="Squash and future sport modules appear here without changing LSC totals."
+          title="Invoice status mix"
+          subtitle="Active and voided invoice state by USD reporting amount."
         >
-          <HorizontalComparisonChart data={dashboard.primaryMix} height={300} />
+          <StatusDonutChart data={dashboard.statusMix} height={255} />
         </Panel>
 
         <Panel
           className="dashboard-chart-panel"
-          title="Module completeness"
-          subtitle="Setup depth across P&L, sponsorship, media, production, payroll, and event assumptions."
+          title="Billed-entity exposure"
+          subtitle="Committed and paid XTZ invoices by receiving entity."
         >
-          <HorizontalComparisonChart data={dashboard.secondaryMix} height={300} />
+          <HorizontalComparisonChart data={dashboard.primaryMix} height={280} />
         </Panel>
       </section>
 
       <section className="lsc-dashboard-two-one-grid">
         <Panel
           className="dashboard-chart-panel"
-          title="AI intake queue"
-          subtitle="Media kits and sponsorship support waiting for preview and approval."
+          title="Payroll and payout operations"
+          subtitle="Worker payout facts stay separate from invoice recognition."
         >
-          <StatusDonutChart data={dashboard.statusMix} height={250} />
+          <StatusDonutChart data={dashboard.secondaryMix} height={255} />
         </Panel>
 
         <Panel
           className="dashboard-chart-panel"
-          title="Consolidation policy"
-          subtitle="Finance treatment for planning values."
-          trailing={<span className="pill">FSP only</span>}
+          title="Recognition policy"
+          subtitle="How XTZ invoices affect LSC/TBR/FSP cost workspaces."
+          trailing={<span className="pill">Accrual ladder</span>}
         >
           <div className="xtz-dashboard-summary">
             <div>
-              <span className="section-kicker">Policy</span>
-              <strong>Excluded</strong>
-              <span>{dashboard.policyNote}</span>
+              <span className="section-kicker">Generated / sent</span>
+              <strong>Commitment</strong>
+              <span>Shown as payable pressure, not approved cost.</span>
             </div>
             <div>
-              <span className="section-kicker">Primary route</span>
-              <strong>Sports</strong>
-              <span>Open sport cockpits for P&L and AI intake.</span>
+              <span className="section-kicker">Paid</span>
+              <strong>Cost + cash</strong>
+              <span>Recognized for billed entity and XTZ revenue.</span>
             </div>
             <div>
-              <span className="section-kicker">Cost view</span>
-              <strong>FSP only</strong>
-              <span>Scenario cost is visible in FSP cost dashboards.</span>
+              <span className="section-kicker">Void</span>
+              <strong>Audit only</strong>
+              <span>Kept for lineage, excluded from totals.</span>
             </div>
           </div>
         </Panel>
@@ -148,7 +155,7 @@ export default async function FspPage() {
           <Link className="card" href={link.href} key={link.href}>
             <div className="card-title-row">
               <div>
-                <span className="section-kicker">FSP module</span>
+                <span className="section-kicker">XTZ module</span>
                 <h3>{link.label}</h3>
               </div>
               <span className="ghost-link">Open</span>
