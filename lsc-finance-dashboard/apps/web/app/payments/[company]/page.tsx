@@ -119,14 +119,18 @@ export default async function PaymentsCompanyPage({ params, searchParams }: Paym
           workstreams={workstreams}
         />
         <section className="grid-two">
-          <article className="card placeholder-card">
+          <article className="card action-state-card">
             <div className="card-title-row">
               <div>
-                <span className="section-kicker">Selected company</span>
-                <h3>FSP payables will appear once platform bills exist</h3>
+                <span className="section-kicker">FSP payment control</span>
+                <h3>Sport-level committed payables stay inside FSP workflows</h3>
               </div>
-              <span className="badge">Placeholder</span>
+              <span className="badge">Scenario gated</span>
             </div>
+            <p className="muted">
+              Approved sport invoices and payment obligations will appear here once posted as FSP
+              actuals. Planning values remain visible in FSP sport dashboards, not LSC cash totals.
+            </p>
           </article>
         </section>
       </div>

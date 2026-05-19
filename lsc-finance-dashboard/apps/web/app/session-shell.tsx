@@ -344,6 +344,7 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/messaging")) return "Cross-Dashboard Messages";
   if (pathname.startsWith("/audit-reports")) return "Audit Reports";
   if (pathname.startsWith("/audit-log")) return "Audit Log";
+  if (pathname.startsWith("/quarantined-data")) return "Quarantined Data";
   if (pathname.startsWith("/qb")) return "QuickBooks";
   if (pathname.startsWith("/legal-integration")) return "Legal Integration";
   if (pathname.startsWith("/project-checklist")) return "Project Checklist";
@@ -438,6 +439,8 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "System" }, { label: "Audit Reports" });
   } else if (pathname.startsWith("/audit-log")) {
     crumbs.push({ label: "System" }, { label: "Audit Log" });
+  } else if (pathname.startsWith("/quarantined-data")) {
+    crumbs.push({ label: "System" }, { label: "Quarantined Data" });
   } else if (pathname.startsWith("/qb")) {
     crumbs.push({ label: "System" }, { label: "QuickBooks" });
   } else if (pathname.startsWith("/legal-integration")) {
@@ -469,6 +472,7 @@ const SYSTEM_PATHS = [
   "/messaging",
   "/audit-reports",
   "/audit-log",
+  "/quarantined-data",
   "/qb",
   "/legal-integration",
   "/project-checklist",
@@ -596,6 +600,7 @@ function getSystemNav(): NavSection[] {
         { href: "/messaging" as Route, label: "Messages", roles: ALL_ADMIN },
         { href: "/audit-reports" as Route, label: "Audit Reports", roles: ALL_ADMIN },
         { href: "/audit-log" as Route, label: "Audit Log", roles: ALL_ADMIN },
+        { href: "/quarantined-data" as Route, label: "Quarantined Data", roles: ALL_ADMIN },
         { href: "/qb" as Route, label: "QuickBooks", roles: ALL_ADMIN },
         { href: "/legal-integration" as Route, label: "Legal Integration", roles: ALL_ADMIN },
       ],

@@ -6,6 +6,12 @@ import { fileURLToPath } from "node:url";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const appDir = path.join(rootDir, "apps", "web", "app");
+const scanRoots = [
+  appDir,
+  path.join(rootDir, "agents"),
+  path.join(rootDir, "docs"),
+  path.join(rootDir, "scripts"),
+];
 
 const forbiddenPatterns = [
   { id: "righthealth-name", pattern: /\bRightHealth\b/i, detail: "Do not copy RightHealth branding into LSC." },
@@ -25,7 +31,7 @@ function walk(dir) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) return walk(fullPath);
     if (!entry.isFile()) return [];
-    return /\.(tsx|ts|css)$/.test(entry.name) ? [fullPath] : [];
+    return /\.(tsx|ts|css|mjs|md)$/.test(entry.name) ? [fullPath] : [];
   });
 }
 
@@ -46,6 +52,30 @@ for (const file of walk(appDir)) {
       line: lineFor(content, match.index),
       ruleId: rule.id,
       detail: rule.detail,
+    });
+  }
+}
+
+const xteAllowlist = [
+  "apps/web/app/lib/entities.ts",
+  "packages/db/src/queries/finance.ts",
+  "packages/db/src/queries/xtz-invoices.ts",
+  "scripts/audit-lsc-blue-ui.mjs",
+  "scripts/seed-employees-sports.mjs",
+];
+
+for (const root of scanRoots) {
+  for (const file of walk(root)) {
+    const relative = path.relative(rootDir, file);
+    if (xteAllowlist.includes(relative)) continue;
+    const content = fs.readFileSync(file, "utf8");
+    const index = content.indexOf("XTE");
+    if (index === -1) continue;
+    findings.push({
+      file: relative,
+      line: lineFor(content, index),
+      ruleId: "visible-xte",
+      detail: "XTE is allowed only in compatibility mappers or legacy seed/audit internals.",
     });
   }
 }

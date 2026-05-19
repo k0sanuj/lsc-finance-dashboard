@@ -38,7 +38,7 @@ begin
     'No 89, Ground Floor, Badami Mansion, Main Road, Parsudih, East Singhbhum — 831002',
     '50100153694001', 'HDFC0009081', 'HDFCINBBXXX',
     'USD',
-    'Product Lead — payroll invoiced separately via XTE Dubai'
+    'Product Lead — payroll invoiced separately via LSC Dubai'
   where not exists (select 1 from vendors where name = 'Sayan Mukherjee')
   returning id into v_id;
 

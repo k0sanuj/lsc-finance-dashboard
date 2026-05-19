@@ -123,14 +123,18 @@ export default async function CommercialGoalsCompanyPage({
           workstreams={workstreams}
         />
         <section className="grid-two">
-          <article className="card placeholder-card">
+          <article className="card action-state-card">
             <div className="card-title-row">
               <div>
-                <span className="section-kicker">Selected company</span>
-                <h3>FSP commercial targets will appear once launch planning is active</h3>
+                <span className="section-kicker">FSP commercial control</span>
+                <h3>Commercial targets activate when sport plans become approved targets</h3>
               </div>
-              <span className="badge">Placeholder</span>
+              <span className="badge">Planning gated</span>
             </div>
+            <p className="muted">
+              Sport sponsorship scenarios are visible in each FSP cockpit. This workspace tracks
+              approved commercial targets and source-backed contracts only.
+            </p>
           </article>
         </section>
       </div>

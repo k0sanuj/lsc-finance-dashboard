@@ -76,6 +76,7 @@ function auditEnvVars() {
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
     "S3_BUCKET",
+    "LSC_INTERNAL_API_KEY",
   ];
 
   for (const key of required) {
@@ -184,6 +185,9 @@ async function auditDatabase() {
     const views = [
       "consolidated_company_metrics",
       "monthly_financial_summary",
+      "finance_recognition_by_entity",
+      "finance_reporting_exclusion_summary",
+      "fsp_consolidation_eligible_actuals",
       "payments_due",
       "tbr_race_cost_summary",
       "tbr_e1_accounting_status_by_season",
@@ -291,18 +295,26 @@ function auditRoutes() {
     "app/tbr/operating-expenses/page.tsx",
     "app/tbr/e1-accounting/page.tsx",
     "app/tbr/overall-pnl/page.tsx",
+    "app/xtz/page.tsx",
+    "app/fsp/page.tsx",
+    "app/fsp/consolidated/page.tsx",
+    "app/fsp/sports/page.tsx",
     "app/costs/page.tsx",
     "app/costs/[company]/page.tsx",
     "app/payments/page.tsx",
     "app/payments/[company]/page.tsx",
+    "app/receivables/page.tsx",
+    "app/receivables/[company]/page.tsx",
     "app/documents/page.tsx",
     "app/documents/[company]/page.tsx",
     "app/commercial-goals/page.tsx",
     "app/commercial-goals/[company]/page.tsx",
+    "app/payroll-invoices/page.tsx",
+    "app/payroll-invoices/generator/page.tsx",
     "app/ai-analysis/page.tsx",
-    "app/fsp/page.tsx",
     "app/agent-graph/page.tsx",
     "app/workflow-graph/page.tsx",
+    "app/quarantined-data/page.tsx",
   ];
 
   for (const route of expectedRoutes) {
@@ -532,6 +544,8 @@ async function auditVercelEnv() {
       if (output.includes(key)) ok(`Vercel has ${key}`);
       else fail(`Vercel MISSING ${key}`);
     }
+    if (output.includes("LSC_INTERNAL_API_KEY")) ok("Vercel has LSC_INTERNAL_API_KEY");
+    else warn("Vercel missing LSC_INTERNAL_API_KEY (internal ingest/tranche APIs will reject calls)");
   } catch {
     warn("Could not check Vercel env vars (CLI not authenticated?)");
   }

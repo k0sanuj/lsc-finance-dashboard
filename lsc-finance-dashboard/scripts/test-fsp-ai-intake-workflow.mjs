@@ -33,9 +33,10 @@ const REQUIRED_SPONSORSHIP_KEYS = [
 ];
 
 function printUsage() {
-  console.log(`FSP AI intake regression posts real canonical QA records.
+  console.log(`FSP AI intake regression supports a safe dry-run by default.
 
 Usage:
+  pnpm test:fsp-ai-intake
   pnpm test:fsp-ai-intake -- --confirm-post
 
 Optional env:
@@ -43,7 +44,8 @@ Optional env:
   LSC_FSP_TEST_SPORT=basketball
   LSC_CONFIRM_FSP_AI_INTAKE_POST=1
 
-This script verifies:
+Dry-run verifies schema and source prerequisites without posting records.
+--confirm-post verifies:
   typed source -> AI draft -> extracted preview fields -> approve -> canonical post
   source_documents + ai_intake_posting_events + audit_log lineage
 `);
@@ -382,13 +384,32 @@ async function verifyResults(pool, draftIds, mediaDraftId, sponsorRunId, sportId
 }
 
 async function main() {
+  loadEnv();
+
   if (!CONFIRMED) {
     printUsage();
-    process.exitCode = 1;
+    const connectionString = process.env.DATABASE_URL_ADMIN || process.env.DATABASE_URL;
+    if (!connectionString) throw new Error("DATABASE_URL_ADMIN or DATABASE_URL is not set.");
+    const dryPool = new pg.Pool({ connectionString, allowExitOnIdle: true, max: 1 });
+    try {
+      for (const table of [
+        "ai_intake_drafts",
+        "ai_intake_draft_fields",
+        "ai_intake_posting_events",
+        "source_documents",
+        "audit_log",
+        "fsp_media_revenue_cpm",
+        "fsp_sponsorships",
+      ]) {
+        await dryPool.query(`select 1 from ${table} limit 1`);
+      }
+      console.log("FSP AI intake dry-run passed: schema is available and no canonical records were posted.");
+    } finally {
+      await dryPool.end();
+    }
     return;
   }
 
-  loadEnv();
   for (const key of ["DATABASE_URL", "AUTH_SESSION_SECRET", "GEMINI_API_KEY"]) {
     if (!process.env[key]) throw new Error(`${key} is not set.`);
   }

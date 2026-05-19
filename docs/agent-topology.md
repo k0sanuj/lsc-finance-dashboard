@@ -93,6 +93,14 @@ graph TD
 4. UI changes must reference view or API sources.
 5. AI analysis must reference approved derived metrics.
 
+## Runtime Skill Registry Rules
+
+1. Every non-infrastructure skill declared in `AGENT_SKILLS` must have a registered dispatcher handler.
+2. Every mutating skill must require `approved=true` and an `idempotencyKey`.
+3. Every mutating skill must write through a transaction-safe backend path where practical, record idempotency, and call the shared cascade/audit helper.
+4. Notification send skills must be queued or sent only after explicit confirmation; draft skills remain read-only.
+5. Dispatcher coverage tests must fail the release if a declared skill is missing a handler.
+
 ## Practical Codex Usage
 
 Use the coordinator prompt to split work into specialist prompts, for example:

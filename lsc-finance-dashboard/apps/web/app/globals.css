@@ -882,7 +882,7 @@ textarea {
 }
 
 .entity-card.fsp,
-.placeholder-card {
+.action-state-card {
   border-left: 3px solid var(--line-strong);
   opacity: 0.85;
 }

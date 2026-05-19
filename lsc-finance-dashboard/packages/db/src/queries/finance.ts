@@ -191,7 +191,7 @@ async function getDbOverviewMetrics(): Promise<OverviewMetric[]> {
     { label: "Cash", value: formatCurrency(cash), scope: "LSC Consolidated" },
     { label: "Receivables", value: formatCurrency(receivables), scope: "LSC Consolidated" },
     { label: "Upcoming Payments", value: formatCurrency(payableTotal), scope: "LSC Consolidated" },
-    { label: "MRR", value: formatCurrency(0), scope: "FSP Placeholder" },
+    { label: "FSP Scenario MRR", value: formatCurrency(0), scope: "FSP planning only" },
     {
       label: "Sponsor Count",
       value: sponsorCountRows[0]?.sponsor_count ?? "0",

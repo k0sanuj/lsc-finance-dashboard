@@ -1,6 +1,7 @@
 import "server-only";
 
-import { Pool, type QueryResultRow } from "pg";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import { getAdminDatabaseUrl, getReadDatabaseUrl } from "./connection";
 
 declare global {
@@ -9,6 +10,8 @@ declare global {
   // eslint-disable-next-line no-var
   var __lscPgAdminPool: Pool | undefined;
 }
+
+const adminTransaction = new AsyncLocalStorage<PoolClient>();
 
 function createPool(connectionString: string) {
   return new Pool({
@@ -44,12 +47,48 @@ export async function queryRowsAdmin<T extends QueryResultRow>(
   text: string,
   values: unknown[] = []
 ) {
+  const transactionClient = adminTransaction.getStore();
+  if (transactionClient) {
+    const result = await transactionClient.query<T>(text, values);
+    return result.rows;
+  }
+
   const pool = getAdminPool();
   const result = await pool.query<T>(text, values);
   return result.rows;
 }
 
 export async function executeAdmin(text: string, values: unknown[] = []) {
+  const transactionClient = adminTransaction.getStore();
+  if (transactionClient) {
+    return transactionClient.query(text, values);
+  }
+
   const pool = getAdminPool();
   return pool.query(text, values);
+}
+
+export async function withAdminTransaction<T>(fn: () => Promise<T>): Promise<T> {
+  if (adminTransaction.getStore()) {
+    return fn();
+  }
+
+  const pool = getAdminPool();
+  const client = await pool.connect();
+
+  try {
+    await client.query("begin");
+    const result = await adminTransaction.run(client, fn);
+    await client.query("commit");
+    return result;
+  } catch (error) {
+    try {
+      await client.query("rollback");
+    } catch {
+      // Preserve the original error.
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
 }

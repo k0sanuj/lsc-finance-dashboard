@@ -103,7 +103,7 @@ pre-register sponsors in Finance.
   "occurredAt": "2026-04-29T12:00:00Z",
   "payload": {
     "legalExternalId": "leg_doc_0001",          // Legal's stable Document/contract id (REQUIRED)
-    "companyCode": "TBR",                        // "LSC" | "TBR" | "FSP" | "XTZ" | "XTE"
+    "companyCode": "TBR",                        // "LSC" | "TBR" | "FSP" | "XTZ"
     "contractName": "ACME 2026 Title Sponsorship",
     "sponsorName": "ACME Beverages Inc.",        // Counterparty (REQUIRED)
     "counterpartyType": "sponsor",                // "sponsor" | "customer" — defaults to sponsor

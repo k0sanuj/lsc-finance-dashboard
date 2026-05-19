@@ -140,6 +140,22 @@ Represents the bridge from an approved AI intake draft to the canonical table an
 
 Represents a specific import operation and preserves operational lineage.
 
+### FinanceReportingExclusion
+
+Represents a preserved source or canonical row that must be excluded from default reporting, usually because it is QA/test data or an intentionally quarantined artifact. Exclusions never delete the source row; they add reporting metadata with reason, source table, source id, quarantine timestamp, and reviewer notes.
+
+### FinanceRecognitionByEntity
+
+Represents the shared backend recognition contract used by entity dashboards. It separates actual revenue/cost/cash, committed payables/receivables, planning/scenario values, and quarantined/excluded values so dashboards do not infer finance treatment from raw status text.
+
+### AgentMutationIdempotency
+
+Represents one approved mutating agent skill execution. It stores the agent id, skill, idempotency key, request payload, resulting entity, and success/failure status so retried agent actions cannot double-post canonical finance rows.
+
+### CascadeActionEvent
+
+Represents one downstream cascade action emitted after a canonical mutation, including audit lineage update, analyzer queue, notification queue, or skipped live-view refresh.
+
 ### TbrSeason
 
 Represents a TBR operating season used for season-level financial control, E1 accounting, and overall P&L reporting.
@@ -183,6 +199,9 @@ Represents the link between E1 accounting rows and matching operating expense ba
 - AI intake draft belongs to a source document and company
 - AI intake draft fields belong to one AI intake draft
 - AI intake posting events preserve the bridge from approved preview fields to canonical records
+- finance reporting exclusions mark source rows as preserved but excluded from default finance views
+- finance recognition views consume canonical records plus quarantine metadata and expose entity-ready recognition buckets
+- mutating agent skill runs create idempotency, audit, and cascade action records
 - TBR seasons have many operating expense control lines
 - TBR seasons have many E1 accounting lines
 - E1 accounting lines group into derived invoice tracker rows by season and invoice number
@@ -227,6 +246,10 @@ Exposes filtered views, APIs, and page-level read models.
 - ai_intake_drafts
 - ai_intake_draft_fields
 - ai_intake_posting_events
+- finance_reporting_exclusions
+- agent_mutation_idempotency
+- outbound_notifications
+- cascade_action_events
 - import_batches
 - raw_import_rows
 - tbr_seasons
@@ -250,12 +273,17 @@ Exposes filtered views, APIs, and page-level read models.
 - tbr_e1_accounting_status_by_season
 - tbr_e1_reconciliation_view
 - tbr_overall_pnl_by_season
+- finance_recognition_by_entity
+- finance_reporting_exclusion_summary
+- fsp_consolidation_eligible_actuals
 
 ## Current Ontology Notes
 
 - TBR is the main active operating entity for v1.
-- FSP should exist in the ontology even if it is mostly unpopulated.
+- FSP is a visible portfolio entity. Its sport scenario/planning values are entity-local until explicitly approved as consolidation-eligible actuals.
+- XTZ is a visible India operating/payroll/vendor entity. XTZ invoice status drives committed payable, paid cost, and XTZ revenue recognition by status.
 - Race events are central to TBR reporting and should not be treated as optional tags.
 - TBR Financial Plan summary rows live in season-control tables, not the generic expense ledger.
 - Overall TBR P&L applies a variance-only E1 reconciliation policy: operating baseline counts once, matched E1 overlap rows are visible in E1 Accounting, only positive E1 variance above the matched baseline flows into P&L, and non-overlapping confirmed E1 obligations count as incremental cost.
+- Legacy entity aliases normalize internally to LSC/Dubai compatibility reads and must not appear in visible navigation, prompts, or new writes.
 - The same sponsor should not be duplicated across sheets if it can be mapped to one canonical sponsor entity.

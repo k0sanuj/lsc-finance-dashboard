@@ -13,7 +13,8 @@ The dashboard should:
 - present consolidated LSC financial performance
 - provide detailed TBR operating visibility
 - provide dedicated TBR season finance, E1 accounting, and overall P&L reporting
-- support FSP as a future-ready entity in schema and filters
+- support FSP as a visible sports-asset portfolio entity with planning/scenario reporting
+- support XTZ India as a visible payroll, vendor, and intercompany invoice entity
 - track costs, invoices, receivables, and payments
 - track commercial goals and sponsorship progress
 - support AI-generated analysis from approved derived metrics
@@ -30,7 +31,11 @@ Team Blue Rising is the current active entity. It operates as a team in the E1 s
 
 ### FSP
 
-Future of Sports is a future business line. It should be supported in schema and consolidated logic, but may remain largely zero-filled or placeholder-driven in v1.
+Future of Sports is a sports-asset portfolio entity. Its sport-level scenario and planning values appear in FSP dashboards, while remaining excluded from LSC actual consolidation until explicitly approved as actual consolidation data.
+
+### XTZ
+
+XTZ India is the operating payroll/vendor entity. Its invoice ladder is status-aware: generated and sent invoices are committed payables/expected inflows, paid invoices become approved billed-entity cost/cash out and XTZ revenue/cash in, and void invoices stay audit-visible but excluded from finance totals.
 
 ## Product Principles
 
@@ -69,7 +74,8 @@ Purpose:
 
 - show LSC consolidated health at a glance
 - show TBR contribution clearly
-- keep FSP visible in model but not visually dominant while unlaunched
+- show FSP planning values without rolling them into LSC actuals
+- show XTZ committed and paid invoice exposure by entity
 
 Main KPIs:
 
@@ -138,7 +144,7 @@ Purpose:
 
 Main sections:
 
-- root index page with company selector: `TBR` or `FSP`
+- root index page with company selector: `LSC`, `TBR`, `FSP`, or `XTZ`
 - company workspace route after selection
 - workspace cards:
   - cost overview
@@ -146,7 +152,7 @@ Main sections:
   - cost analyzer
 - selected summary, chart, table, AI comment block, or source-detail surface only after company and workspace are chosen
 
-For v1, prioritize TBR cost visibility. FSP cost structure may remain defined but unpopulated.
+Cost pages must use entity-aware backend recognition views. TBR uses operating baseline and E1 reconciliation views, FSP uses entity-local sport scenario/planning cost, XTZ uses payroll/vendor invoice support, and LSC uses consolidated actuals plus intercompany paid-cost treatment.
 
 ### 4. Payments
 
@@ -157,7 +163,7 @@ Purpose:
 
 Main sections:
 
-- root index page with company selector: `TBR` or `FSP`
+- root index page with company selector: `LSC`, `TBR`, `FSP`, or `XTZ`
 - company workspace route after selection
 - workspace cards:
   - payment overview
@@ -178,7 +184,7 @@ Purpose:
 
 Main sections:
 
-- root index page with company selector: `TBR` or `FSP`
+- root index page with company selector: `LSC`, `TBR`, `FSP`, or `XTZ`
 - company workspace route after selection
 - workspace cards:
   - snapshot
@@ -215,7 +221,7 @@ Purpose:
 
 Main sections:
 
-- root index page with company selector: `TBR` or `FSP`
+- root index page with company selector: `LSC`, `TBR`, `FSP`, or `XTZ`
 - company workspace route after selection
 - workflow cards for the selected company
 - analyzer intake surface
@@ -308,7 +314,6 @@ Visual direction:
 Do not include these in v1 unless source definitions become stable:
 
 - advanced forecasting engine
-- fully operational FSP dashboard
 - CRM-style sponsorship pipeline system
 - document OCR workflow
 - write-back expense submission portal

@@ -119,14 +119,18 @@ export default async function ReceivablesCompanyPage({ params, searchParams }: R
           workstreams={workstreams}
         />
         <section className="grid-two">
-          <article className="card placeholder-card">
+          <article className="card action-state-card">
             <div className="card-title-row">
               <div>
-                <span className="section-kicker">Selected company</span>
-                <h3>FSP receivables will appear once sponsorship invoices exist</h3>
+                <span className="section-kicker">FSP receivable control</span>
+                <h3>Sponsorship receivables will activate after approved actual invoices</h3>
               </div>
-              <span className="badge">Placeholder</span>
+              <span className="badge">Actuals only</span>
             </div>
+            <p className="muted">
+              FSP sponsorship pipeline and sport scenario revenue remain in FSP dashboards. This
+              ledger shows only approved receivable invoices and collection tranches.
+            </p>
           </article>
         </section>
       </div>

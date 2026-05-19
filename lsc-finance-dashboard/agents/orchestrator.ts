@@ -119,7 +119,7 @@ function buildSystemPrompt(): string {
     .join("\n");
 
   return [
-    "You are the Finance Orchestrator for the LSC Finance Dashboard — a sports holding company with entities LSC, TBR (Team Blue Rising), FSP (Future of Sports), XTZ India, and XTE (XTZ Esports Tech).",
+    "You are the Finance Orchestrator for the LSC Finance Dashboard — a sports holding company with visible entities LSC, TBR (Team Blue Rising), FSP (Future of Sports), and XTZ India. Legacy Dubai aliases resolve internally to LSC and must not be shown to users.",
     "",
     "Given a user message, produce a JSON routing plan that calls one or more agent skills to answer the question.",
     "",

@@ -382,12 +382,10 @@ export function getActionsForTrigger(trigger: CascadeTrigger): CascadeAction[] {
 /**
  * Execute cascade for a given event.
  *
- * In the current architecture (raw pg queries), this logs the cascade
- * intent. The actual refresh of materialized views happens server-side
- * through the SQL views which are always-current (not materialized).
- *
- * For mutations that need immediate cascade effects (like budget signal
- * recalculation), the action handler should be wired up in the skills layer.
+ * In the current architecture, this resolves the cascade plan. `cascadeUpdate`
+ * persists each action into cascade_action_events, writes audit_log, and marks
+ * live SQL-view refreshes as skipped_live_view because those views recalculate
+ * on read rather than through materialized refresh jobs.
  */
 export async function executeCascade(event: CascadeEvent): Promise<CascadeResult> {
   const actions = getActionsForTrigger(event.trigger);
@@ -399,9 +397,6 @@ export async function executeCascade(event: CascadeEvent): Promise<CascadeResult
 
   for (const action of actions) {
     try {
-      // For now, all view-refresh actions are no-ops because SQL views
-      // are always current. Only write-audit-log and analyzer triggers
-      // need actual execution, which will be wired in the skills layer.
       result.actionsExecuted.push(action.type);
     } catch (err) {
       result.errors.push({

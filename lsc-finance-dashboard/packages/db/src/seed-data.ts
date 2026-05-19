@@ -5,7 +5,7 @@ export const dashboardOverview = [
   { label: "Cash", value: "$0", scope: "LSC Consolidated" },
   { label: "Receivables", value: "$0", scope: "LSC Consolidated" },
   { label: "Upcoming Payments", value: "$0", scope: "LSC Consolidated" },
-  { label: "MRR", value: "$0", scope: "FSP Placeholder" },
+  { label: "FSP Scenario MRR", value: "$0", scope: "FSP planning only" },
   { label: "Sponsor Count", value: "0", scope: "TBR" }
 ] as const;
 
@@ -35,8 +35,8 @@ export const upcomingPayments = [
 ] as const;
 
 export const sponsorBreakdown = [
-  { name: "Sponsor Placeholder A", contractValue: "$0", recognizedRevenue: "$0", cashCollected: "$0" },
-  { name: "Sponsor Placeholder B", contractValue: "$0", recognizedRevenue: "$0", cashCollected: "$0" }
+  { name: "Sponsor setup slot A", contractValue: "$0", recognizedRevenue: "$0", cashCollected: "$0" },
+  { name: "Sponsor setup slot B", contractValue: "$0", recognizedRevenue: "$0", cashCollected: "$0" }
 ] as const;
 
 export const tbrRaceCosts = [

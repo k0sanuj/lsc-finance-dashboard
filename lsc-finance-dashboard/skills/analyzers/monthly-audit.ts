@@ -306,7 +306,7 @@ export async function runMonthlyAuditAll(opts: {
   performedBy?: string;
 }): Promise<CompanyAuditResult[]> {
   const companies = await queryRowsAdmin<{ code: string }>(
-    `select code::text from companies where code in ('LSC','TBR','FSP','XTZ','XTE') order by code`
+    `select code::text from companies where code in ('LSC','TBR','FSP','XTZ') order by code`
   ).catch(() => []);
 
   const results: CompanyAuditResult[] = [];

@@ -326,3 +326,40 @@ Approved revenue rules:
 
 - Season 1 includes `USD 250,000` sponsorship revenue from `Classic Car Club Manhattan`
 - Season 2 includes `EUR 100,000` prize money, preserved in EUR and converted to USD for reporting
+
+### Finance Recognition Buckets
+
+Definition:
+
+Shared backend reporting contract that separates values into actuals, committed exposure, planning/scenario values, and excluded/quarantined rows.
+
+Finance treatment:
+
+- actual revenue/cost/cash affects entity metrics and, except FSP scenario-only values, the LSC holding view
+- committed payables/receivables show obligation pressure but do not affect approved cost or cash until settled
+- planning/scenario values are visible inside their entity dashboards only
+- quarantined QA/test rows remain in source tables but are excluded from default finance views
+
+### Quarantined Reporting Data
+
+Definition:
+
+Rows marked in `finance_reporting_exclusions` with `excluded_from_reporting = true`.
+
+Finance treatment:
+
+- preserved for audit and lineage
+- excluded from consolidated metrics, monthly summaries, payables, and entity recognition views
+- visible only in admin/system reporting surfaces
+
+### TBR Management P&L Cost
+
+Definition:
+
+Backend-derived TBR season cost from `tbr_overall_pnl_by_season`, including operating baseline plus E1 variance/incremental cost under the approved no-double-count policy.
+
+Finance treatment:
+
+- used for TBR management P&L and entity dashboard cost visibility
+- supplements generic approved expense rows when those rows do not yet represent the season-control workbook/E1 ledger
+- does not double count E1 overlap rows already covered by operating baseline

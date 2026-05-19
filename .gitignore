@@ -38,6 +38,7 @@ exports/
 # Test outputs
 playwright-report/
 test-results/
+*.tsbuildinfo
 
 # Local workspace artifacts
 .pnpm-store/

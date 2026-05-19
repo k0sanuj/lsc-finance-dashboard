@@ -31,7 +31,7 @@ async function main() {
   try {
     await client.query("begin");
 
-    // --- XTZ Esports Tech Limited (XTE) ---
+    // --- Legacy Dubai entity alias, now represented to users as LSC ---
     const xteRes = await client.query(`select id from companies where code = 'XTE'::company_code`);
     let xteId = xteRes.rows[0]?.id;
     if (!xteId) {
@@ -39,7 +39,7 @@ async function main() {
         `insert into companies (code, name) values ('XTE'::company_code, 'XTZ Esports Tech Limited') returning id`
       );
       xteId = ins.rows[0].id;
-      console.log("Created XTZ Esports Tech Limited (XTE).");
+      console.log("Created legacy Dubai company alias for LSC compatibility.");
     }
 
     // Get existing company IDs
@@ -66,7 +66,7 @@ async function main() {
     }
     console.log(`Seeded ${sports.length} FSP sports.`);
 
-    // --- Sample employees (XTZ India — these are the ones who will be on XTZ India payroll invoiced to XTE) ---
+    // --- Sample employees (XTZ India — these are the ones who will be on XTZ India payroll invoiced to LSC/Dubai) ---
     const sampleEmployees = [
       { name: "Anuj Kumar Singh", email: "anuj@leaguesportsco.com", designation: "CEO & Finance Lead", dept: "Executive", type: "full_time", salary: 0, cur: "INR" },
       { name: "AK", email: "ak@leaguesportsco.com", designation: "Operations Lead", dept: "Operations", type: "full_time", salary: 0, cur: "INR" },

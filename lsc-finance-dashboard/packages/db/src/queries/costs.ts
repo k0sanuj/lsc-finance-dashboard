@@ -180,12 +180,12 @@ export async function getCostInsights(companyCode: "TBR" | "FSP" = "TBR") {
   if (companyCode === "FSP") {
     return [
       {
-        title: "FSP cost workspace is still preparatory",
-        summary: "Keep the structure ready for launch costs, but do not over-interpret placeholder values before FSP has live operating records."
+        title: "FSP costs are scenario/planning until approved actuals exist",
+        summary: "Sport-level planning cost is visible inside FSP dashboards and stays outside LSC consolidation until promoted through the approved-actual gate."
       },
       {
-        title: "Use the same operating model later",
-        summary: "When FSP costs arrive, review them by category, by source document, and by payable timing just like TBR."
+        title: "Use sport cockpit data before generic expense rows",
+        summary: "Squash and future sport modules should show scenario P&L, media, sponsorship, and OPEX inside FSP without pushing planning values into LSC."
       }
     ] satisfies CostInsightRow[];
   }

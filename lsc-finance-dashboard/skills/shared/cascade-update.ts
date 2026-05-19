@@ -13,6 +13,7 @@
 
 import { executeCascade, type CascadeEvent, type CascadeResult } from "../../ontology/cascades";
 import { writeAuditLog } from "./audit-log";
+import { executeAdmin } from "@lsc/db";
 
 export type CascadeInput = CascadeEvent & {
   /** Short imperative action name, e.g. 'approve', 'post', 'create', 'update', 'delete' */
@@ -40,6 +41,37 @@ export async function cascadeUpdate(event: CascadeInput): Promise<CascadeResult>
         },
       ],
     };
+  }
+
+  for (const action of result.actionsExecuted) {
+    const executionStatus = action.startsWith("refresh-") ? "skipped_live_view" : action.startsWith("trigger-") ? "queued" : "executed";
+    try {
+      await executeAdmin(
+        `insert into cascade_action_events (
+           trigger, entity_type, entity_id, action_type, execution_status,
+           performed_by, agent_id, metadata
+         )
+         values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+        [
+          event.trigger,
+          event.entityType,
+          event.entityId,
+          action,
+          executionStatus,
+          event.performedBy ?? null,
+          event.agentId ?? null,
+          JSON.stringify({
+            liveView: executionStatus === "skipped_live_view",
+            queuedAnalyzer: executionStatus === "queued",
+          }),
+        ]
+      );
+    } catch (err) {
+      result.errors.push({
+        action,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   await writeAuditLog({
