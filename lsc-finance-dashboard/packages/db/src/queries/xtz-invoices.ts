@@ -433,12 +433,39 @@ export type XtzInvoiceSummary = {
   paidCount: number;
   pendingCount: number;
   latestInvoice: XtzInvoiceHeaderRow | null;
+  statusMix: Array<{
+    status: string;
+    count: number;
+    totalAmount: number;
+  }>;
+  monthlyTrend: Array<{
+    month: string;
+    count: number;
+    totalAmount: number;
+  }>;
 };
 
 export async function getXtzInvoiceSummary(): Promise<XtzInvoiceSummary> {
   const invoices = await getXtzInvoices({ includeVoided: true });
   const activeInvoices = invoices.filter((i) => i.status !== "void");
   const usdInvoices = activeInvoices.filter((i) => i.currency === "USD");
+  const statusMix = ["generated", "sent", "paid", "void"].map((status) => {
+    const scopedInvoices = invoices.filter((invoice) => invoice.status === status);
+    return {
+      status,
+      count: scopedInvoices.length,
+      totalAmount: scopedInvoices.reduce((sum, invoice) => sum + (invoice.currency === "USD" ? invoice.totalAmount : 0), 0)
+    };
+  });
+  const monthMap = new Map<string, { month: string; count: number; totalAmount: number }>();
+  for (const invoice of activeInvoices) {
+    const key = invoice.payrollMonthRaw || invoice.payrollMonth;
+    const current = monthMap.get(key) ?? { month: invoice.payrollMonth, count: 0, totalAmount: 0 };
+    current.count += 1;
+    current.totalAmount += invoice.currency === "USD" ? invoice.totalAmount : 0;
+    monthMap.set(key, current);
+  }
+
   return {
     totalInvoices: invoices.length,
     totalInvoicedUsd: usdInvoices.reduce((s, i) => s + i.totalAmount, 0),
@@ -450,7 +477,12 @@ export async function getXtzInvoiceSummary(): Promise<XtzInvoiceSummary> {
     pendingCount: activeInvoices.filter(
       (i) => i.status === "generated" || i.status === "sent"
     ).length,
-    latestInvoice: activeInvoices[0] ?? null
+    latestInvoice: activeInvoices[0] ?? null,
+    statusMix,
+    monthlyTrend: [...monthMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([, row]) => row)
   };
 }
 

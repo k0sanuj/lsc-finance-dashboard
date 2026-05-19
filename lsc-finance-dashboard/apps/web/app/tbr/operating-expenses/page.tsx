@@ -1,10 +1,9 @@
 import Link from "next/link";
+import { CircleDollarSign, Flag, ListChecks, Wrench } from "lucide-react";
 import { getTbrOperatingExpenseDashboard } from "@lsc/db";
-import {
-  HorizontalMetricBars,
-  formatCompactCurrency,
-  type HorizontalBarRow
-} from "../../components/dashboard-charts";
+import { formatCompactCurrency } from "../../components/dashboard-charts";
+import { HorizontalComparisonChart, StatusDonutChart, type ChartDatum } from "../../components/lsc-dashboard-charts";
+import { MetricTile, Panel } from "../../components/lsc-blue-primitives";
 import { requireRole } from "../../../lib/auth";
 import { addTbrOperatingExpenseLineAction } from "./actions";
 
@@ -55,21 +54,21 @@ export default async function TbrOperatingExpensesPage({ searchParams }: PagePro
     selectedAmount: includeSpares ? row.totalOperatingExpense : row.totalOperatingExpenseExSpares
   }));
   const matrixRows = includeSpares ? data.matrix : data.matrix.filter((row) => !row.isSpareParts);
-  const categoryChartRows: HorizontalBarRow[] = categoryRows
+  const categoryChartRows: ChartDatum[] = categoryRows
     .filter((row) => row.reportingAmountUsd > 0)
     .map((row) => ({
-      label: row.categoryName,
+      name: row.categoryName,
       value: row.reportingAmountUsd,
       displayValue: row.amount,
-      tone: row.isSpareParts ? "risk" : "secondary"
+      tone: row.isSpareParts ? "ruby" : "brand"
     }));
-  const raceChartRows: HorizontalBarRow[] = raceRows
+  const raceChartRows: ChartDatum[] = raceRows
     .filter((row) => row.selectedAmountUsd > 0)
     .map((row) => ({
-      label: row.raceName,
+      name: row.raceName,
       value: row.selectedAmountUsd,
       displayValue: row.selectedAmount,
-      tone: row.sparePartsUsd > 0 && includeSpares ? "warn" : "good"
+      tone: row.sparePartsUsd > 0 && includeSpares ? "amber" : "good"
     }));
 
   return (
@@ -133,56 +132,26 @@ export default async function TbrOperatingExpensesPage({ searchParams }: PagePro
         </div>
       </section>
 
-      <section className="stats-grid compact-stats">
-        <article className="metric-card accent-brand">
-          <div className="metric-topline">
-            <span className="metric-label">Operating baseline</span>
-          </div>
-          <div className="metric-value">{includeSpares ? summary?.totalOperatingExpense : summary?.totalOperatingExpenseExSpares}</div>
-          <span className="metric-subvalue">{summary?.seasonLabel ?? selectedSeason}</span>
-        </article>
-        <article className="metric-card accent-risk">
-          <div className="metric-topline">
-            <span className="metric-label">Spare parts</span>
-          </div>
-          <div className="metric-value">{summary?.spareParts ?? "$0"}</div>
-          <span className="metric-subvalue">Tracked separately for sensitivity</span>
-        </article>
-        <article className="metric-card accent-good">
-          <div className="metric-topline">
-            <span className="metric-label">Categories</span>
-          </div>
-          <div className="metric-value">{summary?.categoryCount ?? 0}</div>
-          <span className="metric-subvalue">Top-table canonical rows</span>
-        </article>
-        <article className="metric-card accent-warn">
-          <div className="metric-topline">
-            <span className="metric-label">Race rows</span>
-          </div>
-          <div className="metric-value">{matrixRows.length}</div>
-          <span className="metric-subvalue">Matrix cells with assigned values</span>
-        </article>
+      <section className="analytics-kpi-grid">
+        <MetricTile
+          icon={CircleDollarSign}
+          label="Operating baseline"
+          value={includeSpares ? summary?.totalOperatingExpense : summary?.totalOperatingExpenseExSpares}
+          helper={summary?.seasonLabel ?? selectedSeason}
+          tone="brand"
+        />
+        <MetricTile icon={Wrench} label="Spare parts" value={summary?.spareParts ?? "$0"} helper="Tracked separately for sensitivity" tone="ruby" />
+        <MetricTile icon={ListChecks} label="Categories" value={summary?.categoryCount ?? 0} helper="Top-table canonical rows" tone="good" />
+        <MetricTile icon={Flag} label="Race rows" value={matrixRows.length} helper="Matrix cells with assigned values" tone="amber" />
       </section>
 
-      <section className="grid-two">
-        <article className="card compact-section-card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">Category mix</span>
-              <h3>Operating expense composition</h3>
-            </div>
-          </div>
-          <HorizontalMetricBars rows={categoryChartRows} />
-        </article>
-        <article className="card compact-section-card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">Race cost control</span>
-              <h3>Race and allocation totals</h3>
-            </div>
-          </div>
-          <HorizontalMetricBars rows={raceChartRows} />
-        </article>
+      <section className="lsc-dashboard-two-one-grid">
+        <Panel className="dashboard-chart-panel" title="Operating expense composition" subtitle="Category mix from canonical season controls.">
+          <StatusDonutChart data={categoryChartRows} height={245} />
+        </Panel>
+        <Panel className="dashboard-chart-panel" title="Race and allocation totals" subtitle="Race cost control with spare-parts treatment applied.">
+          <HorizontalComparisonChart data={raceChartRows} height={285} />
+        </Panel>
       </section>
 
       <section className="card compact-section-card">

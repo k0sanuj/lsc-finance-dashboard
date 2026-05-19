@@ -81,6 +81,49 @@ for (const marker of ["rail-nav", "Overview", "LSC", "TBR", "FSP", "XTZ", "Costs
   }
 }
 
+if (shell.includes("XTE")) {
+  findings.push({
+    file: "apps/web/app/session-shell.tsx",
+    line: lineFor(shell, shell.indexOf("XTE")),
+    ruleId: "visible-xte",
+    detail: "XTE must stay hidden from visible navigation and selectors.",
+  });
+}
+
+const chartComponent = fs.readFileSync(path.join(appDir, "components", "lsc-dashboard-charts.tsx"), "utf8");
+if (!chartComponent.includes("from \"recharts\"")) {
+  findings.push({
+    file: "apps/web/app/components/lsc-dashboard-charts.tsx",
+    line: 1,
+    ruleId: "recharts-layer",
+    detail: "Dashboard redesign must render through the shared Recharts layer.",
+  });
+}
+
+const priorityDashboardFiles = [
+  "page.tsx",
+  path.join("tbr", "operating-expenses", "page.tsx"),
+  path.join("tbr", "e1-accounting", "page.tsx"),
+  path.join("tbr", "overall-pnl", "page.tsx"),
+  path.join("fsp", "sports", "page.tsx"),
+  path.join("payroll-invoices", "page.tsx"),
+];
+
+for (const relativeFile of priorityDashboardFiles) {
+  const absoluteFile = path.join(appDir, relativeFile);
+  const content = fs.readFileSync(absoluteFile, "utf8");
+  for (const legacy of ["HorizontalMetricBars", "CashTrendChart"]) {
+    const index = content.indexOf(legacy);
+    if (index === -1) continue;
+    findings.push({
+      file: path.relative(rootDir, absoluteFile),
+      line: lineFor(content, index),
+      ruleId: "legacy-dashboard-chart",
+      detail: `Priority dashboard should use shared Recharts primitives instead of ${legacy}.`,
+    });
+  }
+}
+
 if (findings.length > 0) {
   console.log(`LSC Blue UI audit found ${findings.length} finding${findings.length === 1 ? "" : "s"}:`);
   for (const finding of findings) {

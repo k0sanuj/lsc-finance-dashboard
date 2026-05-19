@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { Fragment } from "react";
+import { AlertTriangle, CircleDollarSign, CreditCard, ReceiptText } from "lucide-react";
 import { getTbrE1AccountingDashboard } from "@lsc/db";
-import {
-  HorizontalMetricBars,
-  type HorizontalBarRow
-} from "../../components/dashboard-charts";
+import { HorizontalComparisonChart, StatusDonutChart, type ChartDatum } from "../../components/lsc-dashboard-charts";
+import { MetricTile, Panel } from "../../components/lsc-blue-primitives";
 import {
   AutoSubmitFileInput,
   AutoSubmitSelect,
@@ -94,13 +93,13 @@ export default async function TbrE1AccountingPage({ searchParams }: PageProps) {
   const data = await getTbrE1AccountingDashboard(params.season?.toUpperCase());
   const summary = data.summary;
 
-  const statusRows: HorizontalBarRow[] = summary
+  const statusRows: ChartDatum[] = summary
     ? [
-        { label: "Paid", value: summary.paidAmountUsd, displayValue: summary.paidAmount, tone: "good" },
-        { label: "Due / open", value: summary.dueAmountUsd, displayValue: summary.dueAmount, tone: "risk" },
-        { label: "Credit notes", value: summary.creditNoteAmountUsd, displayValue: summary.creditNoteAmount, tone: "warn" },
-        { label: "Overlap-visible", value: summary.overlapVisibleAmountUsd, displayValue: summary.overlapVisibleAmount, tone: "secondary" },
-        { label: "Incremental-visible", value: summary.incrementalVisibleAmountUsd, displayValue: summary.incrementalVisibleAmount, tone: "good" }
+        { name: "Paid", value: summary.paidAmountUsd, displayValue: summary.paidAmount, tone: "good" },
+        { name: "Due / open", value: summary.dueAmountUsd, displayValue: summary.dueAmount, tone: "ruby" },
+        { name: "Credit notes", value: summary.creditNoteAmountUsd, displayValue: summary.creditNoteAmount, tone: "amber" },
+        { name: "Overlap-visible", value: summary.overlapVisibleAmountUsd, displayValue: summary.overlapVisibleAmount, tone: "brand" },
+        { name: "Incremental-visible", value: summary.incrementalVisibleAmountUsd, displayValue: summary.incrementalVisibleAmount, tone: "good" }
       ]
     : [];
 
@@ -151,61 +150,41 @@ export default async function TbrE1AccountingPage({ searchParams }: PageProps) {
         </div>
       </section>
 
-      <section className="stats-grid compact-stats">
-        <article className="metric-card accent-brand">
-          <div className="metric-topline">
-            <span className="metric-label">Gross E1 ledger</span>
-          </div>
-          <div className="metric-value">{summary?.grossE1Amount ?? "$0"}</div>
-          <span className="metric-subvalue">Source-visible invoice/support amount</span>
-        </article>
-        <article className="metric-card accent-good">
-          <div className="metric-topline">
-            <span className="metric-label">Paid</span>
-          </div>
-          <div className="metric-value">{summary?.paidAmount ?? "$0"}</div>
-          <span className="metric-subvalue">Rows marked paid</span>
-        </article>
-        <article className="metric-card accent-risk">
-          <div className="metric-topline">
-            <span className="metric-label">Due / open</span>
-          </div>
-          <div className="metric-value">{summary?.dueAmount ?? "$0"}</div>
-          <span className="metric-subvalue">Due amount from source sheet or platform edits</span>
-        </article>
-        <article className="metric-card accent-warn">
-          <div className="metric-topline">
-            <span className="metric-label">Excluded / pending</span>
-          </div>
-          <div className="metric-value">{(summary?.excludedLineCount ?? 0) + (summary?.pendingReviewCount ?? 0)}</div>
-          <span className="metric-subvalue">Not counted in P&amp;L yet</span>
-        </article>
+      <section className="analytics-kpi-grid">
+        <MetricTile icon={ReceiptText} label="Gross E1 ledger" value={summary?.grossE1Amount ?? "$0"} helper="Source-visible invoice/support amount" tone="brand" />
+        <MetricTile icon={CreditCard} label="Paid" value={summary?.paidAmount ?? "$0"} helper="Rows marked paid" tone="good" />
+        <MetricTile icon={CircleDollarSign} label="Due / open" value={summary?.dueAmount ?? "$0"} helper="Due amount from source sheet or platform edits" tone="ruby" />
+        <MetricTile
+          icon={AlertTriangle}
+          label="Excluded / pending"
+          value={(summary?.excludedLineCount ?? 0) + (summary?.pendingReviewCount ?? 0)}
+          helper="Not counted in P&L yet"
+          tone="amber"
+        />
       </section>
 
-      <section className="grid-two">
-        <article className="card compact-section-card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">Accounting status</span>
-              <h3>Paid, due, credit and treatment</h3>
-            </div>
+      <section className="lsc-dashboard-two-one-grid">
+        <Panel className="dashboard-chart-panel" title="Paid, due, credit and treatment" subtitle="E1 status mix by USD amount.">
+          <StatusDonutChart data={statusRows} height={245} />
+        </Panel>
+        <Panel className="dashboard-chart-panel" title="Invoice amount by status" subtitle="Ranked control view for finance follow-up.">
+          <HorizontalComparisonChart data={statusRows} height={285} />
+        </Panel>
+      </section>
+
+      <section className="card compact-section-card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">P&amp;L control</span>
+            <h3>Variance-only reconciliation rule</h3>
           </div>
-          <HorizontalMetricBars rows={statusRows} />
-        </article>
-        <article className="card compact-section-card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">P&amp;L control</span>
-              <h3>Variance-only reconciliation rule</h3>
-            </div>
-            <span className="badge">No double count</span>
-          </div>
+          <span className="badge">No double count</span>
+        </div>
           <p>
             E1 rows mapped to catering, insurance, pilot training, spare parts, pre-season testing,
             or VIP support do not automatically add cost in Overall P&amp;L. Costs can still show the
             invoice ledger as active payable evidence based on row status.
           </p>
-        </article>
       </section>
 
       <section className="card compact-section-card">

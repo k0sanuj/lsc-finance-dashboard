@@ -1,8 +1,11 @@
 import Link from "next/link";
 import type { Route } from "next";
+import { Bot, CircleDollarSign, Layers3, Scale } from "lucide-react";
 import { requireRole } from "../../../lib/auth";
 import { getAiIntakeQueue, getFspPnlSummaries, getFspSports, getSportModuleCompleteness } from "@lsc/db";
-import { HorizontalMetricBars, formatCompactCurrency } from "../../components/dashboard-charts";
+import { formatCompactCurrency } from "../../components/dashboard-charts";
+import { HorizontalComparisonChart, StatusDonutChart, type ChartDatum } from "../../components/lsc-dashboard-charts";
+import { MetricTile, Panel } from "../../components/lsc-blue-primitives";
 
 const fallbackSports = [
   { id: "fb-1", sportCode: "basketball", displayName: "Basketball", leagueName: "FSP Basketball League", isActive: true },
@@ -72,11 +75,32 @@ export default async function FspSportsPage(): Promise<React.ReactElement> {
   const totalRevenue = pnlSummaries.reduce((sum, sport) => sum + sport.revenueY1, 0);
   const totalCost = pnlSummaries.reduce((sum, sport) => sum + sport.cogsY1 + sport.opexY1, 0);
   const totalEbitda = pnlSummaries.reduce((sum, sport) => sum + sport.ebitdaY1, 0);
+  const fspWithFinancials = pnlSummaries.filter(
+    (sport) => sport.revenueY1 > 0 || sport.cogsY1 > 0 || sport.opexY1 > 0 || sport.ebitdaY1 !== 0
+  );
   const activeSports = sports.filter((sport) => sport.isActive).length;
   const draftsNeedingReview = aiDrafts.filter((draft) => draft.status === "needs_review").length;
   const postedDrafts = aiDrafts.filter((draft) => draft.status === "posted").length;
   const mediaDrafts = aiDrafts.filter((draft) => draft.targetKind === "fsp_sport_media_kit").length;
   const sponsorshipDrafts = aiDrafts.filter((draft) => draft.targetKind === "fsp_sport_sponsorship_document").length;
+  const portfolioRows: ChartDatum[] = [
+    { name: "Y1 revenue", value: totalRevenue, displayValue: fmt(totalRevenue), tone: "good" },
+    { name: "Y1 cost", value: totalCost, displayValue: fmt(totalCost), tone: "ruby" },
+    { name: "Y1 EBITDA", value: Math.abs(totalEbitda), displayValue: fmt(totalEbitda), tone: totalEbitda >= 0 ? "good" : "ruby" },
+  ];
+  const sportMixRows: ChartDatum[] = pnlSummaries.slice(0, 8).map((sport) => ({
+    name: sport.sportName,
+    value: Math.abs(sport.ebitdaY1),
+    displayValue: fmt(sport.ebitdaY1),
+    sublabel: `Revenue ${fmt(sport.revenueY1)}`,
+    tone: sport.ebitdaY1 >= 0 ? "good" : "ruby"
+  }));
+  const aiQueueRows: ChartDatum[] = [
+    { name: "Needs preview", value: draftsNeedingReview, displayValue: String(draftsNeedingReview), tone: "amber" },
+    { name: "Posted", value: postedDrafts, displayValue: String(postedDrafts), tone: "good" },
+    { name: "Media kits", value: mediaDrafts, displayValue: String(mediaDrafts), tone: "brand" },
+    { name: "Sponsorship docs", value: sponsorshipDrafts, displayValue: String(sponsorshipDrafts), tone: "iris" },
+  ];
 
   return (
     <div className="page-grid">
@@ -93,54 +117,42 @@ export default async function FspSportsPage(): Promise<React.ReactElement> {
         </div>
       </section>
 
-      <section className="stats-grid compact-stats">
-        <article className="metric-card accent-brand">
-          <div className="metric-topline"><span className="metric-label">Sports</span></div>
-          <div className="metric-value">{sports.length}</div>
-          <span className="metric-subvalue">{activeSports} active</span>
-        </article>
-        <article className="metric-card accent-good">
-          <div className="metric-topline"><span className="metric-label">Y1 revenue</span></div>
-          <div className="metric-value">{fmt(totalRevenue)}</div>
-        </article>
-        <article className="metric-card accent-risk">
-          <div className="metric-topline"><span className="metric-label">Y1 cost</span></div>
-          <div className="metric-value">{fmt(totalCost)}</div>
-        </article>
-        <article className={`metric-card ${totalEbitda >= 0 ? "accent-good" : "accent-risk"}`}>
-          <div className="metric-topline"><span className="metric-label">Y1 EBITDA</span></div>
-          <div className="metric-value">{fmt(totalEbitda)}</div>
-        </article>
+      <section className="analytics-kpi-grid">
+        <MetricTile icon={Layers3} label="Sports" value={sports.length} helper={`${activeSports} active`} tone="brand" />
+        <MetricTile icon={CircleDollarSign} label="Y1 revenue" value={fmt(totalRevenue)} helper="Scenario base case" tone="good" />
+        <MetricTile icon={CircleDollarSign} label="Y1 cost" value={fmt(totalCost)} helper="COGS + opex" tone="ruby" />
+        <MetricTile icon={Scale} label="Y1 EBITDA" value={fmt(totalEbitda)} helper="Portfolio scenario result" tone={totalEbitda >= 0 ? "good" : "ruby"} />
       </section>
 
-      <section className="grid-two">
-        <article className="card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">AI source intake</span>
-              <h3>Sports documents waiting for approval</h3>
-            </div>
-            <span className="badge">{aiDrafts.length} recent drafts</span>
-          </div>
-          <div className="mini-metric-grid">
-            <div className="mini-metric">
-              <span>Needs preview</span>
-              <strong>{draftsNeedingReview}</strong>
-            </div>
-            <div className="mini-metric">
-              <span>Posted</span>
-              <strong>{postedDrafts}</strong>
-            </div>
-            <div className="mini-metric">
-              <span>Media kits</span>
-              <strong>{mediaDrafts}</strong>
-            </div>
-            <div className="mini-metric">
-              <span>Sponsorship docs</span>
-              <strong>{sponsorshipDrafts}</strong>
-            </div>
-          </div>
-        </article>
+      <section className="lsc-dashboard-two-one-grid">
+        <Panel
+          className="dashboard-chart-panel"
+          title="Portfolio financial shape"
+          subtitle="Revenue, cost, and EBITDA from FSP base scenario."
+          trailing={<span className="badge">{fspWithFinancials.length} modeled</span>}
+        >
+          <StatusDonutChart data={portfolioRows} height={245} />
+        </Panel>
+
+        <Panel
+          className="dashboard-chart-panel"
+          title="Sport asset EBITDA"
+          subtitle="Ranked sport mix by Y1 EBITDA."
+          trailing={<Link className="ghost-link" href={"/fsp/consolidated" as Route}>Consolidated P&L</Link>}
+        >
+          <HorizontalComparisonChart data={sportMixRows} height={285} />
+        </Panel>
+      </section>
+
+      <section className="lsc-dashboard-two-one-grid">
+        <Panel
+          className="dashboard-chart-panel"
+          title="Sports documents waiting for approval"
+          subtitle="AI queue by intake state and source type."
+          trailing={<span className="badge">{aiDrafts.length} recent drafts</span>}
+        >
+          <StatusDonutChart data={aiQueueRows} height={245} />
+        </Panel>
 
         <article className="card">
           <div className="card-title-row">
@@ -217,12 +229,13 @@ export default async function FspSportsPage(): Promise<React.ReactElement> {
                 <div><span>EBITDA</span><strong>{fmt(ebitda)}</strong></div>
               </div>
 
-              <HorizontalMetricBars
-                rows={[
-                  { label: "Sponsorship pipeline", value: counts.sponsorships, displayValue: `${counts.sponsorships} records`, tone: "good" },
-                  { label: "Media setup", value: counts.mediaChannelsConfigured, displayValue: `${counts.mediaChannelsConfigured} channels`, tone: "secondary" },
-                  { label: "Production cost stack", value: counts.productionItems, displayValue: `${counts.productionItems} lines`, tone: "warn" },
-                  { label: "Module completeness", value: score, displayValue: `${score}%`, tone: score >= 70 ? "good" : "warn" },
+              <HorizontalComparisonChart
+                height={160}
+                data={[
+                  { name: "Sponsorship", value: counts.sponsorships, displayValue: `${counts.sponsorships} records`, tone: "good" },
+                  { name: "Media", value: counts.mediaChannelsConfigured, displayValue: `${counts.mediaChannelsConfigured} channels`, tone: "brand" },
+                  { name: "Production", value: counts.productionItems, displayValue: `${counts.productionItems} lines`, tone: "amber" },
+                  { name: "Completeness", value: score, displayValue: `${score}%`, tone: score >= 70 ? "good" : "amber" },
                 ]}
               />
 

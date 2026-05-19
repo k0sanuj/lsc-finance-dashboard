@@ -24,12 +24,60 @@ import {
 } from "./shared";
 
 const visibleEntityCodes = ["LSC", "TBR", "FSP", "XTZ"] as const;
+type VisibleEntityCode = (typeof visibleEntityCodes)[number];
 
-function normalizeVisibleCompanyCode(value: string): (typeof visibleEntityCodes)[number] {
+export type OverviewTrendPoint = {
+  month: string;
+  revenueUsd: number;
+  costUsd: number;
+  marginUsd: number;
+  cashInUsd: number;
+  cashOutUsd: number;
+  netCashUsd: number;
+  revenue: string;
+  cost: string;
+  margin: string;
+  cashIn: string;
+  cashOut: string;
+  netCash: string;
+};
+
+export type OverviewEntityChartPoint = {
+  code: VisibleEntityCode;
+  label: string;
+  revenueUsd: number;
+  costUsd: number;
+  marginUsd: number;
+  revenue: string;
+  cost: string;
+  margin: string;
+};
+
+export type OverviewBucketChartPoint = {
+  key: string;
+  label: string;
+  amountUsd: number;
+  count: number;
+  amount: string;
+};
+
+export type OverviewAnalytics = {
+  trend: OverviewTrendPoint[];
+  entities: OverviewEntityChartPoint[];
+  receivables: OverviewBucketChartPoint[];
+  payables: OverviewBucketChartPoint[];
+};
+
+function numeric(value: string | number | null | undefined) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeVisibleCompanyCode(value: string): VisibleEntityCode {
   const upper = value.toUpperCase();
   if (upper === "XTE") return "LSC";
-  return visibleEntityCodes.includes(upper as (typeof visibleEntityCodes)[number])
-    ? (upper as (typeof visibleEntityCodes)[number])
+  return visibleEntityCodes.includes(upper as VisibleEntityCode)
+    ? (upper as VisibleEntityCode)
     : "LSC";
 }
 
@@ -187,6 +235,149 @@ async function getDbMonthlyCashFlow(): Promise<CashFlowRow[]> {
         net: formatCurrency(cashIn - cashOut)
       };
     });
+}
+
+async function getDbOverviewAnalytics(): Promise<OverviewAnalytics> {
+  const [trendRows, entityRows, receivableRows, payableRows] = await Promise.all([
+    queryRows<{
+      month_start: string | null;
+      recognized_revenue: string;
+      approved_expenses: string;
+      margin: string;
+      cash_in: string;
+      cash_out: string;
+    }>(
+      `select
+         month_start,
+         coalesce(sum(recognized_revenue), 0)::numeric(14,2)::text as recognized_revenue,
+         coalesce(sum(approved_expenses), 0)::numeric(14,2)::text as approved_expenses,
+         coalesce(sum(recognized_revenue - approved_expenses), 0)::numeric(14,2)::text as margin,
+         coalesce(sum(cash_in), 0)::numeric(14,2)::text as cash_in,
+         coalesce(sum(cash_out), 0)::numeric(14,2)::text as cash_out
+       from monthly_financial_summary
+       where company_code::text in ('LSC', 'TBR', 'FSP', 'XTZ', 'XTE')
+         and month_start is not null
+       group by month_start
+       order by month_start desc
+       limit 6`
+    ),
+    queryRows<{
+      company_code: string;
+      recognized_revenue: string;
+      approved_expenses: string;
+      margin: string;
+    }>(
+      `with visible_metrics as (
+         select
+           case when company_code::text = 'XTE' then 'LSC' else company_code::text end as company_code,
+           coalesce(sum(recognized_revenue), 0)::numeric(14,2)::text as recognized_revenue,
+           coalesce(sum(approved_expenses), 0)::numeric(14,2)::text as approved_expenses,
+           coalesce(sum(margin), 0)::numeric(14,2)::text as margin
+         from consolidated_company_metrics
+         where company_code::text in ('LSC', 'TBR', 'FSP', 'XTZ', 'XTE')
+         group by 1
+       )
+       select
+         r.company_code,
+         coalesce(vm.recognized_revenue, '0') as recognized_revenue,
+         coalesce(vm.approved_expenses, '0') as approved_expenses,
+         coalesce(vm.margin, '0') as margin
+       from (values ('LSC', 1), ('TBR', 2), ('FSP', 3), ('XTZ', 4)) as r(company_code, sort_order)
+       left join visible_metrics vm on vm.company_code = r.company_code
+       order by r.sort_order`
+    ),
+    queryRows<{
+      aging_bucket: string;
+      bucket_count: string;
+      bucket_total: string;
+    }>(
+      `select
+         aging_bucket,
+         count(*)::text as bucket_count,
+         coalesce(sum(outstanding_amount), 0)::numeric(14,2)::text as bucket_total
+       from receivables_aging_buckets
+       group by aging_bucket`
+    ),
+    queryRows<{
+      invoice_status: string;
+      status_count: string;
+      status_total: string;
+    }>(
+      `select
+         invoice_status::text,
+         count(*)::text as status_count,
+         coalesce(sum(total_amount), 0)::numeric(14,2)::text as status_total
+       from payments_due
+       group by invoice_status::text`
+    )
+  ]);
+
+  const trend = trendRows
+    .slice()
+    .reverse()
+    .map((row) => {
+      const revenue = numeric(row.recognized_revenue);
+      const cost = numeric(row.approved_expenses);
+      const margin = numeric(row.margin);
+      const cashIn = numeric(row.cash_in);
+      const cashOut = numeric(row.cash_out);
+      const netCash = cashIn - cashOut;
+      return {
+        month: formatMonthLabel(row.month_start as string),
+        revenueUsd: revenue,
+        costUsd: cost,
+        marginUsd: margin,
+        cashInUsd: cashIn,
+        cashOutUsd: cashOut,
+        netCashUsd: netCash,
+        revenue: formatCurrency(revenue),
+        cost: formatCurrency(cost),
+        margin: formatCurrency(margin),
+        cashIn: formatCurrency(cashIn),
+        cashOut: formatCurrency(cashOut),
+        netCash: formatCurrency(netCash)
+      };
+    });
+
+  return {
+    trend,
+    entities: entityRows.map((row) => {
+      const code = normalizeVisibleCompanyCode(row.company_code);
+      const revenue = numeric(row.recognized_revenue);
+      const cost = numeric(row.approved_expenses);
+      const margin = numeric(row.margin);
+      return {
+        code,
+        label: code,
+        revenueUsd: revenue,
+        costUsd: cost,
+        marginUsd: margin,
+        revenue: formatCurrency(revenue),
+        cost: formatCurrency(cost),
+        margin: formatCurrency(margin)
+      };
+    }),
+    receivables: receivableRows.map((row) => {
+      const amount = numeric(row.bucket_total);
+      return {
+        key: row.aging_bucket,
+        label: row.aging_bucket.replace(/_/g, " "),
+        amountUsd: amount,
+        count: Number(row.bucket_count),
+        amount: formatCurrency(amount)
+      };
+    }),
+    payables: payableRows.map((row) => {
+      const amount = numeric(row.status_total);
+      return {
+        key: row.invoice_status,
+        label: row.invoice_status.replace(/_/g, " "),
+        amountUsd: amount,
+        count: Number(row.status_count),
+        amount: formatCurrency(amount)
+      };
+    })
+  };
 }
 
 async function getDbUpcomingPayments(): Promise<PaymentRow[]> {
@@ -349,6 +540,40 @@ export async function getMonthlyCashFlow() {
   }
 
   return [...monthlyCashFlow];
+}
+
+export async function getOverviewAnalytics(): Promise<OverviewAnalytics> {
+  if (getBackend() === "database") {
+    return getDbOverviewAnalytics();
+  }
+
+  const trend = monthlyCashFlow.map((row) => {
+    const cashIn = numeric(String(row.cashIn).replace(/[^0-9.-]/g, ""));
+    const cashOut = numeric(String(row.cashOut).replace(/[^0-9.-]/g, ""));
+    const netCash = cashIn - cashOut;
+    return {
+      month: row.month,
+      revenueUsd: 0,
+      costUsd: 0,
+      marginUsd: 0,
+      cashInUsd: cashIn,
+      cashOutUsd: cashOut,
+      netCashUsd: netCash,
+      revenue: formatCurrency(0),
+      cost: formatCurrency(0),
+      margin: formatCurrency(0),
+      cashIn: formatCurrency(cashIn),
+      cashOut: formatCurrency(cashOut),
+      netCash: formatCurrency(netCash)
+    };
+  });
+
+  return {
+    trend,
+    entities: [],
+    receivables: [],
+    payables: []
+  };
 }
 
 export async function getUpcomingPayments() {

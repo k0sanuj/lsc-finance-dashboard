@@ -17,14 +17,23 @@ import {
   getFspPnlSummaries,
   getGigPayoutSummary,
   getGigWorkers,
-  getMonthlyCashFlow,
+  getOverviewAnalytics,
   getOverviewMetrics,
-  getReceivablesAgingSummary,
   getTbrSeasonSummaries,
-  getUpcomingPayments
+  getUpcomingPayments,
+  getXtzInvoiceSummary
 } from "@lsc/db";
-import { CashTrendChart, HorizontalMetricBars, formatCompactCurrency, parseCurrency } from "./components/dashboard-charts";
-import { ChartFrame, MetricTile, Panel } from "./components/lsc-blue-primitives";
+import { formatCompactCurrency, parseCurrency } from "./components/dashboard-charts";
+import {
+  CashMovementChart,
+  FinanceTrendChart,
+  HorizontalComparisonChart,
+  MiniSparkline,
+  StatusDonutChart,
+  WaterfallBridgeChart,
+  type ChartDatum
+} from "./components/lsc-dashboard-charts";
+import { MetricTile, Panel } from "./components/lsc-blue-primitives";
 import { getEntityMetadata, getVisibleEntities, type VisibleEntityCode } from "./lib/entities";
 
 function metricValue(metrics: Awaited<ReturnType<typeof getOverviewMetrics>>, label: string) {
@@ -35,33 +44,40 @@ function metricScope(metrics: Awaited<ReturnType<typeof getOverviewMetrics>>, la
   return metrics.find((metric) => metric.label === label)?.scope ?? "LSC Consolidated";
 }
 
-function insightTone(value: number) {
-  if (value > 0) return "signal-pill signal-good";
-  if (value < 0) return "signal-pill signal-risk";
-  return "pill";
+function chartTone(value: number): ChartDatum["tone"] {
+  if (value > 0) return "good";
+  if (value < 0) return "ruby";
+  return "slate";
+}
+
+function bucketTone(key: string): ChartDatum["tone"] {
+  if (key === "current" || key === "paid") return "good";
+  if (key.includes("90") || key === "due" || key === "unpaid") return "ruby";
+  if (key.includes("30") || key === "sent" || key === "partially_paid") return "amber";
+  return "brand";
 }
 
 export default async function OverviewPage() {
   const [
     entitySnapshots,
     overviewMetrics,
-    monthlyCashFlow,
+    overviewAnalytics,
     tbrSeasons,
-    receivablesAging,
     upcomingPayments,
     fspSports,
     xtzPayoutSummary,
-    xtzWorkers
+    xtzWorkers,
+    xtzInvoiceSummary
   ] = await Promise.all([
     getEntitySnapshots(),
     getOverviewMetrics(),
-    getMonthlyCashFlow(),
+    getOverviewAnalytics(),
     getTbrSeasonSummaries(),
-    getReceivablesAgingSummary(),
     getUpcomingPayments(),
     getFspPnlSummaries("base"),
     getGigPayoutSummary("XTZ"),
-    getGigWorkers("XTZ")
+    getGigWorkers("XTZ"),
+    getXtzInvoiceSummary()
   ]);
 
   const snapshotMap = new Map(entitySnapshots.map((entity) => [entity.code, entity]));
@@ -80,6 +96,7 @@ export default async function OverviewPage() {
   const revenue = parseCurrency(metricValue(overviewMetrics, "Total Revenue"));
   const cost = parseCurrency(metricValue(overviewMetrics, "Total Cost"));
   const margin = parseCurrency(metricValue(overviewMetrics, "Margin"));
+  const cash = parseCurrency(metricValue(overviewMetrics, "Cash"));
   const upcoming = parseCurrency(metricValue(overviewMetrics, "Upcoming Payments"));
   const receivables = parseCurrency(metricValue(overviewMetrics, "Receivables"));
   const latestSeason = tbrSeasons.at(-1);
@@ -89,43 +106,84 @@ export default async function OverviewPage() {
   const fspRevenueY1 = fspSports.reduce((sum, sport) => sum + sport.revenueY1, 0);
   const fspCostY1 = fspSports.reduce((sum, sport) => sum + sport.cogsY1 + sport.opexY1, 0);
   const fspEbitdaY1 = fspSports.reduce((sum, sport) => sum + sport.ebitdaY1, 0);
+  const activeXtzWorkers = xtzPayoutSummary.activeWorkers || xtzWorkers.filter((worker) => worker.isActive).length;
 
-  const entityContributionRows = entities.map((entity) => ({
-    label: entity.shortLabel,
-    value: Math.max(parseCurrency(entity.revenue), parseCurrency(entity.cost), Math.abs(parseCurrency(entity.margin))),
+  const trendRows: ChartDatum[] = overviewAnalytics.trend.map((row) => ({
+    name: row.month,
+    revenue: row.revenueUsd,
+    cost: row.costUsd,
+    margin: row.marginUsd,
+    value: row.marginUsd,
+    tone: chartTone(row.marginUsd)
+  }));
+  const cashRows: ChartDatum[] = overviewAnalytics.trend.map((row) => ({
+    name: row.month,
+    cashIn: row.cashInUsd,
+    cashOut: row.cashOutUsd,
+    net: row.netCashUsd,
+    value: row.netCashUsd,
+    tone: chartTone(row.netCashUsd)
+  }));
+  const entityRows: ChartDatum[] = overviewAnalytics.entities.map((entity) => ({
+    name: entity.label,
+    revenue: entity.revenueUsd,
+    cost: entity.costUsd,
+    margin: entity.marginUsd,
+    value: Math.abs(entity.marginUsd),
     displayValue: entity.margin,
     sublabel: `Revenue ${entity.revenue} · Cost ${entity.cost}`,
-    tone: parseCurrency(entity.margin) >= 0 ? "good" as const : "risk" as const,
+    tone: chartTone(entity.marginUsd)
   }));
-
-  const receivablesRows = receivablesAging
-    .filter((row) => row.rawTotal > 0 || row.count > 0)
-    .map((row) => ({
-      label: row.label,
-      value: row.rawTotal,
-      displayValue: row.totalOutstanding,
-      sublabel: `${row.count} open`,
-      tone: row.bucket === "current" ? "good" as const : row.bucket === "90_plus" ? "risk" as const : "warn" as const,
-    }));
-
-  const fspRows = fspSports.slice(0, 5).map((sport) => ({
-    label: sport.sportName,
+  const receivableRows: ChartDatum[] = overviewAnalytics.receivables.map((row) => ({
+    name: row.label,
+    value: row.amountUsd,
+    displayValue: row.amount,
+    sublabel: `${row.count} open`,
+    tone: bucketTone(row.key)
+  }));
+  const payableRows: ChartDatum[] = overviewAnalytics.payables.map((row) => ({
+    name: row.label,
+    value: row.amountUsd,
+    displayValue: row.amount,
+    sublabel: `${row.count} invoices`,
+    tone: bucketTone(row.key)
+  }));
+  const pnlBridgeRows: ChartDatum[] = [
+    { name: "Revenue", value: revenue, displayValue: formatCompactCurrency(revenue), tone: "good" },
+    { name: "Cost", value: -cost, displayValue: formatCompactCurrency(cost), tone: "ruby" }
+  ];
+  const tbrSeasonRows: ChartDatum[] = tbrSeasons.map((season) => ({
+    name: season.seasonLabel,
+    value: parseCurrency(season.cost),
+    displayValue: season.cost,
+    sublabel: `Revenue ${season.revenue} · ${season.raceCount} races`,
+    tone: parseCurrency(season.revenue) - parseCurrency(season.cost) >= 0 ? "good" : "ruby"
+  }));
+  const fspRows: ChartDatum[] = fspSports.slice(0, 6).map((sport) => ({
+    name: sport.sportName,
     value: Math.abs(sport.ebitdaY1),
     displayValue: formatCurrency(sport.ebitdaY1),
     sublabel: `Y1 revenue ${formatCurrency(sport.revenueY1)}`,
-    tone: sport.ebitdaY1 >= 0 ? "good" as const : "risk" as const,
+    tone: sport.ebitdaY1 >= 0 ? "good" : "ruby"
   }));
+  const xtzStatusRows: ChartDatum[] = [
+    { name: "Generated", value: xtzInvoiceSummary.generatedCount, displayValue: String(xtzInvoiceSummary.generatedCount), tone: "amber" },
+    { name: "Sent", value: xtzInvoiceSummary.sentCount, displayValue: String(xtzInvoiceSummary.sentCount), tone: "brand" },
+    { name: "Paid", value: xtzInvoiceSummary.paidCount, displayValue: String(xtzInvoiceSummary.paidCount), tone: "good" },
+    { name: "Void", value: xtzInvoiceSummary.voidCount, displayValue: String(xtzInvoiceSummary.voidCount), tone: "ruby" }
+  ];
+
   const topMetricTiles = [
     { label: "Revenue", value: metricValue(overviewMetrics, "Total Revenue"), helper: metricScope(overviewMetrics, "Total Revenue"), icon: TrendingUp, tone: "good" as const },
     { label: "Cost", value: metricValue(overviewMetrics, "Total Cost"), helper: metricScope(overviewMetrics, "Total Cost"), icon: CircleDollarSign, tone: "ruby" as const },
     { label: "Margin", value: metricValue(overviewMetrics, "Margin"), helper: "Consolidated profitability", icon: Scale, tone: margin >= 0 ? "good" as const : "ruby" as const },
-    { label: "Cash", value: metricValue(overviewMetrics, "Cash"), helper: metricScope(overviewMetrics, "Cash"), icon: Banknote, tone: "brand" as const },
-    { label: "Receivables", value: metricValue(overviewMetrics, "Receivables"), helper: `${receivablesRows.length} aging buckets`, icon: ReceiptText, tone: "amber" as const },
+    { label: "Cash", value: metricValue(overviewMetrics, "Cash"), helper: metricScope(overviewMetrics, "Cash"), icon: Banknote, tone: cash >= 0 ? "brand" as const : "ruby" as const },
+    { label: "Receivables", value: metricValue(overviewMetrics, "Receivables"), helper: `${receivableRows.length} aging buckets`, icon: ReceiptText, tone: "amber" as const },
     { label: "Upcoming", value: metricValue(overviewMetrics, "Upcoming Payments"), helper: "Open payment timeline", icon: CreditCard, tone: "iris" as const },
   ];
 
   return (
-    <div className="page-grid">
+    <div className="page-grid lsc-dashboard-page">
       <section className="workspace-header command-header">
         <div className="workspace-header-left">
           <span className="section-kicker">Finance OS</span>
@@ -160,175 +218,130 @@ export default async function OverviewPage() {
         ))}
       </section>
 
-      <section className="overview-command-grid">
-        <div className="mini-kpi-stack">
-          <MetricTile
-            icon={Layers3}
-            label="Entities"
-            value={entities.length}
-            helper="LSC, TBR, FSP, XTZ"
-            tone="brand"
+      <section className="lsc-dashboard-hero-grid">
+        <Panel
+          className="dashboard-chart-panel dashboard-primary-chart"
+          title="Revenue, cost, and margin trend"
+          subtitle="Approved monthly finance summary across visible LSC entities."
+          trailing={<span className={`signal-pill ${margin >= 0 ? "signal-good" : "signal-risk"}`}>{formatCompactCurrency(margin)}</span>}
+        >
+          <FinanceTrendChart
+            data={trendRows}
+            series={[
+              { key: "revenue", label: "Revenue", tone: "good" },
+              { key: "cost", label: "Cost", tone: "ruby" },
+              { key: "margin", label: "Margin", tone: margin >= 0 ? "brand" : "ruby" }
+            ]}
           />
-          <MetricTile
-            icon={Trophy}
-            label="TBR Seasons"
-            value={tbrSeasons.length}
-            helper={latestSeason ? latestSeason.seasonLabel : "Season controls"}
-            tone="iris"
-          />
-          <MetricTile
-            icon={FileStack}
-            label="FSP Modules"
-            value={fspSports.length}
-            helper={`${fspWithFinancials.length} with financial data`}
-            tone="amber"
-          />
-          <MetricTile
-            icon={WalletCards}
-            label="XTZ Workers"
-            value={xtzPayoutSummary.activeWorkers || xtzWorkers.filter((worker) => worker.isActive).length}
-            helper="Active payroll/vendor support"
-            tone="slate"
-          />
+          <div className="lsc-chart-summary-strip">
+            <span><strong>{formatCompactCurrency(revenue)}</strong> revenue</span>
+            <span><strong>{formatCompactCurrency(cost)}</strong> cost</span>
+            <span><strong>{formatCompactCurrency(margin)}</strong> margin</span>
+          </div>
+        </Panel>
+
+        <div className="lsc-dashboard-side-stack">
+          <MetricTile icon={Layers3} label="Entities" value={entities.length} helper="LSC, TBR, FSP, XTZ" tone="brand" />
+          <MetricTile icon={Trophy} label="TBR Seasons" value={tbrSeasons.length} helper={latestSeason ? latestSeason.seasonLabel : "Season controls"} tone="iris" />
+          <MetricTile icon={FileStack} label="FSP Modules" value={fspSports.length} helper={`${fspWithFinancials.length} with financial data`} tone="amber" />
+          <MetricTile icon={WalletCards} label="XTZ Workers" value={activeXtzWorkers} helper="Payroll/vendor support" tone="slate" />
         </div>
+      </section>
+
+      <section className="lsc-dashboard-two-one-grid">
+        <Panel
+          className="dashboard-chart-panel"
+          title="Consolidated P&L bridge"
+          subtitle="Revenue less cost, with margin shown as the derived result."
+          trailing={<span className="pill">Derived only</span>}
+        >
+          <WaterfallBridgeChart data={pnlBridgeRows} height={245} />
+        </Panel>
 
         <Panel
-          className="overview-primary-panel"
-          title="Consolidated P&L waterfall"
-          subtitle="Revenue, cost, and margin from approved LSC finance metrics."
-          trailing={<span className={insightTone(margin)}>{formatCompactCurrency(margin)}</span>}
+          className="dashboard-chart-panel"
+          title="Collection and payable pressure"
+          subtitle="Outstanding receivables against upcoming payment exposure."
+          trailing={<span className={receivables >= upcoming ? "signal-pill signal-good" : "signal-pill signal-risk"}>{receivables >= upcoming ? "Covered" : "Watch"}</span>}
         >
-          <ChartFrame>
-            <HorizontalMetricBars
-              rows={[
-                { label: "Revenue", value: revenue, displayValue: formatCompactCurrency(revenue), tone: "good" },
-                { label: "Cost", value: cost, displayValue: formatCompactCurrency(cost), tone: "risk" },
-                { label: "Margin", value: Math.abs(margin), displayValue: formatCompactCurrency(margin), tone: margin >= 0 ? "good" : "risk" },
-              ]}
-            />
-          </ChartFrame>
+          <StatusDonutChart
+            data={[
+              { name: "Receivables", value: receivables, displayValue: formatCompactCurrency(receivables), tone: "amber" },
+              { name: "Upcoming", value: upcoming, displayValue: formatCompactCurrency(upcoming), tone: "ruby" },
+              { name: "Cash", value: Math.max(0, cash), displayValue: formatCompactCurrency(cash), tone: "brand" }
+            ]}
+            height={220}
+          />
         </Panel>
       </section>
 
-      <section className="grid-two portfolio-panels">
-        <article className="card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">Entity ledger</span>
-              <h3>Workspace operating status</h3>
-            </div>
-            <span className="pill">{entities.length} entities</span>
-          </div>
-          <div className="table-wrapper clean-table compact-ledger-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Entity</th>
-                  <th>Status</th>
-                  <th>Revenue</th>
-                  <th>Cost</th>
-                  <th>Margin</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entities.map((entity) => (
-                  <tr key={entity.code}>
-                    <td>
-                      <Link className="record-title" href={entity.homeHref}>{entity.shortLabel}</Link>
-                      <span className="record-subtitle">{entity.label}</span>
-                    </td>
-                    <td><span className="pill">{entity.status}</span></td>
-                    <td>{entity.revenue}</td>
-                    <td>{entity.cost}</td>
-                    <td><strong>{entity.margin}</strong></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </article>
+      <section className="lsc-dashboard-grid-3">
+        <Panel className="dashboard-chart-panel" title="Entity comparison" subtitle="Margin contribution by workspace.">
+          <HorizontalComparisonChart data={entityRows} height={250} />
+        </Panel>
 
-        <article className="card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">Entity contribution</span>
-              <h3>Margin by workspace</h3>
-            </div>
-            <span className="pill">{entities.length} entities</span>
-          </div>
-          <HorizontalMetricBars rows={entityContributionRows} />
-        </article>
+        <Panel className="dashboard-chart-panel" title="Cash movement" subtitle="Monthly cash in, cash out, and net movement.">
+          <CashMovementChart data={cashRows} height={250} />
+        </Panel>
+
+        <Panel className="dashboard-chart-panel" title="Receivables aging" subtitle="Collection risk by aging bucket.">
+          <StatusDonutChart data={receivableRows} height={220} />
+        </Panel>
       </section>
 
-      <section className="grid-two portfolio-panels">
-        <article className="card trend-chart">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">Cash in / out</span>
-              <h3>Monthly movement</h3>
-            </div>
-            <span className="pill">LSC + legacy Dubai</span>
-          </div>
-          <CashTrendChart rows={monthlyCashFlow} />
-        </article>
+      <section className="lsc-dashboard-grid-3">
+        <Panel className="dashboard-chart-panel" title="Payables mix" subtitle="Upcoming payment amount by status.">
+          <StatusDonutChart data={payableRows} height={220} />
+        </Panel>
 
-        <article className="card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">Receivables aging</span>
-              <h3>Outstanding collection risk</h3>
-            </div>
-            <span className="pill">{formatCompactCurrency(receivables)}</span>
-          </div>
-          <HorizontalMetricBars rows={receivablesRows} />
-        </article>
+        <Panel
+          className="dashboard-chart-panel"
+          title="TBR season P&L"
+          subtitle="Race season cost stack and revenue context."
+          trailing={<Link className="ghost-link" href={latestSeason ? `/tbr/races?season=${latestSeason.seasonYear}` : "/tbr/races"}>Open races</Link>}
+        >
+          <HorizontalComparisonChart data={tbrSeasonRows} height={250} />
+        </Panel>
+
+        <Panel
+          className="dashboard-chart-panel"
+          title="FSP sport mix"
+          subtitle="Y1 EBITDA by sports asset."
+          trailing={<Link className="ghost-link" href="/fsp/sports">Open FSP</Link>}
+        >
+          <HorizontalComparisonChart data={fspRows} height={250} />
+        </Panel>
       </section>
 
-      <section className="grid-two portfolio-panels">
-        <article className="card">
-          <div className="card-title-row">
+      <section className="lsc-dashboard-two-one-grid">
+        <Panel
+          className="dashboard-chart-panel"
+          title="XTZ invoice and payroll summary"
+          subtitle="Invoice lifecycle plus active payroll/vendor support."
+          trailing={<Link className="ghost-link" href={getEntityMetadata("XTZ" satisfies VisibleEntityCode).homeHref}>Open XTZ India</Link>}
+        >
+          <div className="xtz-dashboard-summary">
             <div>
-              <span className="section-kicker">Payments timeline</span>
-              <h3>Upcoming payables</h3>
+              <span className="section-kicker">Active workers</span>
+              <strong>{activeXtzWorkers}</strong>
+              <MiniSparkline data={trendRows} dataKey="value" />
             </div>
-            <span className="pill">{formatCompactCurrency(upcoming)}</span>
+            <div>
+              <span className="section-kicker">Pending payouts</span>
+              <strong>{xtzPayoutSummary.pendingPayouts}</strong>
+              <span>{formatCurrency(xtzPayoutSummary.pendingAmount)}</span>
+            </div>
+            <div>
+              <span className="section-kicker">Active invoices</span>
+              <strong>{xtzInvoiceSummary.activeInvoices}</strong>
+              <span>{formatCompactCurrency(xtzInvoiceSummary.totalInvoicedUsd)}</span>
+            </div>
           </div>
-          <div className="table-wrapper clean-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Payable</th>
-                  <th>Context</th>
-                  <th>Due</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {upcomingPayments.slice(0, 6).map((payment) => (
-                  <tr key={`${payment.vendor}-${payment.dueDate}-${payment.amount}`}>
-                    <td><strong>{payment.vendor}</strong></td>
-                    <td>{payment.race || payment.category}</td>
-                    <td>{payment.dueDate}</td>
-                    <td><strong>{payment.amount}</strong></td>
-                  </tr>
-                ))}
-                {upcomingPayments.length === 0 ? (
-                  <tr><td className="muted" colSpan={4}>No upcoming payables.</td></tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-        </article>
+          <StatusDonutChart data={xtzStatusRows} height={210} />
+        </Panel>
 
-        <article className="card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">AI insight panel</span>
-              <h3>Approved-metric signals</h3>
-            </div>
-            <span className="pill">Derived only</span>
-          </div>
-          <div className="process-list">
+        <Panel className="dashboard-chart-panel" title="AI metric signals" subtitle="Narrative based only on approved derived metrics.">
+          <div className="process-list dashboard-signal-list">
             <div className="process-step">
               <span className="process-step-index">1</span>
               <strong>{margin >= 0 ? "Margin is positive" : "Margin needs review"}</strong>
@@ -345,81 +358,50 @@ export default async function OverviewPage() {
               <span className="muted">Y1 FSP EBITDA is {formatCompactCurrency(fspEbitdaY1)} from {formatCompactCurrency(fspRevenueY1)} revenue and {formatCompactCurrency(fspCostY1)} cost.</span>
             </div>
           </div>
-        </article>
+        </Panel>
       </section>
 
-      <section className="grid-two portfolio-panels">
-        <article className="card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">TBR race P&amp;L</span>
-              <h3>Season leaderboard</h3>
-            </div>
-            <Link className="ghost-link" href={latestSeason ? `/tbr/races?season=${latestSeason.seasonYear}` : "/tbr/races"}>
-              Open races
-            </Link>
-          </div>
-          <div className="season-grid compact-season-grid">
-            {tbrSeasons.map((season) => (
-              <Link className="season-card" href={`/tbr/races?season=${season.seasonYear}`} key={season.seasonYear}>
-                <div className="season-card-top">
-                  <span className="badge">{season.status}</span>
-                  <span className="season-tag">{season.seasonLabel}</span>
-                </div>
-                <h3>{season.raceCount} races</h3>
-                <div className="season-metrics">
-                  <div><span>Revenue</span><strong>{season.revenue}</strong></div>
-                  <div><span>Cost</span><strong>{season.cost}</strong></div>
-                  <div><span>Open payables</span><strong>{season.openPayables}</strong></div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </article>
-
-        <article className="card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">FSP sports portfolio</span>
-              <h3>Sport asset EBITDA</h3>
-            </div>
-            <Link className="ghost-link" href="/fsp/sports">Open FSP</Link>
-          </div>
-          <HorizontalMetricBars rows={fspRows} />
-        </article>
-      </section>
-
-      <section className="card">
-        <div className="card-title-row">
-          <div>
-            <span className="section-kicker">XTZ India</span>
-            <h3>Payroll, vendors, and payouts</h3>
-          </div>
-          <Link className="ghost-link" href={getEntityMetadata("XTZ" satisfies VisibleEntityCode).homeHref}>
-            Open XTZ India
-          </Link>
+      <Panel className="dashboard-ledger-panel" title="Workspace operating ledger" subtitle="Entity totals remain traceable to canonical services and SQL views.">
+        <div className="table-wrapper clean-table compact-ledger-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Entity</th>
+                <th>Status</th>
+                <th>Revenue</th>
+                <th>Cost</th>
+                <th>Margin</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entities.map((entity) => (
+                <tr key={entity.code}>
+                  <td>
+                    <Link className="record-title" href={entity.homeHref}>{entity.shortLabel}</Link>
+                    <span className="record-subtitle">{entity.label}</span>
+                  </td>
+                  <td><span className="pill">{entity.status}</span></td>
+                  <td>{entity.revenue}</td>
+                  <td>{entity.cost}</td>
+                  <td><strong>{entity.margin}</strong></td>
+                </tr>
+              ))}
+              {upcomingPayments.slice(0, 4).map((payment) => (
+                <tr key={`${payment.vendor}-${payment.dueDate}-${payment.amount}`}>
+                  <td>
+                    <strong className="record-title">{payment.vendor}</strong>
+                    <span className="record-subtitle">{payment.race || payment.category}</span>
+                  </td>
+                  <td><span className="pill">{payment.status}</span></td>
+                  <td>-</td>
+                  <td>{payment.amount}</td>
+                  <td>{payment.dueDate}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <section className="stats-grid compact-stats">
-          <article className="metric-card accent-brand">
-            <div className="metric-topline"><span className="metric-label">Active workers</span></div>
-            <div className="metric-value">{xtzPayoutSummary.activeWorkers || xtzWorkers.filter((worker) => worker.isActive).length}</div>
-            <span className="metric-subvalue">{xtzPayoutSummary.totalWorkers || xtzWorkers.length} total</span>
-          </article>
-          <article className="metric-card accent-warn">
-            <div className="metric-topline"><span className="metric-label">Pending payouts</span></div>
-            <div className="metric-value">{xtzPayoutSummary.pendingPayouts}</div>
-            <span className="metric-subvalue">{formatCurrency(xtzPayoutSummary.pendingAmount)}</span>
-          </article>
-          <article className="metric-card accent-good">
-            <div className="metric-topline"><span className="metric-label">MTD paid</span></div>
-            <div className="metric-value">{formatCurrency(xtzPayoutSummary.mtdPaid)}</div>
-          </article>
-          <article className="metric-card">
-            <div className="metric-topline"><span className="metric-label">YTD paid</span></div>
-            <div className="metric-value">{formatCurrency(xtzPayoutSummary.ytdPaid)}</div>
-          </article>
-        </section>
-      </section>
+      </Panel>
     </div>
   );
 }

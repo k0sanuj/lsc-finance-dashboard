@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
+import { CircleDollarSign, FileText, Send, WalletCards } from "lucide-react";
 import { requireRole } from "../../lib/auth";
 import { getXtzInvoices, getXtzInvoiceSummary } from "@lsc/db";
 import {
@@ -9,6 +10,8 @@ import {
 } from "./actions";
 import { AutoFormSelect } from "../components/auto-form-select";
 import { SubmitButton } from "../components/submit-button";
+import { FinanceTrendChart, StatusDonutChart, type ChartDatum } from "../components/lsc-dashboard-charts";
+import { MetricTile, Panel } from "../components/lsc-blue-primitives";
 
 const fmtMoney = (n: number, currency: string): string =>
   n.toLocaleString("en-US", {
@@ -34,6 +37,13 @@ function statusPill(status: string): string {
     default:
       return "subtle-pill";
   }
+}
+
+function chartTone(status: string): ChartDatum["tone"] {
+  if (status === "paid") return "good";
+  if (status === "void") return "ruby";
+  if (status === "sent") return "brand";
+  return "amber";
 }
 
 type PageProps = {
@@ -66,6 +76,20 @@ export default async function PayrollInvoiceDashboardPage({ searchParams }: Page
       includeVoided,
     }),
   ]);
+  const statusRows: ChartDatum[] = summary.statusMix.map((row) => ({
+    name: row.status.replace(/_/g, " "),
+    value: row.totalAmount || row.count,
+    displayValue: row.totalAmount > 0 ? fmtMoney(row.totalAmount, "USD") : String(row.count),
+    tone: chartTone(row.status)
+  }));
+  const trendRows: ChartDatum[] = summary.monthlyTrend.map((row) => ({
+    name: row.month,
+    invoiceValue: row.totalAmount,
+    invoiceCount: row.count,
+    value: row.totalAmount,
+    displayValue: fmtMoney(row.totalAmount, "USD"),
+    tone: "brand"
+  }));
 
   return (
     <div className="page-grid">
@@ -94,35 +118,27 @@ export default async function PayrollInvoiceDashboardPage({ searchParams }: Page
         </section>
       ) : null}
 
-      <section className="stats-grid compact-stats">
-        <article className="metric-card accent-brand">
-          <div className="metric-topline">
-            <span className="metric-label">Active invoices</span>
-          </div>
-          <div className="metric-value">{summary.activeInvoices}</div>
-          <span className="metric-subvalue">{summary.voidCount} voided hidden by default</span>
-        </article>
-        <article className="metric-card accent-good">
-          <div className="metric-topline">
-            <span className="metric-label">Total invoiced</span>
-          </div>
-          <div className="metric-value">{fmtMoney(summary.totalInvoicedUsd, "USD")}</div>
-          <span className="metric-subvalue">USD active invoices</span>
-        </article>
-        <article className="metric-card accent-warn">
-          <div className="metric-topline">
-            <span className="metric-label">Needs action</span>
-          </div>
-          <div className="metric-value">{summary.pendingCount}</div>
-          <span className="metric-subvalue">Generated and sent</span>
-        </article>
-        <article className="metric-card">
-          <div className="metric-topline">
-            <span className="metric-label">Paid</span>
-          </div>
-          <div className="metric-value">{summary.paidCount}</div>
-          <span className="metric-subvalue">{summary.sentCount} sent</span>
-        </article>
+      <section className="analytics-kpi-grid">
+        <MetricTile icon={FileText} label="Active invoices" value={summary.activeInvoices} helper={`${summary.voidCount} voided hidden by default`} tone="brand" />
+        <MetricTile icon={CircleDollarSign} label="Total invoiced" value={fmtMoney(summary.totalInvoicedUsd, "USD")} helper="USD active invoices" tone="good" />
+        <MetricTile icon={Send} label="Needs action" value={summary.pendingCount} helper="Generated and sent" tone="amber" />
+        <MetricTile icon={WalletCards} label="Paid" value={summary.paidCount} helper={`${summary.sentCount} sent`} tone="slate" />
+      </section>
+
+      <section className="lsc-dashboard-two-one-grid">
+        <Panel className="dashboard-chart-panel" title="Invoice status mix" subtitle="Lifecycle amount and count across active and voided invoices.">
+          <StatusDonutChart data={statusRows} height={245} />
+        </Panel>
+        <Panel className="dashboard-chart-panel" title="Monthly invoice trend" subtitle="Generated invoice value and count by payroll month.">
+          <FinanceTrendChart
+            data={trendRows}
+            height={285}
+            series={[
+              { key: "invoiceValue", label: "Invoice value", tone: "brand" },
+              { key: "invoiceCount", label: "Count", tone: "amber" }
+            ]}
+          />
+        </Panel>
       </section>
 
       <section className="card">

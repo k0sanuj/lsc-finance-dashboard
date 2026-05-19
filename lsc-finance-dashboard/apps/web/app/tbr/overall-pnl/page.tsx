@@ -1,10 +1,9 @@
 import Link from "next/link";
+import { CircleDollarSign, Scale, TrendingDown, TrendingUp } from "lucide-react";
 import { getTbrOverallPnlDashboard } from "@lsc/db";
-import {
-  HorizontalMetricBars,
-  formatCompactCurrency,
-  type HorizontalBarRow
-} from "../../components/dashboard-charts";
+import { formatCompactCurrency } from "../../components/dashboard-charts";
+import { HorizontalComparisonChart, StatusDonutChart, WaterfallBridgeChart, type ChartDatum } from "../../components/lsc-dashboard-charts";
+import { MetricTile, Panel } from "../../components/lsc-blue-primitives";
 import { requireRole } from "../../../lib/auth";
 
 type PageProps = {
@@ -27,22 +26,30 @@ export default async function TbrOverallPnlPage({ searchParams }: PageProps) {
   const data = await getTbrOverallPnlDashboard(params.season?.toUpperCase());
   const selected = data.selected;
 
-  const bridgeRows: HorizontalBarRow[] = selected
+  const bridgeRows: ChartDatum[] = selected
     ? [
-        { label: "Sponsorship revenue", value: selected.sponsorshipRevenueUsd, displayValue: selected.sponsorshipRevenue, tone: "good" },
-        { label: "Prize money revenue", value: selected.prizeMoneyRevenueUsd, displayValue: selected.prizeMoneyRevenue, tone: "good" },
-        { label: "Operating baseline", value: selected.operatingBaselineUsd, displayValue: selected.operatingBaseline, tone: "risk" },
-        { label: "E1 incremental cost", value: selected.e1IncrementalCostUsd, displayValue: selected.e1IncrementalCost, tone: "warn" },
-        { label: "E1 overlap variance", value: selected.e1OverlapVarianceUsd, displayValue: selected.e1OverlapVariance, tone: "warn" }
+        { name: "Sponsorship", value: selected.sponsorshipRevenueUsd, displayValue: selected.sponsorshipRevenue, tone: "good" },
+        { name: "Prize money", value: selected.prizeMoneyRevenueUsd, displayValue: selected.prizeMoneyRevenue, tone: "good" },
+        { name: "Baseline", value: -selected.operatingBaselineUsd, displayValue: selected.operatingBaseline, tone: "ruby" },
+        { name: "E1 incremental", value: -selected.e1IncrementalCostUsd, displayValue: selected.e1IncrementalCost, tone: "amber" },
+        { name: "E1 variance", value: -selected.e1OverlapVarianceUsd, displayValue: selected.e1OverlapVariance, tone: "amber" }
       ]
     : [];
-  const seasonComparisonRows: HorizontalBarRow[] = data.rows.map((row) => ({
-    label: row.seasonLabel,
-    value: row.ebitdaUsd,
+  const seasonComparisonRows: ChartDatum[] = data.rows.map((row) => ({
+    name: row.seasonLabel,
+    value: Math.abs(row.ebitdaUsd),
     displayValue: row.ebitda,
     sublabel: `Revenue ${row.totalRevenue} · Cost ${row.totalCost}`,
-    tone: row.ebitdaUsd >= 0 ? "good" : "risk"
+    tone: row.ebitdaUsd >= 0 ? "good" : "ruby"
   }));
+  const revenueMixRows: ChartDatum[] = selected
+    ? [
+        { name: "Sponsorship", value: selected.sponsorshipRevenueUsd, displayValue: selected.sponsorshipRevenue, tone: "good" },
+        { name: "Prize money", value: selected.prizeMoneyRevenueUsd, displayValue: selected.prizeMoneyRevenue, tone: "brand" },
+        { name: "Other", value: selected.otherRevenueUsd, displayValue: selected.otherRevenue, tone: "slate" }
+      ]
+    : [];
+  const season1 = data.rows.find((row) => row.seasonCode === "S1");
 
   return (
     <div className="page-grid finance-workspace">
@@ -84,86 +91,56 @@ export default async function TbrOverallPnlPage({ searchParams }: PageProps) {
         </div>
       </section>
 
-      <section className="stats-grid compact-stats">
-        <article className="metric-card accent-good">
-          <div className="metric-topline">
-            <span className="metric-label">Revenue</span>
-          </div>
-          <div className="metric-value">{selected?.totalRevenue ?? "$0"}</div>
-          <span className="metric-subvalue">Sponsorship, prize money, other</span>
-        </article>
-        <article className="metric-card accent-risk">
-          <div className="metric-topline">
-            <span className="metric-label">Total cost</span>
-          </div>
-          <div className="metric-value">{selected?.totalCost ?? "$0"}</div>
-          <span className="metric-subvalue">Baseline + E1 incremental/variance</span>
-        </article>
-        <article className={`metric-card ${selected && selected.ebitdaUsd >= 0 ? "accent-good" : "accent-risk"}`}>
-          <div className="metric-topline">
-            <span className="metric-label">EBITDA</span>
-          </div>
-          <div className="metric-value">{selected?.ebitda ?? "$0"}</div>
-          <span className="metric-subvalue">Derived in Postgres</span>
-        </article>
-        <article className="metric-card accent-warn">
-          <div className="metric-topline">
-            <span className="metric-label">Overlap variance</span>
-          </div>
-          <div className="metric-value">{selected?.e1OverlapVariance ?? "$0"}</div>
-          <span className="metric-subvalue">Only positive excess is counted</span>
-        </article>
+      <section className="analytics-kpi-grid">
+        <MetricTile icon={TrendingUp} label="Revenue" value={selected?.totalRevenue ?? "$0"} helper="Sponsorship, prize money, other" tone="good" />
+        <MetricTile icon={TrendingDown} label="Total cost" value={selected?.totalCost ?? "$0"} helper="Baseline + E1 incremental/variance" tone="ruby" />
+        <MetricTile icon={Scale} label="EBITDA" value={selected?.ebitda ?? "$0"} helper="Derived in Postgres" tone={selected && selected.ebitdaUsd >= 0 ? "good" : "ruby"} />
+        <MetricTile icon={CircleDollarSign} label="Overlap variance" value={selected?.e1OverlapVariance ?? "$0"} helper="Only positive excess is counted" tone="amber" />
       </section>
 
-      <section className="grid-two">
-        <article className="card compact-section-card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">P&amp;L bridge</span>
-              <h3>{selected?.seasonLabel ?? data.selectedSeasonCode} waterfall inputs</h3>
-            </div>
-            <span className="badge">{selected?.ebitda ?? "$0"} EBITDA</span>
-          </div>
-          <HorizontalMetricBars rows={bridgeRows} />
-        </article>
-        <article className="card compact-section-card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">Season comparison</span>
-              <h3>EBITDA by season</h3>
-            </div>
-          </div>
-          <HorizontalMetricBars rows={seasonComparisonRows} />
-        </article>
+      <section className="lsc-dashboard-two-one-grid">
+        <Panel
+          className="dashboard-chart-panel"
+          title={`${selected?.seasonLabel ?? data.selectedSeasonCode} waterfall inputs`}
+          subtitle="Revenue less baseline, incremental, and overlap variance cost."
+          trailing={<span className="badge">{selected?.ebitda ?? "$0"} EBITDA</span>}
+        >
+          <WaterfallBridgeChart data={bridgeRows} height={285} />
+        </Panel>
+        <Panel className="dashboard-chart-panel" title="EBITDA by season" subtitle="Season comparison from the overall P&L view.">
+          <HorizontalComparisonChart data={seasonComparisonRows} height={285} />
+        </Panel>
       </section>
 
-      <section className="card compact-section-card">
-        <div className="card-title-row">
-          <div>
-            <span className="section-kicker">Revenue rule cards</span>
-            <h3>Explicit revenue assumptions now in P&amp;L</h3>
+      <section className="lsc-dashboard-two-one-grid">
+        <Panel className="dashboard-chart-panel" title="Revenue mix" subtitle="Selected season revenue composition.">
+          <StatusDonutChart data={revenueMixRows} height={245} />
+        </Panel>
+
+        <Panel
+          className="dashboard-chart-panel"
+          title="Explicit revenue assumptions"
+          subtitle="Business-rule backed revenue now in P&L."
+          trailing={<span className="pill">Business-rule backed</span>}
+        >
+          <div className="xtz-dashboard-summary">
+            <div>
+              <span className="section-kicker">Season 1 sponsorship</span>
+              <strong>{season1?.sponsorshipRevenue ?? "$0"}</strong>
+              <span>Classic Car Club Manhattan</span>
+            </div>
+            <div>
+              <span className="section-kicker">Season 2 prize money</span>
+              <strong>€100K</strong>
+              <span>Stored original EUR; reported USD</span>
+            </div>
+            <div>
+              <span className="section-kicker">Selected revenue</span>
+              <strong>{selected?.totalRevenue ?? "$0"}</strong>
+              <span>{selected ? `${formatCompactCurrency(selected.sponsorshipRevenueUsd)} sponsorship · ${formatCompactCurrency(selected.prizeMoneyRevenueUsd)} prize` : "No selected row"}</span>
+            </div>
           </div>
-          <span className="pill">Business-rule backed</span>
-        </div>
-        <div className="stats-grid compact-stats">
-          <article className="metric-card accent-good">
-            <span className="metric-label">Season 1 sponsorship</span>
-            <div className="metric-value">$150K</div>
-            <span className="metric-subvalue">Classic Car Club Manhattan</span>
-          </article>
-          <article className="metric-card accent-good">
-            <span className="metric-label">Season 2 prize money</span>
-            <div className="metric-value">€100K</div>
-            <span className="metric-subvalue">Stored original EUR; reported USD</span>
-          </article>
-          <article className="metric-card accent-brand">
-            <span className="metric-label">Selected season revenue</span>
-            <div className="metric-value">{selected?.totalRevenue ?? "$0"}</div>
-            <span className="metric-subvalue">
-              {selected ? `${formatCompactCurrency(selected.sponsorshipRevenueUsd)} sponsorship · ${formatCompactCurrency(selected.prizeMoneyRevenueUsd)} prize` : "No selected row"}
-            </span>
-          </article>
-        </div>
+        </Panel>
       </section>
 
       <section className="grid-two">
