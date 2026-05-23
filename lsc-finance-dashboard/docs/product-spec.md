@@ -13,6 +13,7 @@ The dashboard should:
 - present consolidated LSC financial performance
 - provide detailed TBR operating visibility
 - provide dedicated TBR season finance, E1 accounting, and overall P&L reporting
+- provide reusable P&L statement sections for LSC, TBR, FSP, FSP sports, and XTZ India
 - support FSP as a visible sports-asset portfolio entity with planning/scenario reporting
 - support XTZ India as a visible payroll, vendor, and intercompany invoice entity
 - track costs, invoices, receivables, and payments
@@ -116,7 +117,8 @@ Main sections:
 - season finance entry points:
   - operating expenses
   - E1 accounting
-  - overall P&L
+  - P&L statement
+  - overall P&L legacy reconciliation view
 - season-wise race browser
 - race-detail workflow for user bill and receipt intake
 - sponsor revenue summary
@@ -134,6 +136,28 @@ Required filters:
 - race
 - cost category
 - sponsor
+
+### Universal P&L Statements
+
+Purpose:
+
+- allow every entity and sport to generate the same clean P&L report shape
+- keep actual, management, forecast, non-cash, contingency, and pending lines visibly separated
+- preserve lineage from workbook rows, invoices, AI intake, and source modules into statement rows
+
+Routes:
+
+- `/lsc/pnl`
+- `/tbr/pnl`
+- `/fsp/pnl`
+- `/xtz/pnl`
+- `/fsp/sports/[sport]/pnl`
+
+TBR reference:
+
+- `/Users/anujsingh/Downloads/TBR_P_L_Statement.xlsx` is the current TBR source of truth
+- S3 is management P&L with first two races actual/partial actual and the remaining races forecast
+- scenario assumptions such as prize pool and pilot bonus are stored as scenario inputs, not hard-coded actuals
 
 ### 3. Costs
 

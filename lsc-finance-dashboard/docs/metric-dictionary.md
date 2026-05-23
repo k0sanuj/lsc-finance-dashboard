@@ -178,6 +178,32 @@ Finance treatment:
 - excluded from LSC holding-company consolidated finance totals
 - must not be copied into generic `revenue_records` or `expenses` without an explicit approved-actual consolidation gate
 
+### Universal P&L Statement
+
+Definition:
+
+Reusable statement view for an entity, sport, or future asset. It presents revenue, expense sections, and net income/loss from approved source-backed P&L line items or backend-generated recognition views.
+
+Finance treatment:
+
+- every P&L line has an owner scope, scenario, period, section, data status, source module, and lineage
+- `actual` and `partial_actual` lines represent available source-backed activity
+- `forecast`, `contingency`, and `non_cash` lines are shown separately and must not be treated as cash movement
+- TBR Season 3 is a management P&L: first two races are actual/partial actual where noted in the workbook, remaining races are forecast
+- P&L statement totals are derived in SQL views or backend services, not React components
+
+### P&L Scenario
+
+Definition:
+
+A named version of a P&L statement, such as actual, management, forecast, budget, or sensitivity. A scenario owns the assumptions and periods used to produce a statement.
+
+Notes:
+
+- TBR default scenario is the workbook-backed management reference
+- FSP base scenario remains portfolio planning until approved as actual consolidation
+- only actual scenarios should feed cash or recognized accounting views unless another recognition policy is explicitly approved
+
 ### Sponsor Count
 
 Definition:

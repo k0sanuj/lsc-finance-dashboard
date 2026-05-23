@@ -194,6 +194,9 @@ async function auditDatabase() {
       "tbr_e1_reconciliation_view",
       "tbr_e1_invoice_tracker_by_season",
       "tbr_e1_cost_module_lines",
+      "finance_pnl_summary_by_period",
+      "finance_pnl_statement_lines",
+      "finance_pnl_source_coverage_view",
       "tbr_overall_pnl_by_season"
     ];
     for (const view of views) {
@@ -294,11 +297,16 @@ function auditRoutes() {
     "app/tbr/team-management/page.tsx",
     "app/tbr/operating-expenses/page.tsx",
     "app/tbr/e1-accounting/page.tsx",
+    "app/tbr/pnl/page.tsx",
     "app/tbr/overall-pnl/page.tsx",
+    "app/lsc/pnl/page.tsx",
     "app/xtz/page.tsx",
+    "app/xtz/pnl/page.tsx",
     "app/fsp/page.tsx",
+    "app/fsp/pnl/page.tsx",
     "app/fsp/consolidated/page.tsx",
     "app/fsp/sports/page.tsx",
+    "app/fsp/sports/[sport]/pnl/page.tsx",
     "app/costs/page.tsx",
     "app/costs/[company]/page.tsx",
     "app/payments/page.tsx",

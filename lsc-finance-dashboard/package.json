@@ -26,6 +26,7 @@
     "attach:e1-s2-invoices": "node scripts/attach-e1-s2-invoices.mjs",
     "normalize:race-expenses": "node scripts/normalize-race-expenses.mjs",
     "normalize:tbr-season-finance": "node scripts/normalize-tbr-season-finance.mjs",
+    "import:tbr-pnl": "node scripts/import-tbr-pnl-statement.mjs",
     "normalize:revenue": "node scripts/normalize-revenue.mjs",
     "seed:document-analysis": "node scripts/seed-document-analysis.mjs",
     "auth:bootstrap-admin": "node scripts/bootstrap-admin-user.mjs",
@@ -37,6 +38,7 @@
     "db:apply:tranches": "node scripts/apply-sql.mjs sql/017_contract_tranches.sql",
     "seed:contract-tranches": "node scripts/seed-contract-tranches.mjs",
     "test:tbr-season-finance": "node scripts/test-tbr-season-finance.mjs",
+    "test:pnl-statement": "node scripts/test-pnl-statement-import.mjs",
     "audit:ai-upload-ux": "node scripts/audit-ai-upload-ux.mjs"
   },
   "devDependencies": {

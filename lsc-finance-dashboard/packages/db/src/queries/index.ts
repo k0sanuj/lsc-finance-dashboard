@@ -40,3 +40,4 @@ export * from "./legal";
 export * from "./tbr-finance";
 export * from "./entity-dashboard";
 export * from "./reporting";
+export * from "./pnl-statements";

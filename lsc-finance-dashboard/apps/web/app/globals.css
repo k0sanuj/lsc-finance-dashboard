@@ -2382,6 +2382,114 @@ textarea {
   }
 }
 
+.pnl-workspace {
+  gap: 22px;
+}
+
+.pnl-control-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.pnl-assumption-list,
+.pnl-source-coverage {
+  display: grid;
+  gap: 10px;
+}
+
+.pnl-assumption-list > div,
+.pnl-source-coverage > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.pnl-assumption-list > div.selected {
+  border-color: rgba(31, 93, 132, 0.36);
+  background: rgba(31, 93, 132, 0.08);
+}
+
+.pnl-assumption-list span,
+.pnl-source-coverage span {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.pnl-assumption-list strong,
+.pnl-source-coverage strong {
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.pnl-source-coverage small {
+  grid-column: 1 / -1;
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+}
+
+.pnl-statement-table th:nth-child(1),
+.pnl-statement-table td:nth-child(1) {
+  min-width: 280px;
+}
+
+.pnl-statement-table th:nth-child(3),
+.pnl-statement-table td:nth-child(3) {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pnl-section-row td {
+  background: rgba(31, 93, 132, 0.08);
+  color: var(--ink);
+  font-weight: 800;
+  border-top: 1px solid rgba(31, 93, 132, 0.18);
+  border-bottom: 1px solid rgba(31, 93, 132, 0.18);
+}
+
+.pnl-line-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.pnl-line-title svg {
+  color: var(--brand);
+  flex: 0 0 auto;
+}
+
+.source-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.source-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #fff;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .pnl-control-strip {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ─── Minimal enhancements (added by Claude Code) ─────── */
 
 /* Focus states for accessibility */

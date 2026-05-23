@@ -148,6 +148,22 @@ Represents a preserved source or canonical row that must be excluded from defaul
 
 Represents the shared backend recognition contract used by entity dashboards. It separates actual revenue/cost/cash, committed payables/receivables, planning/scenario values, and quarantined/excluded values so dashboards do not infer finance treatment from raw status text.
 
+### FinancePnlScenario
+
+Represents one P&L scenario for an entity, sport, or future asset. Scenario types include actual, management, forecast, budget, and sensitivity. A scenario owns ordered P&L periods, assumptions, and line items.
+
+### FinancePnlPeriod
+
+Represents a P&L reporting column such as TBR Season 1, Season 2, Season 3 management forecast, an FSP planning year, or an XTZ recognition period.
+
+### FinancePnlLineItem
+
+Represents one source-backed P&L statement row. It stores section, display order, source amount and currency, FX, USD reporting amount, data status, source module, source document, import batch, notes, and include/exclude treatment.
+
+### FinancePnlAssumption
+
+Represents editable assumptions behind a scenario, including prize pool cases, FX rates, bonus scenarios, and future sensitivity inputs.
+
 ### AgentMutationIdempotency
 
 Represents one approved mutating agent skill execution. It stores the agent id, skill, idempotency key, request payload, resulting entity, and success/failure status so retried agent actions cannot double-post canonical finance rows.
@@ -201,6 +217,9 @@ Represents the link between E1 accounting rows and matching operating expense ba
 - AI intake posting events preserve the bridge from approved preview fields to canonical records
 - finance reporting exclusions mark source rows as preserved but excluded from default finance views
 - finance recognition views consume canonical records plus quarantine metadata and expose entity-ready recognition buckets
+- P&L scenarios have many P&L periods, assumptions, and line items
+- P&L line items link back to source documents, import batches, raw rows, and the canonical module that produced them
+- entity and sport pages consume P&L statement views; source/detail modules remain the operational owners
 - mutating agent skill runs create idempotency, audit, and cascade action records
 - TBR seasons have many operating expense control lines
 - TBR seasons have many E1 accounting lines

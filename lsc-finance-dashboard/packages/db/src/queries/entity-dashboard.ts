@@ -177,6 +177,7 @@ async function getLscEntityDashboard(): Promise<EntityDashboard> {
       }
     ],
     links: [
+      { label: "P&L Statement", href: "/lsc/pnl", helper: "Reusable statement and recognition view" },
       { label: "Costs", href: "/costs/LSC", helper: "Approved and committed cost control" },
       { label: "Payments", href: "/payments/LSC", helper: "Payables and cash movement" },
       { label: "Documents", href: "/documents/LSC", helper: "Source-backed support" },
@@ -265,7 +266,8 @@ async function getTbrEntityDashboard(): Promise<EntityDashboard> {
     links: [
       { label: "Operating Expenses", href: "/tbr/operating-expenses", helper: "Season baseline matrix" },
       { label: "E1 Accounting", href: "/tbr/e1-accounting", helper: "Invoice/payment ledger" },
-      { label: "Overall P&L", href: "/tbr/overall-pnl", helper: "No-double-count P&L" },
+      { label: "P&L Statement", href: "/tbr/pnl", helper: "Workbook-backed statement and scenarios" },
+      { label: "Overall P&L", href: "/tbr/overall-pnl", helper: "Legacy no-double-count view" },
       { label: "Costs", href: "/costs/TBR", helper: "Entity cost workspace" }
     ]
   };
@@ -378,6 +380,7 @@ async function getFspEntityDashboard(): Promise<EntityDashboard> {
     ],
     links: [
       { label: "All Sports", href: "/fsp/sports", helper: "Sport asset cards and cockpits" },
+      { label: "P&L Statement", href: "/fsp/pnl", helper: "Portfolio statement and sport rollups" },
       { label: "Consolidated P&L", href: "/fsp/consolidated", helper: "FSP-only scenario dashboard" },
       { label: "Costs", href: "/costs/FSP", helper: "Scenario cost workspace" },
       { label: "Documents", href: "/documents/FSP", helper: "Media kits and sponsorship support" }
@@ -456,6 +459,7 @@ async function getXtzEntityDashboard(): Promise<EntityDashboard> {
       }
     ],
     links: [
+      { label: "P&L Statement", href: "/xtz/pnl", helper: "Invoice recognition statement" },
       { label: "Invoice Dashboard", href: "/payroll-invoices", helper: "Generated/sent/paid register" },
       { label: "Generate Invoice", href: "/payroll-invoices/generator", helper: "Payroll/vendor invoice builder" },
       { label: "Gig Workers", href: "/gig-workers", helper: "Worker roster and payouts" },

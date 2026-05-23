@@ -90,6 +90,7 @@ function getLscNav(): CompanyNav {
       {
         label: "Command Center",
         links: [
+          { href: "/lsc/pnl" as Route, label: "P&L Statement", roles: [...ALL_ADMIN, "viewer"] },
           { href: "/costs/LSC" as Route, label: "Costs", roles: [...ALL_ADMIN, "viewer"] },
           { href: "/payments/LSC" as Route, label: "Payments", roles: ALL_ADMIN },
           { href: "/receivables/LSC" as Route, label: "Receivables", roles: ALL_ADMIN },
@@ -143,7 +144,8 @@ function getTbrNav(): CompanyNav {
         links: [
           { href: "/tbr/operating-expenses", label: "Operating Expenses", roles: ALL_ADMIN },
           { href: "/tbr/e1-accounting", label: "E1 Accounting", roles: ALL_ADMIN },
-          { href: "/tbr/overall-pnl", label: "Overall P&L", roles: ALL_ADMIN },
+          { href: "/tbr/pnl", label: "P&L Statement", roles: ALL_ADMIN },
+          { href: "/tbr/overall-pnl", label: "Overall P&L (Legacy)", roles: ALL_ADMIN },
           { href: "/costs/TBR" as Route, label: "Costs", roles: [...ALL_ADMIN, "viewer"] },
           { href: "/payments/TBR" as Route, label: "Payments", roles: ALL_ADMIN },
           { href: "/receivables/TBR" as Route, label: "Receivables", roles: ALL_ADMIN },
@@ -191,7 +193,7 @@ function getTbrNav(): CompanyNav {
 function sportSubLinks(sportCode: string): NavSubLink[] {
   return [
     { href: `/fsp/sports/${sportCode}?tab=overview` as Route, label: "Overview" },
-    { href: `/fsp/sports/${sportCode}?tab=summary` as Route, label: "P&L" },
+    { href: `/fsp/sports/${sportCode}/pnl` as Route, label: "P&L" },
     { href: `/fsp/sports/${sportCode}?tab=sponsorship` as Route, label: "Sponsorship" },
     { href: `/fsp/sports/${sportCode}?tab=media` as Route, label: "Media" },
     { href: `/fsp/sports/${sportCode}?tab=opex` as Route, label: "OPEX" },
@@ -209,6 +211,7 @@ function getFspNav(): CompanyNav {
         label: "Sports",
         links: [
           { href: "/fsp/sports" as Route, label: "All Sports", roles: ALL_ADMIN },
+          { href: "/fsp/pnl" as Route, label: "P&L Statement", roles: ALL_ADMIN },
           { href: "/fsp/consolidated" as Route, label: "Consolidated P&L", roles: ALL_ADMIN },
           {
             href: "/fsp/sports/squash" as Route,
@@ -264,6 +267,7 @@ function getXtzNav(): CompanyNav {
       {
         label: "People",
         links: [
+          { href: "/xtz/pnl" as Route, label: "P&L Statement", roles: ALL_ADMIN },
           { href: "/costs/XTZ" as Route, label: "Costs", roles: [...ALL_ADMIN, "viewer"] },
           { href: "/employees?company=XTZ" as Route, label: "Employees", roles: ALL_ADMIN },
           { href: "/salary-payable?company=XTZ" as Route, label: "Salary Payable", roles: ALL_ADMIN },
@@ -309,10 +313,15 @@ function getWorkspaceLabel(pathname: string) {
   if (pathname.startsWith("/tbr/invoice-hub")) return "Invoice Hub";
   if (pathname.startsWith("/tbr/operating-expenses")) return "Operating Expenses";
   if (pathname.startsWith("/tbr/e1-accounting")) return "E1 Accounting";
+  if (pathname.startsWith("/tbr/pnl")) return "P&L Statement";
   if (pathname.startsWith("/tbr/overall-pnl")) return "Overall P&L";
   if (pathname.startsWith("/tbr/team-management")) return "Team Management";
   if (pathname.startsWith("/tbr")) return "TBR Overview";
+  if (pathname.startsWith("/xtz/pnl")) return "XTZ P&L Statement";
   if (pathname === "/xtz" || pathname.startsWith("/xtz/")) return "XTZ Overview";
+  if (pathname.startsWith("/lsc/pnl")) return "LSC P&L Statement";
+  if (pathname.startsWith("/fsp/pnl")) return "FSP P&L Statement";
+  if (pathname.startsWith("/fsp/sports/") && pathname.endsWith("/pnl")) return "Sport P&L Statement";
   if (pathname.startsWith("/fsp")) return "FSP";
   if (pathname.startsWith("/commercial-goals")) return "Commercial Goals";
   if (pathname.startsWith("/costs")) return "Costs";
@@ -373,9 +382,12 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
       races: "Races", "my-expenses": "My Expenses", "expense-management": "Expense Review",
       "invoice-hub": "Invoice Hub", "team-management": "Team Management",
       "operating-expenses": "Operating Expenses", "e1-accounting": "E1 Accounting",
+      pnl: "P&L Statement",
       "overall-pnl": "Overall P&L",
     };
     if (labels[sub]) crumbs.push({ label: labels[sub] });
+  } else if (pathname.startsWith("/lsc/pnl")) {
+    crumbs.push({ label: "LSC", href: "/" }, { label: "P&L Statement" });
   } else if (pathname.startsWith("/costs/")) {
     const c = companyCodeToLabel(pathname.slice("/costs/".length).split("/")[0]) ?? "TBR";
     crumbs.push({ label: c, href: companyCodeToHref(pathname.slice("/costs/".length).split("/")[0]) }, { label: "Costs" });
@@ -403,6 +415,8 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "XTZ India", href: "/xtz" }, { label: "Expenses" });
   } else if (pathname.startsWith("/gig-workers")) {
     crumbs.push({ label: "XTZ India", href: "/xtz" }, { label: "Gig Workers" });
+  } else if (pathname.startsWith("/xtz/pnl")) {
+    crumbs.push({ label: "XTZ India", href: "/xtz" }, { label: "P&L Statement" });
   } else if (pathname === "/xtz" || pathname.startsWith("/xtz/")) {
     crumbs.push({ label: "XTZ India" });
   } else if (pathname.startsWith("/deal-pipeline")) {
@@ -415,8 +429,12 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; href?: string 
     crumbs.push({ label: "Intelligence" }, { label: "AI Data Ingestion" });
   } else if (pathname.startsWith("/sports-dashboard")) {
     crumbs.push({ label: "Sports Dashboard" });
+  } else if (pathname.startsWith("/fsp/pnl")) {
+    crumbs.push({ label: "FSP", href: "/fsp" }, { label: "P&L Statement" });
   } else if (pathname.startsWith("/fsp/consolidated")) {
     crumbs.push({ label: "FSP", href: "/fsp" }, { label: "Consolidated P&L" });
+  } else if (pathname.startsWith("/fsp/sports/") && pathname.endsWith("/pnl")) {
+    crumbs.push({ label: "FSP", href: "/fsp" }, { label: "Sports", href: "/fsp/sports" }, { label: "P&L Statement" });
   } else if (pathname.startsWith("/fsp/sports/")) {
     crumbs.push({ label: "FSP", href: "/fsp" }, { label: "Sports", href: "/fsp/sports" }, { label: "Module" });
   } else if (pathname.startsWith("/fsp/sports")) {
@@ -493,6 +511,7 @@ const PRIMARY_NAV_ITEMS: PrimaryNavItem[] = [
     roles: ALL_ROLES,
     isActive: (pathname, searchParams) =>
       pathname.startsWith("/costs/LSC") ||
+      pathname.startsWith("/lsc/pnl") ||
       pathname.startsWith("/payments/LSC") ||
       pathname.startsWith("/receivables/LSC") ||
       pathname.startsWith("/documents/LSC") ||
