@@ -89,6 +89,19 @@ async function main() {
       [fullName, email, normalizedEmail, role, passwordHash]
     );
 
+    await client.query(
+      `insert into auth_allowed_identities (normalized_email, email, full_name, role, is_active, metadata)
+       values ($1, $2, $3, $4::app_user_role, true, jsonb_build_object('source', 'bootstrap_admin'))
+       on conflict (normalized_email) do update
+         set email = excluded.email,
+             full_name = excluded.full_name,
+             role = excluded.role,
+             is_active = true,
+             updated_at = now(),
+             metadata = auth_allowed_identities.metadata || excluded.metadata`,
+      [normalizedEmail, email, fullName, role]
+    );
+
     const company = await client.query(`select id from companies where code = 'TBR'::company_code`);
     const companyId = company.rows[0]?.id ?? null;
 

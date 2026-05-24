@@ -77,6 +77,8 @@ function auditEnvVars() {
     "AWS_SECRET_ACCESS_KEY",
     "S3_BUCKET",
     "LSC_INTERNAL_API_KEY",
+    "RESEND_API_KEY",
+    "AUTH_MAGIC_LINK_FROM",
   ];
 
   for (const key of required) {
@@ -156,6 +158,30 @@ async function auditDatabase() {
     // Users
     const userRes = await pool.query("SELECT count(*)::int as cnt FROM app_users WHERE is_active = true");
     ok(`Active users: ${userRes.rows[0]?.cnt}`);
+
+    // Auth allowlist
+    const allowlistRes = await pool.query(
+      "SELECT count(*)::int as cnt FROM auth_allowed_identities WHERE is_active = true"
+    );
+    const allowedCount = allowlistRes.rows[0]?.cnt ?? 0;
+    if (allowedCount > 0 && allowedCount <= 3) ok(`Active auth allowlist: ${allowedCount} email(s)`);
+    else fail(`Active auth allowlist has ${allowedCount} email(s); expected 1-3`);
+
+    if (allowedCount < 3) {
+      warn("Auth allowlist has fewer than three active emails; add the remaining approved user when known");
+    }
+
+    const outsideAllowlistRes = await pool.query(`
+      select count(*)::int as cnt
+      from app_users u
+      left join auth_allowed_identities ai
+        on ai.normalized_email = u.normalized_email
+       and ai.is_active = true
+      where u.is_active = true
+        and ai.normalized_email is null
+    `);
+    if (outsideAllowlistRes.rows[0]?.cnt === 0) ok("No active app users outside auth allowlist");
+    else fail(`${outsideAllowlistRes.rows[0]?.cnt} active app user(s) outside auth allowlist`);
 
     // Invoice intakes
     const intakeRes = await pool.query("SELECT count(*)::int as cnt FROM invoice_intakes");
@@ -287,6 +313,7 @@ function auditRoutes() {
   const expectedRoutes = [
     "app/page.tsx",
     "app/login/page.tsx",
+    "app/login/magic/route.ts",
     "app/tbr/page.tsx",
     "app/tbr/races/page.tsx",
     "app/tbr/races/[raceId]/page.tsx",
@@ -329,10 +356,12 @@ function auditRoutes() {
     const fullPath = join(WEB, route);
     if (existsSync(fullPath)) {
       const content = readFileSync(fullPath, "utf8");
-      if (content.includes("export default")) {
+      if (route.endsWith("/route.ts") && /export\s+async\s+function\s+(GET|POST|PUT|PATCH|DELETE)/.test(content)) {
+        ok(route);
+      } else if (content.includes("export default")) {
         ok(route);
       } else {
-        fail(`${route}: exists but missing default export`);
+        fail(`${route}: exists but missing expected export`);
       }
     } else {
       fail(`${route}: FILE MISSING`);
@@ -554,6 +583,8 @@ async function auditVercelEnv() {
     }
     if (output.includes("LSC_INTERNAL_API_KEY")) ok("Vercel has LSC_INTERNAL_API_KEY");
     else warn("Vercel missing LSC_INTERNAL_API_KEY (internal ingest/tranche APIs will reject calls)");
+    if (output.includes("RESEND_API_KEY")) ok("Vercel has RESEND_API_KEY");
+    else warn("Vercel missing RESEND_API_KEY (magic-link email delivery will fall back to password login)");
   } catch {
     warn("Could not check Vercel env vars (CLI not authenticated?)");
   }

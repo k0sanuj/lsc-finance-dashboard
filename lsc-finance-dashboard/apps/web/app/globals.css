@@ -477,6 +477,22 @@ textarea {
   line-height: 0.95;
 }
 
+.password-fallback {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.password-fallback summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+.password-fallback[open] {
+  display: grid;
+  gap: 14px;
+}
+
 .page-grid,
 .section,
 .graph-shell,
