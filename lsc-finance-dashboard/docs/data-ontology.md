@@ -168,6 +168,10 @@ Represents editable assumptions behind a scenario, including prize pool cases, F
 
 Represents one approved mutating agent skill execution. It stores the agent id, skill, idempotency key, request payload, resulting entity, and success/failure status so retried agent actions cannot double-post canonical finance rows.
 
+### AgentActivityLog
+
+Canonical v1 runtime event stream for the app's product agents. It records orchestrator requests, fallback/degraded states, dispatched steps, duration, provider health, and execution outcomes. `agent_tasks` and `agent_handoffs` remain legacy/visualization tables unless upgraded later.
+
 ### CascadeActionEvent
 
 Represents one downstream cascade action emitted after a canonical mutation, including audit lineage update, analyzer queue, notification queue, or skipped live-view refresh.
@@ -266,6 +270,7 @@ Exposes filtered views, APIs, and page-level read models.
 - ai_intake_draft_fields
 - ai_intake_posting_events
 - finance_reporting_exclusions
+- agent_activity_log
 - agent_mutation_idempotency
 - outbound_notifications
 - cascade_action_events

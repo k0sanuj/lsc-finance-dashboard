@@ -105,6 +105,7 @@ Environment:
 
 - `RESEND_API_KEY` enables production magic-link email delivery.
 - `AUTH_MAGIC_LINK_FROM` controls the email sender address.
+- Production magic-link rollout is not complete until both email variables are present in Vercel and all three approved identities are allowlisted.
 - `AUTH_ALLOWED_USERS_JSON` can define the three active users as JSON with
   `email`, `fullName`, and `role`.
 - `AUTH_ALLOWED_EMAILS` can define a simpler comma-separated email allowlist.

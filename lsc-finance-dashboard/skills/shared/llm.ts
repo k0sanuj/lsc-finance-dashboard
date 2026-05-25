@@ -59,6 +59,12 @@ export type LlmCallResult<T = unknown> = {
 };
 
 export type LlmProvider = "anthropic" | "gemini";
+export type LlmProviderHealth = {
+  provider: LlmProvider;
+  requiredEnv: string;
+  configured: boolean;
+  status: "ready" | "missing";
+};
 
 /**
  * Purpose → provider routing.
@@ -105,6 +111,28 @@ const DEFAULT_PROVIDER: LlmProvider = "anthropic";
 
 export function providerForPurpose(purpose: string): LlmProvider {
   return PURPOSE_PROVIDER[purpose] ?? DEFAULT_PROVIDER;
+}
+
+export function getLlmProviderHealth(): LlmProviderHealth[] {
+  return [
+    {
+      provider: "anthropic",
+      requiredEnv: "ANTHROPIC_API_KEY",
+      configured: Boolean(process.env.ANTHROPIC_API_KEY),
+      status: process.env.ANTHROPIC_API_KEY ? "ready" : "missing",
+    },
+    {
+      provider: "gemini",
+      requiredEnv: "GEMINI_API_KEY",
+      configured: Boolean(process.env.GEMINI_API_KEY),
+      status: process.env.GEMINI_API_KEY ? "ready" : "missing",
+    },
+  ];
+}
+
+export function getPurposeProviderHealth(purpose: string): LlmProviderHealth {
+  const provider = providerForPurpose(purpose);
+  return getLlmProviderHealth().find((health) => health.provider === provider)!;
 }
 
 /**

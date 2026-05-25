@@ -4,6 +4,13 @@
 
 This project should be operated as a coordinator system with specialist sub-agents. The point is not to have one general agent doing everything. The point is to route the right task to the right specialist and keep a single shared ontology underneath all of them.
 
+This document describes the **development-time Codex operating model**. The app also has a separate **runtime product-agent graph** in `lsc-finance-dashboard/agents/agent-graph.ts` with agents such as `orchestrator`, `finance-agent`, `invoice-agent`, and `document-agent`. Do not mix the two layers:
+
+- development specialists decide how to build safely
+- runtime product agents answer user requests and execute approved skills
+- `agent_activity_log` is the v1 runtime execution log
+- `agent_tasks` and `agent_handoffs` are legacy/visualization tables unless explicitly upgraded later
+
 ## Topology
 
 ```mermaid
@@ -100,6 +107,8 @@ graph TD
 3. Every mutating skill must write through a transaction-safe backend path where practical, record idempotency, and call the shared cascade/audit helper.
 4. Notification send skills must be queued or sent only after explicit confirmation; draft skills remain read-only.
 5. Dispatcher coverage tests must fail the release if a declared skill is missing a handler.
+6. `/api/orchestrate` must never crash on missing provider keys; it must return a safe fallback result and record degraded runtime activity.
+7. Production orchestration requires `ANTHROPIC_API_KEY`; document extraction requires `GEMINI_API_KEY`.
 
 ## Practical Codex Usage
 

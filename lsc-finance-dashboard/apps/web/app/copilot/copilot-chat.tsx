@@ -28,6 +28,9 @@ type OrchestratorResult = {
   };
   results: StepResult[];
   summary: string;
+  fallbackReason?: string;
+  llmProviderUsed?: string;
+  llmTokens?: { prompt: number; candidates: number; total: number };
   geminiTokens?: { prompt: number; candidates: number; total: number };
   classifyDurationMs?: number;
 };
@@ -250,12 +253,18 @@ function CopilotResult({
               {result.classifyDurationMs != null
                 ? ` • classify ${result.classifyDurationMs}ms`
                 : ""}
-              {result.geminiTokens
-                ? ` • ${result.geminiTokens.total.toLocaleString()} tokens`
+              {result.llmProviderUsed ? ` • ${result.llmProviderUsed}` : ""}
+              {(result.llmTokens ?? result.geminiTokens)
+                ? ` • ${(result.llmTokens ?? result.geminiTokens)!.total.toLocaleString()} tokens`
                 : ""}
             </span>
           )}
         </div>
+        {result.fallbackReason ? (
+          <div className="copilot-status signal-warn">
+            <strong>Fallback:</strong> {result.fallbackReason}
+          </div>
+        ) : null}
         {result.plan.reasoning ? (
           <div className="copilot-reasoning">
             <strong>Plan: </strong>

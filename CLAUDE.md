@@ -22,7 +22,7 @@ A living financial operating system for League Sports Co (LSC). Ontology-backed 
 - **Styling**: Vanilla CSS with CSS custom properties (`globals.css`) — NOT Tailwind
 - **Database**: Neon Postgres via `pg` (node-postgres), raw SQL with role-based connection pooling
 - **Validation**: Manual validation (Zod planned but not yet adopted)
-- **AI**: Google Gemini API (`gemini-2.5-flash`) for document intelligence
+- **AI**: Anthropic for orchestration/routing and Google Gemini for document intelligence
 - **Storage**: AWS S3 for document storage (with inline base64 fallback)
 - **Auth**: Custom HMAC-SHA256 session tokens via Web Crypto API
 - **Monorepo**: pnpm workspaces (root `package.json` + `lsc-finance-dashboard/` inner workspace)
@@ -56,8 +56,8 @@ lsc-finance-dashboard-1/          # Git root
     │   └── orchestrator.ts        # Intent classification + plan execution
     ├── skills/
     │   └── shared/
-    │       ├── audit-log.ts       # Audit log skill (stub — console-only for now)
-    │       └── cascade-update.ts
+    │       ├── audit-log.ts       # Writes mutation/audit lineage to audit_log
+    │       └── cascade-update.ts  # Persists cascade_action_events + audit_log
     ├── apps/
     │   └── web/                   # Next.js app
     │       ├── next.config.ts     # CSP headers, transpilePackages, tracing root
@@ -153,18 +153,20 @@ lsc-finance-dashboard-1/          # Git root
 ### Ontology Layer (`ontology/`)
 - `schema.ts`: TypeScript types mirroring SQL tables (not Drizzle — plain types + const enums)
 - `relations.ts`: Declarative entity relationship graph
-- `cascades.ts`: Trigger → Action rules engine (currently, SQL views are always-current so most actions are no-ops; audit-log and analyzer triggers are stubs)
+- `cascades.ts`: Trigger → Action rules engine. Live SQL-view refreshes are marked skipped, analyzer triggers are queued in `cascade_action_events`, and every canonical mutation writes audit lineage.
 
 ### Agent Architecture (`agents/`)
-- `agent-graph.ts`: Defines 11 agents (1 orchestrator, 6 specialists, 5 analyzers) with topology, skills registry, and routing validation
-- `orchestrator.ts`: Intent classification (keyword-based stub, Gemini integration planned) + topological plan execution with parallel steps
+- Development-time specialist agents live in `AGENTS.md` / `docs/agent-topology.md`; runtime product agents live in `lsc-finance-dashboard/agents/agent-graph.ts`.
+- `agent-graph.ts`: Runtime topology, skills registry, and routing validation for the app agents.
+- `orchestrator.ts`: Anthropic-backed intent classification with safe fallback + topological plan execution with parallel steps.
+- `observability.ts`: Writes runtime orchestrator/dispatch events to `agent_activity_log`.
 - Analyzers are READ-ONLY with scoped context
 
 ### Auth System
 - **NOT scrypt** — uses Web Crypto `HMAC-SHA256` for session tokens
 - Password hashing is in `lib/password.ts`
 - Session token format: `base64url(payload).base64url(hmac_signature)`
-- 7-day expiry, HTTP-only cookies
+- 90-day expiry, HTTP-only cookies
 - Middleware redirects unauthenticated users to `/login`
 - Roles: `super_admin`, `finance_admin`, `team_member`, `commercial_user`, `viewer`
 - Role-based nav filtering in `session-shell.tsx`
@@ -223,6 +225,7 @@ Never collapse these layers. Every UI number must trace to a canonical table or 
 - `DATABASE_URL` or `DATABASE_URL_ADMIN` — Neon Postgres connection
 - `AUTH_SESSION_SECRET` — HMAC signing key for sessions
 - `GEMINI_API_KEY` — Google Gemini API key
+- `ANTHROPIC_API_KEY` — Anthropic API key for runtime orchestration/routing
 
 ### Optional
 - `DATABASE_URL_APP_READ` — Dedicated read-only connection
@@ -239,7 +242,7 @@ Never collapse these layers. Every UI number must trace to a canonical table or 
 cd lsc-finance-dashboard && node scripts/pre-deploy-audit.mjs
 ```
 
-Checks: env vars, DB connection, critical queries, Gemini key, S3, page routes, build compilation, Vercel env parity.
+Checks: env vars, DB connection, critical queries, AI provider keys, agent runtime safety, S3, page routes, build compilation, Vercel env parity.
 
 **Do not deploy if any check fails.**
 

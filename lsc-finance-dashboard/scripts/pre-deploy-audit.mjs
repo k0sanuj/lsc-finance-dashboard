@@ -11,11 +11,11 @@
  * 2. All env vars are set and valid (no trailing newlines)
  * 3. Database connection works
  * 4. All critical queries return data
- * 5. Gemini API key is valid
+ * 5. AI provider keys and agent runtime safety are valid
  * 6. S3 storage is accessible
  * 7. All page routes exist and export default
  * 8. No TypeScript errors
- * 9. Vercel env vars match local (no newlines)
+ * 9. Vercel env vars match production requirements
  */
 
 import { readFileSync, existsSync, readdirSync, statSync } from "fs";
@@ -77,6 +77,7 @@ function auditEnvVars() {
     "AWS_SECRET_ACCESS_KEY",
     "S3_BUCKET",
     "LSC_INTERNAL_API_KEY",
+    "ANTHROPIC_API_KEY",
     "RESEND_API_KEY",
     "AUTH_MAGIC_LINK_FROM",
   ];
@@ -106,6 +107,10 @@ function auditEnvVars() {
   // Verify LSC_DATA_BACKEND is exactly "database"
   if (process.env.LSC_DATA_BACKEND && process.env.LSC_DATA_BACKEND !== "database") {
     fail(`LSC_DATA_BACKEND is "${process.env.LSC_DATA_BACKEND}" — must be exactly "database" for live data`);
+  }
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    warn("ANTHROPIC_API_KEY is not set locally — /api/orchestrate will use safe fallback in local dev");
   }
 }
 
@@ -302,6 +307,42 @@ async function auditS3() {
     ok("S3 delete works");
   } catch (err) {
     fail(`S3 error: ${err.message}`);
+  }
+}
+
+// ─── 4b. Agent Runtime Safety ─────────────────────────────
+
+function auditAgentRuntime() {
+  heading("4b. Agent Runtime Safety");
+
+  const checks = [
+    ["Dispatcher coverage", "pnpm test:agent-dispatcher"],
+    ["Orchestrator fallback", "pnpm test:orchestrator-fallback"],
+    ["Agent runtime mutation/cascade/audit safety", "pnpm test:agent-runtime"],
+    ["Magic-link auth allowlist", "pnpm test:magic-link-auth"],
+  ];
+
+  for (const [label, command] of checks) {
+    try {
+      execSync(command, { cwd: ROOT, encoding: "utf8", timeout: 120000, stdio: "pipe" });
+      ok(label);
+    } catch (err) {
+      const output = [err.stdout, err.stderr].filter(Boolean).join("\n").slice(-1200);
+      fail(`${label}: ${output || err.message}`);
+    }
+  }
+
+  try {
+    execSync("pnpm test:orchestrator-smoke", {
+      cwd: ROOT,
+      encoding: "utf8",
+      timeout: 120000,
+      stdio: "pipe",
+    });
+    ok("Live orchestrator smoke completed or skipped when local Anthropic is absent");
+  } catch (err) {
+    const output = [err.stdout, err.stderr].filter(Boolean).join("\n").slice(-1200);
+    fail(`Live orchestrator smoke: ${output || err.message}`);
   }
 }
 
@@ -576,7 +617,13 @@ async function auditVercelEnv() {
       { cwd: ROOT, encoding: "utf8", timeout: 15000 }
     );
 
-    const required = ["DATABASE_URL", "LSC_DATA_BACKEND", "AUTH_SESSION_SECRET", "GEMINI_API_KEY"];
+    const required = [
+      "DATABASE_URL",
+      "LSC_DATA_BACKEND",
+      "AUTH_SESSION_SECRET",
+      "GEMINI_API_KEY",
+      "ANTHROPIC_API_KEY",
+    ];
     for (const key of required) {
       if (output.includes(key)) ok(`Vercel has ${key}`);
       else fail(`Vercel MISSING ${key}`);
@@ -584,7 +631,9 @@ async function auditVercelEnv() {
     if (output.includes("LSC_INTERNAL_API_KEY")) ok("Vercel has LSC_INTERNAL_API_KEY");
     else warn("Vercel missing LSC_INTERNAL_API_KEY (internal ingest/tranche APIs will reject calls)");
     if (output.includes("RESEND_API_KEY")) ok("Vercel has RESEND_API_KEY");
-    else warn("Vercel missing RESEND_API_KEY (magic-link email delivery will fall back to password login)");
+    else fail("Vercel missing RESEND_API_KEY (production magic-link email delivery is not ready)");
+    if (output.includes("AUTH_MAGIC_LINK_FROM")) ok("Vercel has AUTH_MAGIC_LINK_FROM");
+    else fail("Vercel missing AUTH_MAGIC_LINK_FROM (production magic-link sender is not configured)");
   } catch {
     warn("Could not check Vercel env vars (CLI not authenticated?)");
   }
@@ -601,6 +650,7 @@ async function main() {
   await auditDatabase();
   await auditGemini();
   await auditS3();
+  auditAgentRuntime();
   auditRoutes();
   auditComponents();
   await auditQueryFunctions();

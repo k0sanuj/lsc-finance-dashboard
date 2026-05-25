@@ -2,8 +2,8 @@
  * LSC Finance Dashboard — Orchestrator
  *
  * Single entry point for AI-powered operations.
- * Classifies user intent via an LLM (T1 — routed to Anthropic Haiku by the
- * purpose registry in skills/shared/llm.ts), produces a RoutingPlan,
+ * Classifies user intent via an LLM (T1 — routed by the provider registry in
+ * skills/shared/llm.ts), produces a RoutingPlan,
  * validates against the agent graph, executes via the skill dispatcher,
  * and merges results.
  *
@@ -19,7 +19,15 @@ import {
   canRoute,
   validateRoutingPlan,
 } from "./agent-graph";
-import { callLlm } from "../skills/shared/llm";
+import { createHash, randomUUID } from "node:crypto";
+import { logAgentActivity } from "./observability";
+import {
+  callLlm,
+  getLlmProviderHealth,
+  getPurposeProviderHealth,
+  providerForPurpose,
+  type LlmProviderHealth,
+} from "../skills/shared/llm";
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -52,6 +60,10 @@ export type OrchestratorResult = {
   plan: RoutingPlan;
   results: StepResult[];
   summary: string;
+  fallbackReason?: string;
+  llmProviderHealth?: LlmProviderHealth[];
+  llmProviderUsed?: string;
+  llmTokens?: { prompt: number; candidates: number; total: number };
   geminiTokens?: { prompt: number; candidates: number; total: number };
   classifyDurationMs?: number;
 };
@@ -61,6 +73,8 @@ export type OrchestratorInput = {
   context?: Record<string, unknown>;
   /** If true, HITL steps are executed. Default: false (they are skipped). */
   autoRunHitl?: boolean;
+  /** App user id for runtime activity logging. */
+  performedByUserId?: string;
 };
 
 // ─── Dispatcher contract ───────────────────────────────────
@@ -97,10 +111,10 @@ export function validatePlan(plan: RoutingPlan): { valid: boolean; errors: strin
   return { valid: errors.length === 0, errors };
 }
 
-// ─── Gemini intent classification ──────────────────────────
+// ─── LLM intent classification ─────────────────────────────
 
 /**
- * Build the system prompt with the full skill catalog so Gemini knows
+ * Build the system prompt with the full skill catalog so the routing LLM knows
  * exactly what it can route to. We send the catalog inline rather than
  * via RAG — it's small (~60 entries) and fits comfortably in T1 context.
  */
@@ -217,7 +231,7 @@ function safeFallbackPlan(reason: string): RoutingPlan {
 }
 
 /**
- * Classify intent via Gemini and produce a validated plan.
+ * Classify intent via the configured routing provider and produce a validated plan.
  * Never throws. On any failure, returns a safe fallback plan.
  */
 export async function classifyAndPlan(
@@ -226,6 +240,8 @@ export async function classifyAndPlan(
   plan: RoutingPlan;
   tokensUsed?: { prompt: number; candidates: number; total: number };
   durationMs: number;
+  fallbackReason?: string;
+  providerUsed?: string;
 }> {
   const started = Date.now();
 
@@ -233,22 +249,39 @@ export async function classifyAndPlan(
     ? `\n\nCONTEXT: ${JSON.stringify(input.context)}`
     : "";
 
-  const call = await callLlm<RawPlan>({
-    tier: "T1",
-    purpose: "orchestrator-intent-classify",
-    systemPrompt: buildSystemPrompt(),
-    prompt: `USER MESSAGE: ${input.message}${contextBlock}`,
-    jsonSchema: PLAN_SCHEMA,
-    timeoutMs: 15_000,
-  });
+  let call: Awaited<ReturnType<typeof callLlm<RawPlan>>>;
+  try {
+    call = await callLlm<RawPlan>({
+      tier: "T1",
+      purpose: "orchestrator-intent-classify",
+      systemPrompt: buildSystemPrompt(),
+      prompt: `USER MESSAGE: ${input.message}${contextBlock}`,
+      jsonSchema: PLAN_SCHEMA,
+      timeoutMs: 15_000,
+    });
+  } catch (err) {
+    const providerHealth = getPurposeProviderHealth("orchestrator-intent-classify");
+    const reason = `LLM classify threw: ${
+      err instanceof Error ? err.message : String(err)
+    } — defaulting to finance overview`;
+    return {
+      plan: safeFallbackPlan(reason),
+      durationMs: Date.now() - started,
+      fallbackReason: reason,
+      providerUsed: providerHealth.provider,
+    };
+  }
 
   if (!call.ok || !call.data) {
+    const reason = `LLM classify failed: ${
+      call.error ?? "no data"
+    } — defaulting to finance overview`;
     return {
-      plan: safeFallbackPlan(
-        `LLM classify failed: ${call.error ?? "no data"} — defaulting to finance overview`
-      ),
+      plan: safeFallbackPlan(reason),
       tokensUsed: call.tokensUsed,
       durationMs: Date.now() - started,
+      fallbackReason: reason,
+      providerUsed: call.providerUsed,
     };
   }
 
@@ -272,22 +305,27 @@ export async function classifyAndPlan(
   const graphValidation = validateRoutingPlan(steps);
 
   if (steps.length === 0) {
+    const reason =
+      raw.reasoning ?? "LLM returned no actionable steps — defaulting to finance overview";
     return {
-      plan: safeFallbackPlan(
-        raw.reasoning ?? "Gemini returned no actionable steps — defaulting to finance overview"
-      ),
+      plan: safeFallbackPlan(reason),
       tokensUsed: call.tokensUsed,
       durationMs: Date.now() - started,
+      fallbackReason: reason,
+      providerUsed: call.providerUsed,
     };
   }
 
   if (!graphValidation.valid) {
+    const reason = `Plan failed validation: ${graphValidation.errors.join(
+      "; "
+    )} — defaulting to finance overview`;
     return {
-      plan: safeFallbackPlan(
-        `Plan failed validation: ${graphValidation.errors.join("; ")} — defaulting to finance overview`
-      ),
+      plan: safeFallbackPlan(reason),
       tokensUsed: call.tokensUsed,
       durationMs: Date.now() - started,
+      fallbackReason: reason,
+      providerUsed: call.providerUsed,
     };
   }
 
@@ -300,6 +338,7 @@ export async function classifyAndPlan(
     },
     tokensUsed: call.tokensUsed,
     durationMs: Date.now() - started,
+    providerUsed: call.providerUsed,
   };
 }
 
@@ -313,11 +352,17 @@ export async function classifyAndPlan(
 export async function executePlan(
   plan: RoutingPlan,
   dispatcher: SkillDispatcher,
-  opts: { autoRunHitl?: boolean } = {}
+  opts: {
+    autoRunHitl?: boolean;
+    runId?: string;
+    performedByUserId?: string;
+    planStartedAt?: number;
+  } = {}
 ): Promise<StepResult[]> {
   const results: StepResult[] = new Array(plan.steps.length);
   const completed = new Set<number>();
   const hitlSet = new Set(plan.hitlSteps);
+  const planStartedAt = opts.planStartedAt ?? Date.now();
 
   while (completed.size < plan.steps.length) {
     const ready: number[] = [];
@@ -345,6 +390,8 @@ export async function executePlan(
 
     const executions = ready.map(async (i) => {
       const step = plan.steps[i];
+      const dependencyWaitMs = Date.now() - planStartedAt;
+      const stepStarted = Date.now();
 
       if (hitlSet.has(i) && !opts.autoRunHitl) {
         results[i] = {
@@ -354,6 +401,21 @@ export async function executePlan(
           status: "skipped",
           error: "HITL step — requires human confirmation (pass autoRunHitl=true to execute)",
         };
+        await logAgentActivity({
+          agentId: step.agentId,
+          action: "dispatch_step_skipped",
+          entityType: "orchestration_step",
+          performedBy: opts.performedByUserId,
+          details: {
+            runId: opts.runId ?? null,
+            stepIndex: i,
+            skill: step.skill,
+            status: "skipped",
+            dependencyWaitMs,
+            durationMs: Date.now() - stepStarted,
+            reason: "hitl_requires_confirmation",
+          },
+        });
         completed.add(i);
         return;
       }
@@ -367,6 +429,20 @@ export async function executePlan(
           status: "success",
           data: result.data,
         };
+        await logAgentActivity({
+          agentId: step.agentId,
+          action: "dispatch_step_success",
+          entityType: "orchestration_step",
+          performedBy: opts.performedByUserId,
+          details: {
+            runId: opts.runId ?? null,
+            stepIndex: i,
+            skill: step.skill,
+            status: "success",
+            dependencyWaitMs,
+            durationMs: Date.now() - stepStarted,
+          },
+        });
       } else {
         results[i] = {
           stepIndex: i,
@@ -375,6 +451,22 @@ export async function executePlan(
           status: "error",
           error: result.error,
         };
+        await logAgentActivity({
+          agentId: step.agentId,
+          action: "dispatch_step_error",
+          entityType: "orchestration_step",
+          performedBy: opts.performedByUserId,
+          details: {
+            runId: opts.runId ?? null,
+            stepIndex: i,
+            skill: step.skill,
+            status: "error",
+            code: result.code ?? null,
+            error: result.error,
+            dependencyWaitMs,
+            durationMs: Date.now() - stepStarted,
+          },
+        });
       }
       completed.add(i);
     });
@@ -394,9 +486,18 @@ export async function orchestrate(
   input: OrchestratorInput,
   dispatcher: SkillDispatcher
 ): Promise<OrchestratorResult> {
+  const runId = randomUUID();
+  const startedAt = Date.now();
+  const messageHash = createHash("sha256").update(input.message).digest("hex");
+  const providerHealth = getLlmProviderHealth();
+  const routingProvider = providerForPurpose("orchestrator-intent-classify");
+
   const classify = await classifyAndPlan(input);
   const results = await executePlan(classify.plan, dispatcher, {
     autoRunHitl: input.autoRunHitl,
+    runId,
+    performedByUserId: input.performedByUserId,
+    planStartedAt: startedAt,
   });
 
   const successCount = results.filter((r) => r.status === "success").length;
@@ -408,12 +509,45 @@ export async function orchestrate(
   if (errorCount) parts.push(`${errorCount} failed`);
   if (skippedCount) parts.push(`${skippedCount} skipped (HITL)`);
   const summary = parts.length ? parts.join(", ") : "nothing executed";
+  const action =
+    classify.fallbackReason || errorCount > 0
+      ? "orchestrate_degraded"
+      : "orchestrate_completed";
+
+  await logAgentActivity({
+    agentId: AgentId.Orchestrator,
+    action,
+    entityType: "orchestration",
+    performedBy: input.performedByUserId,
+    details: {
+      runId,
+      messageHash,
+      intent: classify.plan.intent,
+      plan: classify.plan,
+      stepCount: classify.plan.steps.length,
+      successCount,
+      errorCount,
+      skippedCount,
+      summary,
+      providerUsed: classify.providerUsed ?? routingProvider,
+      providerHealth,
+      fallbackReason: classify.fallbackReason ?? null,
+      durationMs: Date.now() - startedAt,
+      classifyDurationMs: classify.durationMs,
+      autoRunHitl: input.autoRunHitl === true,
+      contextKeys: input.context ? Object.keys(input.context) : [],
+    },
+  });
 
   return {
     intent: classify.plan.intent,
     plan: classify.plan,
     results,
     summary,
+    fallbackReason: classify.fallbackReason,
+    llmProviderHealth: providerHealth,
+    llmProviderUsed: classify.providerUsed ?? routingProvider,
+    llmTokens: classify.tokensUsed,
     geminiTokens: classify.tokensUsed,
     classifyDurationMs: classify.durationMs,
   };

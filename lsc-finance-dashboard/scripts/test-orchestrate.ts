@@ -1,15 +1,23 @@
 /**
  * Integration test for the orchestrator's classifyAndPlan().
- * Hits Gemini for real. Does NOT execute the plan (skips dispatcher/DB).
+ * Hits the configured routing provider for real. Does NOT execute the plan.
  * Run with: npx tsx --tsconfig apps/web/tsconfig.json scripts/test-orchestrate.ts
  */
-import fs from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
+import { strict as assert } from "node:assert";
 
 async function main() {
-  const env = await fs.readFile(".env.local", "utf8");
-  for (const line of env.split("\n")) {
-    const m = line.match(/^([A-Z_]+)=(.*)$/);
-    if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+  for (const file of [".env.local", "apps/web/.env.local"]) {
+    if (!existsSync(file)) continue;
+    for (const line of readFileSync(file, "utf8").split("\n")) {
+      const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+    }
+  }
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn("ANTHROPIC_API_KEY is not set; skipping live orchestrator smoke.");
+    return;
   }
 
   const { classifyAndPlan } = await import("../agents/orchestrator");
@@ -33,8 +41,10 @@ async function main() {
       console.log(`  - ${s.agentId}:${s.skill}`, s.payload);
     }
     console.log("HITL steps:", r.plan.hitlSteps);
+    console.log("Provider:", r.providerUsed);
     console.log("LLM tokens:", r.tokensUsed);
     console.log("Classify ms:", r.durationMs);
+    assert.notEqual(r.plan.intent, "overview-fallback", "live provider should not fallback");
   }
 }
 

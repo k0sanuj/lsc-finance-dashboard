@@ -1,11 +1,16 @@
 import pg from "pg";
 import fs from "node:fs/promises";
+import { existsSync } from "node:fs";
 
 const { Client } = pg;
-const content = await fs.readFile(".env.local", "utf8");
-for (const line of content.split("\n")) {
-  const m = line.match(/^([A-Z_]+)=(.*)$/);
-  if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+
+for (const file of [".env.local", "apps/web/.env.local"]) {
+  if (!existsSync(file)) continue;
+  const content = await fs.readFile(file, "utf8");
+  for (const line of content.split("\n")) {
+    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+  }
 }
 
 const c = new Client({ connectionString: process.env.DATABASE_URL_ADMIN || process.env.DATABASE_URL });

@@ -35,6 +35,9 @@ Add these in the Vercel project settings before the preview is used with live da
 - `LSC_DATA_BACKEND=database`
 - `GEMINI_API_KEY`
 - `GEMINI_MODEL=gemini-2.5-flash`
+- `ANTHROPIC_API_KEY`
+- `RESEND_API_KEY`
+- `AUTH_MAGIC_LINK_FROM`
 
 Optional if you later use explicit derived role URLs:
 

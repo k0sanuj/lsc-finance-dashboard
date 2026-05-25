@@ -6,7 +6,7 @@ The Agent Graph page should visualize how the internal agent system operates ins
 
 ## Core Concept
 
-The main coordinating agent is:
+The development-time coordinating agent is:
 
 - `Finance Overlord`
 
@@ -88,13 +88,19 @@ Edge display can use:
 
 ## Data Model For This View
 
-Suggested graph entities:
+The historical visualization tables remain available:
 
 - `agent_nodes`
 - `agent_edges`
-- `agent_status_events`
 - `agent_handoffs`
 - `agent_tasks`
+
+For live v1 runtime observability, use:
+
+- `agent_activity_log` as the canonical orchestrator/dispatch event stream
+- `agent_mutation_idempotency` for approved mutating skill idempotency
+- `cascade_action_events` for downstream cascade execution records
+- `outbound_notifications` for queued notification-send skills
 
 Suggested node fields:
 
@@ -187,4 +193,6 @@ graph TD
 
 ## V1 Implementation Approach
 
-For v1, this page can run from a structured configuration file or database seed rather than a live multi-agent runtime. The model should still be designed so live agent events can replace static configuration later.
+For v1, `/agent-graph` renders the runtime product-agent graph from `agents/agent-graph.ts`. `/agent-graph/dispatcher-status` combines static dispatcher coverage with live runtime health from `agent_activity_log`, `cascade_action_events`, and `outbound_notifications`.
+
+Development-time specialist agents such as `finance architect`, `schema engineer`, and `QA debug agent` remain a Codex operating model. Runtime product agents such as `orchestrator`, `finance-agent`, `invoice-agent`, and `document-agent` are the app execution layer.

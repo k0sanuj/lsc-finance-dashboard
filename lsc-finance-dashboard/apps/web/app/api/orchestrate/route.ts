@@ -5,7 +5,7 @@
  * Returns: OrchestratorResult
  *
  * Admin-only. This is the end-to-end loop:
- *   user message → Gemini intent classify → RoutingPlan → dispatcher → results
+ *   user message → LLM intent classify → RoutingPlan → dispatcher → results
  */
 import { NextResponse } from "next/server";
 import { requireRole } from "../../../lib/auth";
@@ -13,8 +13,9 @@ import { orchestrate } from "@lsc/agents/orchestrator";
 import { dispatch } from "@lsc/skills/dispatcher";
 
 export async function POST(req: Request) {
+  let session;
   try {
-    await requireRole(["super_admin", "finance_admin"]);
+    session = await requireRole(["super_admin", "finance_admin"]);
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
       message: body.message.trim(),
       context: body.context,
       autoRunHitl: body.autoRunHitl === true,
+      performedByUserId: session.id,
     },
     dispatch
   );
