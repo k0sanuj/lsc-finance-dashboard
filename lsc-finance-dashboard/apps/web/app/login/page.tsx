@@ -39,11 +39,17 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <form action={passwordLoginAction} className="stack-form">
           <label className="field">
             <span>Email</span>
-            <input name="email" type="email" autoComplete="email" required />
+            <input id="login-email" name="email" type="email" autoComplete="username" required />
           </label>
           <label className="field">
             <span>Password</span>
-            <input name="password" type="password" autoComplete="current-password" required />
+            <input
+              id="login-password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+            />
           </label>
           <button className="action-button primary" type="submit">
             Sign in
