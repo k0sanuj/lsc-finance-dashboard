@@ -13,6 +13,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const error = params?.error ?? null;
   const sent = params?.sent === "1";
   const devLink = params?.devLink ?? null;
+  const magicLinkAvailable = Boolean(process.env.RESEND_API_KEY);
 
   return (
     <div className="login-shell">
@@ -20,46 +21,48 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <span className="eyebrow">League Sports Co</span>
         <h2>Sign in to Finance Control Center</h2>
         <p>
-          Enter your approved email and we will send a secure sign-in link. Access is restricted
-          to the allowlisted LSC finance accounts.
+          Use your approved email and password. Access is restricted to three allowlisted LSC
+          finance accounts and sessions stay active for 90 days unless access is revoked.
         </p>
-        {error ? <div className="notice error">{error}</div> : null}
+        {error ? <div className="login-notice error">{error}</div> : null}
         {sent ? (
-          <div className="notice success">
+          <div className="login-notice success">
             If this email is approved, a sign-in link has been sent. The link expires in 15
             minutes.
           </div>
         ) : null}
         {devLink ? (
-          <div className="notice">
+          <div className="login-notice">
             Development magic link: <a href={devLink}>open sign-in link</a>
           </div>
         ) : null}
-        <form action={requestMagicLinkAction} className="stack-form">
+        <form action={passwordLoginAction} className="stack-form">
           <label className="field">
             <span>Email</span>
             <input name="email" type="email" autoComplete="email" required />
           </label>
+          <label className="field">
+            <span>Password</span>
+            <input name="password" type="password" autoComplete="current-password" required />
+          </label>
           <button className="action-button primary" type="submit">
-            Send secure link
+            Sign in
           </button>
         </form>
-        <details className="password-fallback">
-          <summary>Use password instead</summary>
-          <form action={passwordLoginAction} className="stack-form">
-            <label className="field">
-              <span>Email</span>
-              <input name="email" type="email" autoComplete="email" required />
-            </label>
-            <label className="field">
-              <span>Password</span>
-              <input name="password" type="password" autoComplete="current-password" required />
-            </label>
-            <button className="action-button secondary" type="submit">
-              Sign in with password
-            </button>
-          </form>
-        </details>
+        {magicLinkAvailable ? (
+          <details className="password-fallback">
+            <summary>Use secure email link instead</summary>
+            <form action={requestMagicLinkAction} className="stack-form">
+              <label className="field">
+                <span>Email</span>
+                <input name="email" type="email" autoComplete="email" required />
+              </label>
+              <button className="action-button secondary" type="submit">
+                Send secure link
+              </button>
+            </form>
+          </details>
+        ) : null}
       </section>
     </div>
   );

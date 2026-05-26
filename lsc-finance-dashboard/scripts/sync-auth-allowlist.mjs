@@ -43,7 +43,8 @@ function parseJsonAllowlist() {
     email: String(entry.email ?? "").trim(),
     normalizedEmail: normalizeEmail(entry.email),
     fullName: String(entry.fullName ?? entry.name ?? entry.email ?? "").trim(),
-    role: String(entry.role ?? "viewer")
+    role: String(entry.role ?? "viewer"),
+    password: entry.password ? String(entry.password) : null
   }));
 }
 
@@ -60,8 +61,23 @@ function parseEmailAllowlist() {
       email,
       normalizedEmail: normalizeEmail(email),
       fullName: email.split("@")[0],
-      role: defaultRole
+      role: defaultRole,
+      password: null
     }));
+}
+
+function validatePasswordStrength(email, password) {
+  if (!password) return;
+  const failures = [];
+  if (password.length < 12) failures.push("at least 12 characters");
+  if (!/[a-z]/.test(password)) failures.push("a lowercase letter");
+  if (!/[A-Z]/.test(password)) failures.push("an uppercase letter");
+  if (!/[0-9]/.test(password)) failures.push("a number");
+  if (!/[^A-Za-z0-9]/.test(password)) failures.push("a symbol");
+
+  if (failures.length > 0) {
+    throw new Error(`Weak password for ${email}; include ${failures.join(", ")}.`);
+  }
 }
 
 async function loadExistingActiveUsers(pool) {
@@ -89,6 +105,7 @@ function validateAllowlist(entries) {
     if (!VALID_ROLES.has(entry.role)) {
       throw new Error(`Invalid role for ${entry.email}: ${entry.role}`);
     }
+    validatePasswordStrength(entry.email, entry.password);
     deduped.set(entry.normalizedEmail, {
       ...entry,
       fullName: entry.fullName || entry.email
@@ -119,7 +136,21 @@ try {
     await client.query("begin");
 
     for (const entry of entries) {
-      const passwordHash = hashPassword(`magic-link-only:${randomBytes(32).toString("hex")}`);
+      const existingUser = await client.query(
+        `select id from app_users where normalized_email = $1 limit 1`,
+        [entry.normalizedEmail]
+      );
+
+      if (!entry.password && existingUser.rowCount === 0) {
+        throw new Error(
+          `Password is required for new allowlisted user ${entry.email}. ` +
+            "Add a strong password field to AUTH_ALLOWED_USERS_JSON."
+        );
+      }
+
+      const passwordHash = entry.password
+        ? hashPassword(entry.password)
+        : hashPassword(`password-not-set:${randomBytes(32).toString("hex")}`);
       const user = await client.query(
         `insert into app_users (full_name, email, normalized_email, role, password_hash, is_active, metadata)
          values ($1, $2, $3, $4, $5, true, jsonb_build_object('auth_source', 'allowlist_sync'))
@@ -127,11 +158,22 @@ try {
            set full_name = excluded.full_name,
                email = excluded.email,
                role = excluded.role,
+               password_hash = case
+                 when $6::boolean then excluded.password_hash
+                 else app_users.password_hash
+               end,
                is_active = true,
                updated_at = now(),
                metadata = app_users.metadata || jsonb_build_object('auth_source', 'allowlist_sync')
          returning id`,
-        [entry.fullName, entry.email, entry.normalizedEmail, entry.role, passwordHash]
+        [
+          entry.fullName,
+          entry.email,
+          entry.normalizedEmail,
+          entry.role,
+          passwordHash,
+          Boolean(entry.password)
+        ]
       );
 
       await client.query(

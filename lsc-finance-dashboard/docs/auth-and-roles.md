@@ -56,9 +56,9 @@ The goal is to protect the full app before broader rollout, then use role-aware 
 
 ## Session Model
 
-Use a signed cookie session. The primary production login flow is passwordless magic link,
-with the password form retained as an operational fallback while email delivery is being
-rolled out.
+Use a signed cookie session. The primary production login flow is allowlisted email plus
+password. Passwordless magic link remains an optional future/secondary channel, but it is
+not required for production access.
 
 The session payload should contain:
 
@@ -99,16 +99,21 @@ Rules:
 Operational scripts:
 
 - `pnpm auth:sync-allowlist`
-- `pnpm test:magic-link-auth`
+- `pnpm test:auth-allowlist`
 
 Environment:
 
-- `RESEND_API_KEY` enables production magic-link email delivery.
-- `AUTH_MAGIC_LINK_FROM` controls the email sender address.
-- Production magic-link rollout is not complete until both email variables are present in Vercel and all three approved identities are allowlisted.
-- `AUTH_ALLOWED_USERS_JSON` can define the three active users as JSON with
-  `email`, `fullName`, and `role`.
+- `AUTH_SESSION_SECRET` signs 90-day sessions.
+- `AUTH_ALLOWED_USERS_JSON` is the recommended local bootstrap/sync input for the three
+  active users. It may include `email`, `fullName`, `role`, and a strong `password`.
 - `AUTH_ALLOWED_EMAILS` can define a simpler comma-separated email allowlist.
+- `RESEND_API_KEY` optionally enables magic-link email delivery.
+- `AUTH_MAGIC_LINK_FROM` optionally controls the magic-link email sender address.
+
+For password-primary production access, every new allowlisted user must have a strong
+password set through `AUTH_ALLOWED_USERS_JSON` or an admin bootstrap/reset script. The
+allowlist sync preserves existing password hashes when a password is omitted, and it
+rejects brand-new users without a password.
 
 ## Bootstrap Rule
 

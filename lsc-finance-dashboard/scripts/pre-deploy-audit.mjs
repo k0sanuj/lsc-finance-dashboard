@@ -319,7 +319,7 @@ function auditAgentRuntime() {
     ["Dispatcher coverage", "pnpm test:agent-dispatcher"],
     ["Orchestrator fallback", "pnpm test:orchestrator-fallback"],
     ["Agent runtime mutation/cascade/audit safety", "pnpm test:agent-runtime"],
-    ["Magic-link auth allowlist", "pnpm test:magic-link-auth"],
+    ["Password auth allowlist", "pnpm test:auth-allowlist"],
   ];
 
   for (const [label, command] of checks) {
@@ -630,10 +630,10 @@ async function auditVercelEnv() {
     }
     if (output.includes("LSC_INTERNAL_API_KEY")) ok("Vercel has LSC_INTERNAL_API_KEY");
     else warn("Vercel missing LSC_INTERNAL_API_KEY (internal ingest/tranche APIs will reject calls)");
-    if (output.includes("RESEND_API_KEY")) ok("Vercel has RESEND_API_KEY");
-    else fail("Vercel missing RESEND_API_KEY (production magic-link email delivery is not ready)");
-    if (output.includes("AUTH_MAGIC_LINK_FROM")) ok("Vercel has AUTH_MAGIC_LINK_FROM");
-    else fail("Vercel missing AUTH_MAGIC_LINK_FROM (production magic-link sender is not configured)");
+    if (output.includes("RESEND_API_KEY")) ok("Vercel has RESEND_API_KEY (optional magic-link email)");
+    else warn("Vercel missing RESEND_API_KEY (magic-link email disabled; password auth remains primary)");
+    if (output.includes("AUTH_MAGIC_LINK_FROM")) ok("Vercel has AUTH_MAGIC_LINK_FROM (optional magic-link sender)");
+    else warn("Vercel missing AUTH_MAGIC_LINK_FROM (magic-link email disabled; password auth remains primary)");
   } catch {
     warn("Could not check Vercel env vars (CLI not authenticated?)");
   }

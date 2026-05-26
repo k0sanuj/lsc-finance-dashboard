@@ -18,6 +18,7 @@
     "test:orchestrator-fallback": "NODE_OPTIONS=--conditions=react-server tsx --tsconfig apps/web/tsconfig.json scripts/test-orchestrator-fallback.ts",
     "test:orchestrator-smoke": "NODE_OPTIONS=--conditions=react-server tsx --tsconfig apps/web/tsconfig.json scripts/test-orchestrate.ts",
     "test:magic-link-auth": "node scripts/test-magic-link-auth.mjs",
+    "test:auth-allowlist": "node scripts/test-magic-link-auth.mjs",
     "quarantine:qa": "node scripts/quarantine-reporting-qa.mjs",
     "db:apply": "node scripts/apply-sql.mjs sql/001_initial_schema.sql sql/002_derived_views.sql sql/003_seed_reference_data.sql sql/005_document_intelligence.sql sql/006_contract_source_document.sql sql/007_auth_and_teams.sql sql/010_document_intake_events.sql",
     "db:apply:document-intake": "node scripts/apply-sql.mjs sql/010_document_intake_events.sql",

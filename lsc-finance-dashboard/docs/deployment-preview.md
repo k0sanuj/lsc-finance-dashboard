@@ -36,8 +36,7 @@ Add these in the Vercel project settings before the preview is used with live da
 - `GEMINI_API_KEY`
 - `GEMINI_MODEL=gemini-2.5-flash`
 - `ANTHROPIC_API_KEY`
-- `RESEND_API_KEY`
-- `AUTH_MAGIC_LINK_FROM`
+- `AUTH_SESSION_SECRET`
 
 Optional if you later use explicit derived role URLs:
 
@@ -58,6 +57,15 @@ Optional if you enable private S3-backed file storage:
 - `S3_FORCE_PATH_STYLE`
   - optional for S3-compatible storage
 - `S3_SIGNED_URL_TTL_SECONDS`
+
+Optional if you later re-enable passwordless magic-link email:
+
+- `RESEND_API_KEY`
+- `AUTH_MAGIC_LINK_FROM`
+
+Password-primary production access is controlled by the database allowlist. Use
+`AUTH_ALLOWED_USERS_JSON` locally with `pnpm auth:sync-allowlist` to keep the active
+identity list at three users or fewer.
 
 ## Important Safety Rule
 

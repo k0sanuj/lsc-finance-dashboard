@@ -1357,6 +1357,25 @@ textarea {
   border-color: rgba(181, 106, 61, 0.28);
 }
 
+.login-notice {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-card);
+}
+
+.login-notice.success {
+  border-color: rgba(46, 107, 76, 0.24);
+}
+
+.login-notice.error {
+  border-color: rgba(181, 106, 61, 0.28);
+}
+
 .notice.warning {
   border-color: rgba(181, 106, 61, 0.35);
   background: rgba(181, 106, 61, 0.08);

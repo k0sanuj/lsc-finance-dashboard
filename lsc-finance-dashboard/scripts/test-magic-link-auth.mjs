@@ -20,6 +20,13 @@ function hashPassword(password) {
   return `scrypt$${salt}$${derivedKey}`;
 }
 
+function verifyPassword(password, hash) {
+  const [method, salt, storedHash] = String(hash ?? "").split("$");
+  if (method !== "scrypt" || !salt || !storedHash) return false;
+  const derivedKey = scryptSync(password, salt, 64).toString("hex");
+  return derivedKey === storedHash;
+}
+
 function hashToken(token) {
   return createHash("sha256").update(token).digest("hex");
 }
@@ -56,6 +63,7 @@ try {
 
   const client = await pool.connect();
   const email = `magic-test-${Date.now()}@example.invalid`;
+  const password = "Auth-Test-Password-2026!";
   const token = randomBytes(32).toString("base64url");
 
   try {
@@ -68,8 +76,12 @@ try {
     const user = await client.query(
       `insert into app_users (full_name, email, normalized_email, role, password_hash)
        values ('Magic Test', $1, $1, 'viewer', $2)
-       returning id`,
-      [email, hashPassword("unused")]
+       returning id, password_hash`,
+      [email, hashPassword(password)]
+    );
+    assert(
+      verifyPassword(password, user.rows[0].password_hash),
+      "Password hash verification failed for password-login model."
     );
     await client.query(
       `insert into auth_magic_links (app_user_id, normalized_email, token_hash, expires_at)
@@ -95,7 +107,7 @@ try {
     client.release();
   }
 
-  console.log(JSON.stringify({ ok: true, activeAllowedCount, activeUsersOutsideAllowlist: 0 }, null, 2));
+  console.log(JSON.stringify({ ok: true, activeAllowedCount, activeUsersOutsideAllowlist: 0, passwordModel: "verified" }, null, 2));
 } finally {
   await pool.end();
 }
