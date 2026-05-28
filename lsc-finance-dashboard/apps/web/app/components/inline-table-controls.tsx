@@ -154,7 +154,11 @@ export function DocumentPreviewButton({
   const canPreview = Boolean(previewDataUrl);
 
   if (!canPreview) {
-    return <span className="document-link document-link-muted">{documentName}</span>;
+    return (
+      <span className="document-link document-link-muted" title={documentName}>
+        {documentName}
+      </span>
+    );
   }
 
   return (
@@ -162,6 +166,7 @@ export function DocumentPreviewButton({
       <button
         className="document-link document-preview-trigger"
         onClick={() => dialogRef.current?.showModal()}
+        title={documentName}
         type="button"
       >
         {documentName}

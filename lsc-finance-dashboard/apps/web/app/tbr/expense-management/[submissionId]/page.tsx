@@ -59,6 +59,10 @@ function reviewTone(statusKey: string) {
   return "signal-muted";
 }
 
+function compactReceiptLabel(documentName: string) {
+  return documentName === "No source document linked" ? "No receipt" : documentName;
+}
+
 type ExpenseSubmissionDetailPageProps = {
   params: Promise<{
     submissionId: string;
@@ -331,7 +335,7 @@ export default async function ExpenseSubmissionDetailPage({
                     </td>
                     <td>
                       <DocumentPreviewButton
-                        documentName={item.sourceDocumentName}
+                        documentName={compactReceiptLabel(item.sourceDocumentName)}
                         previewDataUrl={item.sourcePreviewDataUrl}
                         previewMimeType={item.sourcePreviewMimeType}
                       />
