@@ -114,9 +114,10 @@ The seeded Lake Como Season 3 report for `mashael@teambluerising.com` is a sourc
 
 Expected control totals:
 
-- workbook-equivalent original total: `EUR 2,535.95`
-- reporting total: `USD 2,952.35`
-- over-cap amount: `USD 31.49`
+- reporting total after user-confirmed currency correction: `USD 2,623.96`
+- podium bonus: `USD 2,000` (not EUR)
+- over-cap amount: `USD 31.50`
+- original Expensify/workbook total before correction: `EUR 2,535.95`
 
 This seed must remain traceable to `source_documents`, `import_batches`, raw row metadata, expense submission items, rule findings, and item-level review status.
 

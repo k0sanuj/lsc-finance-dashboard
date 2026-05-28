@@ -59,8 +59,8 @@ function reviewTone(statusKey: string) {
   return "signal-muted";
 }
 
-function compactReceiptLabel(documentName: string) {
-  return documentName === "No source document linked" ? "No receipt" : documentName;
+function hasPreviewableReceipt(item: { sourcePreviewDataUrl: string | null }) {
+  return Boolean(item.sourcePreviewDataUrl);
 }
 
 type ExpenseSubmissionDetailPageProps = {
@@ -248,7 +248,6 @@ export default async function ExpenseSubmissionDetailPage({
                 <th>Race</th>
                 <th>Original</th>
                 <th>USD</th>
-                <th>Receipt</th>
                 <th>Rules</th>
                 <th>Status</th>
                 <th>Decision</th>
@@ -260,11 +259,30 @@ export default async function ExpenseSubmissionDetailPage({
                   <tr key={item.id}>
                     <td>{item.expenseDate}</td>
                     <td>
+                      <div className="merchant-item-cell">
+                        {hasPreviewableReceipt(item) ? (
+                          <DocumentPreviewButton
+                            className="item-name-receipt-link"
+                            displayLabel={
+                              <>
+                                <span className="receipt-presence-icon has-receipt" aria-hidden="true" />
+                                <span>{item.merchantName}</span>
+                              </>
+                            }
+                            documentName={item.sourceDocumentName}
+                            previewDataUrl={item.sourcePreviewDataUrl}
+                            previewMimeType={item.sourcePreviewMimeType}
+                          />
+                        ) : (
+                          <span className="item-name-receipt-missing" title="No receipt linked">
+                            <span className="receipt-presence-icon missing-receipt" aria-hidden="true" />
+                            <strong>{item.merchantName}</strong>
+                          </span>
+                        )}
+                        <span className="merchant-item-description">{item.description}</span>
+                      </div>
                       <details className="row-evidence-details">
-                        <summary>
-                          <strong>{item.merchantName}</strong>
-                          <span>{item.description}</span>
-                        </summary>
+                        <summary>Evidence and splits</summary>
                         <div className="row-evidence-panel">
                           <div>
                             <span className="section-kicker">Source evidence</span>
@@ -332,13 +350,6 @@ export default async function ExpenseSubmissionDetailPage({
                         <strong>{item.reportingAmountUsd}</strong>
                         <span className="bill-subnote">FX {item.fxRateToUsd ?? "N/A"}</span>
                       </div>
-                    </td>
-                    <td>
-                      <DocumentPreviewButton
-                        documentName={compactReceiptLabel(item.sourceDocumentName)}
-                        previewDataUrl={item.sourcePreviewDataUrl}
-                        previewMimeType={item.sourcePreviewMimeType}
-                      />
                     </td>
                     <td>
                       <div className="stacked-table-cell">
@@ -417,7 +428,7 @@ export default async function ExpenseSubmissionDetailPage({
                 ))
               ) : (
                 <tr>
-                  <td className="muted" colSpan={10}>
+                  <td className="muted" colSpan={9}>
                     No expense items are linked to this submission.
                   </td>
                 </tr>

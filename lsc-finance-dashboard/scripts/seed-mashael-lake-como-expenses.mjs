@@ -9,9 +9,16 @@ const { Client } = pg;
 const SCRYPT_KEY_LENGTH = 64;
 const WORKBOOK_PATH =
   "/Users/anujsingh/Downloads/Mashael expenses S2 Lake Como/TBR_Mashael_Expense_Review_LakeComo_S3.xlsx";
+const RECEIPT_DIR = "/Users/anujsingh/Downloads/TBR improvments ";
 const MASHAEL_EMAIL = "mashael@teambluerising.com";
 const REPORT_SOURCE_ID = "mashael-lake-como-s3-expense-review-v1";
 const EUR_TO_USD = 1.1642;
+const EXPECTED_TOTALS = {
+  usd: 2623.96,
+  over_cap_usd: 31.5,
+  podium_bonus_usd: 2000,
+  original_report_total_eur_before_correction: 2535.95
+};
 
 function loadEnv() {
   for (const file of [".env.local", "apps/web/.env.local"]) {
@@ -44,6 +51,29 @@ function generatePassword() {
 
 function previewDataUrl(text) {
   return `data:text/plain;base64,${Buffer.from(text, "utf8").toString("base64")}`;
+}
+
+function sourceMetadataForLine(line, sourceDocumentId) {
+  if (line.receiptFileName) {
+    const filePath = path.join(RECEIPT_DIR, line.receiptFileName);
+    if (existsSync(filePath)) {
+      const bytes = readFileSync(filePath);
+      return {
+        source_report_document_id: sourceDocumentId,
+        preview_data_url: `data:image/jpeg;base64,${bytes.toString("base64")}`,
+        preview_mime_type: "image/jpeg",
+        receipt_file_name: line.receiptFileName,
+        receipt_file_path: filePath,
+        receipt_file_size: bytes.byteLength
+      };
+    }
+  }
+
+  return {
+    source_report_document_id: sourceDocumentId,
+    preview_data_url: previewDataUrl(`${line.sourceDocumentName}\n\nSeeded source placeholder from workbook row ${line.key}.`),
+    preview_mime_type: "text/plain"
+  };
 }
 
 const categories = [
@@ -83,6 +113,7 @@ const expenseLines = [
     noReceiptReason: null,
     description: "Arrival transfer for E1 Series Season 3 Lake Como.",
     sourceDocumentName: "Lake Como arrival Uber receipt",
+    receiptFileName: "w_ac7daae3855558c65bde4544a859c76617bb2a6b.jpg",
     finding: "Transport transfer requires finance review against race travel policy."
   },
   {
@@ -98,7 +129,8 @@ const expenseLines = [
     receiptStatus: "attached",
     noReceiptReason: null,
     description: "Home to airport transfer.",
-    sourceDocumentName: "Home to airport Uber receipt"
+    sourceDocumentName: "Home to airport Uber receipt",
+    receiptFileName: "w_02bf34cd54e1677662c45a452b4dd5fcd0a58e98.jpg"
   },
   {
     key: "podium-bonus",
@@ -106,9 +138,9 @@ const expenseLines = [
     merchant: "Podium bonus",
     categoryCode: "UNCATEGORIZED",
     tagKeys: ["lake_como_s3", "podium_bonus"],
-    originalCurrency: "EUR",
+    originalCurrency: "USD",
     originalAmount: 2000,
-    reportingUsd: 2328.39,
+    reportingUsd: 2000,
     reviewStatus: "pending",
     receiptStatus: "missing_with_reason",
     noReceiptReason: "Performance bonus with no vendor receipt; support note comes from Mashael workbook.",
@@ -145,7 +177,8 @@ const expenseLines = [
     receiptStatus: "attached",
     noReceiptReason: null,
     description: "Airport to home transfer.",
-    sourceDocumentName: "Riyadh airport car service receipt"
+    sourceDocumentName: "Riyadh airport car service receipt",
+    receiptFileName: "w_98c03503ec0adab79492a7414e5f64ba60ae976c.jpg"
   },
   {
     key: "food-departure",
@@ -178,6 +211,7 @@ const expenseLines = [
     noReceiptReason: null,
     description: "Departure transfer from Lake Como to airport.",
     sourceDocumentName: "Lake Como departure Uber receipt",
+    receiptFileName: "w_88b593463bbe2e1e4200874cfd3a37cde61d7fe0.jpg",
     finding: "Transport transfer requires finance review against race travel policy."
   },
   {
@@ -193,7 +227,8 @@ const expenseLines = [
     receiptStatus: "attached",
     noReceiptReason: null,
     description: "Transport to dunk test.",
-    sourceDocumentName: "Uber to dunk test receipt"
+    sourceDocumentName: "Uber to dunk test receipt",
+    receiptFileName: "w_a86df0e14f73bb2ab823b5834ada4058d6720d3b.jpg"
   }
 ];
 
@@ -435,9 +470,10 @@ try {
         report_id: "R00WXk2K04pj",
         event: "E1 Series Season 3, Race #2 | Lake Como, 24-25 April 2026",
         totals: {
-          eur: 2535.95,
-          usd: 2952.35,
-          over_cap_usd: 31.49
+          usd: EXPECTED_TOTALS.usd,
+          over_cap_usd: EXPECTED_TOTALS.over_cap_usd,
+          podium_bonus_usd: EXPECTED_TOTALS.podium_bonus_usd,
+          original_report_total_eur_before_correction: EXPECTED_TOTALS.original_report_total_eur_before_correction
         },
         assumptions: {
           eur_to_usd: EUR_TO_USD,
@@ -494,7 +530,7 @@ try {
             source_identifier: REPORT_SOURCE_ID,
             source_document_id: sourceDocumentId,
             import_batch_id: importBatchId,
-            expected_totals: { eur: 2535.95, usd: 2952.35, over_cap_usd: 31.49 },
+            expected_totals: EXPECTED_TOTALS,
             reviewed_on: "2026-05-28"
           })
         ]
@@ -521,7 +557,7 @@ try {
             source_identifier: REPORT_SOURCE_ID,
             source_document_id: sourceDocumentId,
             import_batch_id: importBatchId,
-            expected_totals: { eur: 2535.95, usd: 2952.35, over_cap_usd: 31.49 },
+            expected_totals: EXPECTED_TOTALS,
             reviewed_on: "2026-05-28"
           })
         ]
@@ -553,12 +589,8 @@ try {
             companyId,
             `${REPORT_SOURCE_ID}:${line.key}`,
             line.sourceDocumentName,
-            WORKBOOK_PATH,
-            JSON.stringify({
-              source_report_document_id: sourceDocumentId,
-              preview_data_url: previewDataUrl(`${line.sourceDocumentName}\n\nSeeded source placeholder from workbook row ${line.key}.`),
-              preview_mime_type: "text/plain"
-            })
+            line.receiptFileName ? path.join(RECEIPT_DIR, line.receiptFileName) : WORKBOOK_PATH,
+            JSON.stringify(sourceMetadataForLine(line, sourceDocumentId))
           ]
         )
       : null;
@@ -716,9 +748,9 @@ try {
     reportSubmissionId: submissionId,
     workbookPath: WORKBOOK_PATH,
     expectedTotals: {
-      eur: 2535.95,
-      usd: 2952.35,
-      overCapUsd: 31.49
+      usd: EXPECTED_TOTALS.usd,
+      overCapUsd: EXPECTED_TOTALS.over_cap_usd,
+      podiumBonusUsd: EXPECTED_TOTALS.podium_bonus_usd
     }
   }, null, 2));
 } catch (error) {

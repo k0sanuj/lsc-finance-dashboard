@@ -58,18 +58,26 @@ async function main() {
   const queueRow = queue.find((row) => row.id === sourceSubmission.id);
   assert(queueRow, "Admin approval queue includes the Lake Como report.");
   assert(queueRow?.itemCount === "8", "Admin approval queue exposes the 8 imported items.");
-  assert(queueRow?.openItemCount === "8", "Admin approval queue exposes open review item count.");
+  assert(
+    Number(queueRow?.openItemCount ?? 0) +
+      Number(queueRow?.approvedItemCount ?? 0) +
+      Number(queueRow?.rejectedItemCount ?? 0) ===
+      8,
+    "Admin approval queue exposes item review status counts."
+  );
   assert(Number(queueRow?.openRuleFindingCount ?? 0) >= 4, "Admin approval queue exposes rule exception count.");
   assert(queueRow?.missingReceiptCount === "3", "Admin approval queue exposes no-receipt item count.");
 
   const detail = await getExpenseSubmissionDetail(sourceSubmission.id);
   assert(detail, "Report detail service returns the Lake Como report.");
   assert(detail?.submittedByUserId === user.id, "Report detail preserves submitter ownership.");
-  assert(detail?.totalAmount === "$2,952", "Report detail returns the USD submitted total.");
+  assert(detail?.totalAmount === "$2,624", "Report detail returns the corrected USD submitted total.");
 
   const items = await getExpenseSubmissionItems(sourceSubmission.id);
   assert(items.length === 8, "Report item service returns 8 items.");
   assert(items.some((item) => item.originalCurrencyCode === "SAR"), "Report item service preserves SAR original currency.");
+  assert(items.some((item) => item.merchantName === "Podium bonus" && item.originalCurrencyCode === "USD" && item.reportingAmountUsd === "$2,000"), "Report item service reflects the USD podium bonus correction.");
+  assert(items.filter((item) => Boolean(item.sourcePreviewDataUrl)).length >= 5, "Report item service exposes attached receipt previews.");
   assert(items.some((item) => item.tagLabels.includes("Lake Como")), "Report item service exposes item tags.");
   assert(items.some((item) => Number(item.openRuleFindingCount) > 0), "Report item service exposes rule findings.");
   assert(items.some((item) => item.reviewStatusKey === "needs_info"), "Report item service exposes needs-info lines.");

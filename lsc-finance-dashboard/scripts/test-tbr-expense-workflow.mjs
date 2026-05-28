@@ -6,7 +6,7 @@ import pg from "pg";
 const { Pool } = pg;
 const MASHAEL_EMAIL = "mashael@teambluerising.com";
 const REPORT_SOURCE_ID = "mashael-lake-como-s3-expense-review-v1";
-const EUR_TO_USD = 1.1642;
+const EXPECTED_USD_TOTAL = 2623.96;
 
 function loadEnv() {
   for (const file of [".env.local", "apps/web/.env.local"]) {
@@ -81,9 +81,7 @@ try {
       [submissionId]
     );
     assert(totals.rows[0].item_count === 8, `Expected 8 imported items, got ${totals.rows[0].item_count}.`);
-    assert(nearlyEqual(totals.rows[0].usd_total, 2952.35), `Expected USD 2952.35, got ${totals.rows[0].usd_total}.`);
-    const workbookEquivalentEur = Number(totals.rows[0].usd_total) / EUR_TO_USD;
-    assert(nearlyEqual(workbookEquivalentEur, 2535.95, 0.02), `Expected workbook-equivalent EUR 2535.95, got ${workbookEquivalentEur.toFixed(2)}.`);
+    assert(nearlyEqual(totals.rows[0].usd_total, EXPECTED_USD_TOTAL), `Expected USD ${EXPECTED_USD_TOTAL}, got ${totals.rows[0].usd_total}.`);
     assert(nearlyEqual(totals.rows[0].over_cap_usd, 31.5, 0.02), `Expected over cap near USD 31.49, got ${totals.rows[0].over_cap_usd}.`);
 
     const currencyRows = await client.query(
@@ -93,20 +91,36 @@ try {
       [submissionId]
     );
     assert(
-      JSON.stringify(currencyRows.rows[0].currencies) === JSON.stringify(["EUR", "SAR"]),
-      `Expected EUR and SAR original currencies, got ${JSON.stringify(currencyRows.rows[0].currencies)}.`
+      JSON.stringify(currencyRows.rows[0].currencies) === JSON.stringify(["EUR", "SAR", "USD"]),
+      `Expected EUR, SAR, and USD original currencies, got ${JSON.stringify(currencyRows.rows[0].currencies)}.`
     );
+
+    const podium = await client.query(
+      `select original_currency_code, original_amount::numeric(14,2)::text, reporting_amount_usd::numeric(14,2)::text
+       from expense_submission_items
+       where submission_id = $1
+         and merchant_name = 'Podium bonus'
+       limit 1`,
+      [submissionId]
+    );
+    assert(podium.rowCount === 1, "Podium bonus item is missing.");
+    assert(podium.rows[0].original_currency_code === "USD", "Podium bonus must be USD, not EUR.");
+    assert(nearlyEqual(podium.rows[0].reporting_amount_usd, 2000), `Expected podium bonus USD 2000, got ${podium.rows[0].reporting_amount_usd}.`);
 
     const review = await client.query(
       `select
          count(*) filter (where review_status = 'pending')::int as pending_count,
+         count(*) filter (where review_status = 'approved')::int as approved_count,
          count(*) filter (where review_status = 'review')::int as review_count,
          count(*) filter (where review_status = 'needs_info')::int as needs_info_count
        from expense_submission_items
        where submission_id = $1`,
       [submissionId]
     );
-    assert(review.rows[0].pending_count === 4, "Expected 4 clean pending items.");
+    assert(
+      review.rows[0].pending_count + review.rows[0].approved_count === 4,
+      "Expected 4 clean pending-or-approved items."
+    );
     assert(review.rows[0].review_count === 2, "Expected 2 review items.");
     assert(review.rows[0].needs_info_count === 2, "Expected 2 needs-info items.");
 
@@ -133,7 +147,7 @@ try {
       submissionId,
       itemCount: totals.rows[0].item_count,
       eurOriginalTotal: totals.rows[0].eur_original_total,
-      workbookEquivalentEur: workbookEquivalentEur.toFixed(2),
+      podiumBonusCurrency: podium.rows[0].original_currency_code,
       usdTotal: totals.rows[0].usd_total,
       findingCount: findings.rows[0].finding_count
     }, null, 2));

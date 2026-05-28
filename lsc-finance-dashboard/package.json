@@ -41,6 +41,7 @@
     "db:apply:tbr-expense-hardening": "node scripts/apply-sql.mjs sql/044_tbr_expense_review_hardening.sql",
     "seed:expense-management": "node scripts/seed-expense-management.mjs",
     "seed:mashael-lake-como-expenses": "node scripts/seed-mashael-lake-como-expenses.mjs",
+    "attach:mashael-lake-como-receipts": "node scripts/attach-mashael-lake-como-receipts.mjs",
     "db:apply:invoice-workflow": "node scripts/apply-sql.mjs sql/009_invoice_workflow.sql",
     "seed:invoice-workflow": "node scripts/seed-invoice-workflow.mjs",
     "db:apply:race-budgets": "node scripts/apply-sql.mjs sql/013_race_budget_rules.sql sql/014_race_budget_rule_units.sql",

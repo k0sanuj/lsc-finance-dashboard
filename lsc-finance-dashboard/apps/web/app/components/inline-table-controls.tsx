@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type ChangeEvent, type Ref } from "react";
+import { useId, useState, type ChangeEvent, type ReactNode, type Ref } from "react";
 
 const FILE_INPUT_TYPE = "file";
 
@@ -139,53 +139,63 @@ export function AutoSubmitFileInput(props: AutoSubmitFileInputProps) {
 
 type DocumentPreviewButtonProps = {
   documentName: string;
+  className?: string;
+  displayLabel?: ReactNode;
   previewDataUrl: string | null;
   previewMimeType: string | null;
 };
 
 export function DocumentPreviewButton({
   documentName,
+  className = "",
+  displayLabel,
   previewDataUrl,
   previewMimeType
 }: DocumentPreviewButtonProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
+  const rawPreviewId = useId();
+  const previewId = `document-preview-${rawPreviewId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const titleId = `${previewId}-title`;
   const isImage = previewMimeType?.startsWith("image/");
   const canPreview = Boolean(previewDataUrl);
 
   if (!canPreview) {
     return (
-      <span className="document-link document-link-muted" title={documentName}>
-        {documentName}
+      <span className={`document-link document-link-muted ${className}`.trim()} title={documentName}>
+        {displayLabel ?? documentName}
       </span>
     );
   }
 
   return (
     <>
-      <button
-        className="document-link document-preview-trigger"
-        onClick={() => dialogRef.current?.showModal()}
+      <a
+        className={`document-link document-preview-trigger ${className}`.trim()}
+        href={`#${previewId}`}
         title={documentName}
-        type="button"
       >
-        {documentName}
-      </button>
-      <dialog aria-labelledby={titleId} className="document-preview-dialog" ref={dialogRef}>
-        <div className="document-preview-shell">
+        {displayLabel ?? documentName}
+      </a>
+      <div
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="document-preview-target"
+        id={previewId}
+        role="dialog"
+      >
+        <a aria-label="Close document preview" className="document-preview-backdrop" href="#" />
+        <div className="document-preview-shell document-preview-target-shell">
           <header className="document-preview-header">
             <div>
               <span className="section-kicker">Source document</span>
               <h3 id={titleId}>{documentName}</h3>
             </div>
-            <button
+            <a
               aria-label="Close document preview"
               className="document-preview-close"
-              onClick={() => dialogRef.current?.close()}
-              type="button"
+              href="#"
             >
               x
-            </button>
+            </a>
           </header>
           <div className="document-preview-frame">
             {isImage ? (
@@ -195,7 +205,7 @@ export function DocumentPreviewButton({
             )}
           </div>
         </div>
-      </dialog>
+      </div>
     </>
   );
 }
