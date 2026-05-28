@@ -393,7 +393,7 @@ async function safeCascade(params: Parameters<typeof cascadeUpdate>[0]) {
 }
 
 export async function createAiIntakeDraftAction(formData: FormData) {
-  await requireRole(["super_admin", "finance_admin", "team_member", "commercial_user"]);
+  await requireRole(["super_admin", "finance_admin", "team_member", "expense_submitter", "commercial_user"]);
   const session = await requireSession();
 
   const redirectPath = clean(formData.get("redirectPath")) || "/";
@@ -405,6 +405,15 @@ export async function createAiIntakeDraftAction(formData: FormData) {
   const operatorNote = cleanMultiline(formData.get("documentNote")).slice(0, 1000) || null;
   const typedInput = cleanMultiline(formData.get("typedInput")).slice(0, 24000) || null;
   const upload = formData.get("document");
+
+  if (
+    session.role === "expense_submitter" &&
+    (companyCode !== "TBR" ||
+      !["expense_receipt", "reimbursement_bundle"].includes(targetKind) ||
+      !workflowContext.startsWith("tbr-"))
+  ) {
+    redirect(buildRedirectPath(redirectPath, "error", "This account can only create TBR expense intake drafts."));
+  }
 
   if (!hasUpload(upload) && !typedInput) {
     redirect(buildRedirectPath(redirectPath, "error", "Upload a file or paste/type source text before running AI extract."));
@@ -1455,7 +1464,7 @@ async function getDraftFields(client: PoolClient, draftId: string) {
 }
 
 export async function reviewAiIntakeDraftAction(formData: FormData) {
-  await requireRole(["super_admin", "finance_admin", "team_member", "commercial_user"]);
+  await requireRole(["super_admin", "finance_admin", "team_member", "expense_submitter", "commercial_user"]);
   const session = await requireSession();
 
   const draftId = clean(formData.get("draftId"));

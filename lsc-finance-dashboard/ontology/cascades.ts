@@ -18,12 +18,19 @@ export type CascadeTrigger =
   | "invoice:status:changed"
   | "invoice:created"
   | "invoice:deleted"
+  | "expense:created"
   | "expense:approved"
   | "expense:rejected"
   | "expense:paid"
+  | "expense-item:reviewed"
+  | "expense-item:rejected"
+  | "expense-item:challenged"
+  | "expense-submission:submitted"
   | "expense-submission:approved"
   | "expense-submission:posted"
   | "expense-submission:rejected"
+  | "expense-submission:exported"
+  | "expense-submission:invoice-created"
   | "invoice-intake:approved"
   | "invoice-intake:posted"
   | "revenue:recognized"
@@ -219,6 +226,14 @@ export const CASCADE_RULES: CascadeRule[] = [
 
   // Expense events
   {
+    trigger: "expense:created",
+    actions: [
+      { type: "refresh-company-metrics", description: "Update approved expense totals" },
+      { type: "refresh-race-cost-summary", description: "Update race-level costs" },
+      { type: "write-audit-log", description: "Record approved expense creation" },
+    ],
+  },
+  {
     trigger: "expense:approved",
     actions: [
       { type: "refresh-company-metrics", description: "Update approved expense totals" },
@@ -239,6 +254,33 @@ export const CASCADE_RULES: CascadeRule[] = [
 
   // Expense submission workflow
   {
+    trigger: "expense-submission:submitted",
+    actions: [
+      { type: "update-expense-budget-signals", description: "Evaluate report against workspace and race rules" },
+      { type: "write-audit-log", description: "Record expense report submission" },
+    ],
+  },
+  {
+    trigger: "expense-item:reviewed",
+    actions: [
+      { type: "update-expense-budget-signals", description: "Refresh item review and rule state" },
+      { type: "write-audit-log", description: "Record line-item review decision" },
+    ],
+  },
+  {
+    trigger: "expense-item:rejected",
+    actions: [
+      { type: "update-expense-budget-signals", description: "Remove rejected item from approval-ready amount" },
+      { type: "write-audit-log", description: "Record line-item rejection" },
+    ],
+  },
+  {
+    trigger: "expense-item:challenged",
+    actions: [
+      { type: "write-audit-log", description: "Record submitter challenge on rejected item" },
+    ],
+  },
+  {
     trigger: "expense-submission:approved",
     actions: [
       { type: "update-expense-budget-signals", description: "Recalculate budget signals for race" },
@@ -252,6 +294,19 @@ export const CASCADE_RULES: CascadeRule[] = [
       { type: "refresh-race-cost-summary", description: "Update race cost summary" },
       { type: "trigger-budget-analyzer", description: "Analyze budget utilization" },
       { type: "write-audit-log", description: "Record submission posting" },
+    ],
+  },
+  {
+    trigger: "expense-submission:exported",
+    actions: [
+      { type: "write-audit-log", description: "Record expense CSV export" },
+    ],
+  },
+  {
+    trigger: "expense-submission:invoice-created",
+    actions: [
+      { type: "refresh-payments-due", description: "Add reimbursement invoice to finance intake queue" },
+      { type: "write-audit-log", description: "Record reimbursement invoice creation" },
     ],
   },
 

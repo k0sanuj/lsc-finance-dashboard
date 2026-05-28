@@ -12,6 +12,7 @@ export type AppUserRole =
   | "super_admin"
   | "finance_admin"
   | "team_member"
+  | "expense_submitter"
   | "commercial_user"
   | "viewer";
 
@@ -196,6 +197,38 @@ export async function requireRole(roles: AppUserRole[]) {
 
   if (!roles.includes(session.role)) {
     redirect("/");
+  }
+
+  return session;
+}
+
+export async function hasFeatureAccess(appUserId: string, featureKey: string) {
+  const rows = await queryRowsAdmin<{ id: string }>(
+    `select id
+     from app_user_feature_access
+     where app_user_id = $1
+       and feature_key = $2
+       and is_active = true
+     limit 1`,
+    [appUserId, featureKey]
+  );
+
+  return Boolean(rows[0]);
+}
+
+export async function requireTbrExpensePortalAccess() {
+  const session = await requireRole([
+    "super_admin",
+    "finance_admin",
+    "team_member",
+    "expense_submitter",
+  ]);
+
+  if (session.role === "expense_submitter") {
+    const allowed = await hasFeatureAccess(session.id, "tbr_expense_submitter");
+    if (!allowed) {
+      redirect("/");
+    }
   }
 
   return session;

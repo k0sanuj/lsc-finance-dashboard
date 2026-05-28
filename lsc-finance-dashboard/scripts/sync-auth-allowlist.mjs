@@ -8,6 +8,7 @@ const VALID_ROLES = new Set([
   "super_admin",
   "finance_admin",
   "team_member",
+  "expense_submitter",
   "commercial_user",
   "viewer"
 ]);

@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   getExpenseApprovalQueue,
   getExpenseFormOptions,
+  getExpenseWorkspaceControls,
   getExpenseWorkflowSummary,
   getNextUpcomingTbrRace,
   getRaceBudgetRules,
@@ -12,7 +13,12 @@ import {
 } from "@lsc/db";
 import { requireRole } from "../../../lib/auth";
 import { RaceBudgetRuleBuilder } from "../../components/race-budget-rule-builder";
-import { deleteRaceBudgetRuleAction, updateExpenseSubmissionStatusAction } from "./actions";
+import {
+  deleteRaceBudgetRuleAction,
+  updateExpenseSubmissionStatusAction,
+  upsertExpenseTagAction,
+  upsertExpenseWorkspaceRuleAction
+} from "./actions";
 
 type ExpenseManagementPageProps = {
   searchParams?: Promise<{
@@ -73,7 +79,7 @@ export default async function ExpenseManagementPage({
     }
   }
 
-  const [summary, queue, formOptions, seasons, users, seasonRaceCards] = await Promise.all([
+  const [summary, queue, formOptions, workspaceControls, seasons, users, seasonRaceCards] = await Promise.all([
     getExpenseWorkflowSummary(),
     getExpenseApprovalQueue({
       seasonYear: Number.isFinite(selectedSeason) ? selectedSeason : null,
@@ -83,6 +89,7 @@ export default async function ExpenseManagementPage({
       budgetSignal: selectedBudgetSignal || null
     }),
     getExpenseFormOptions(),
+    getExpenseWorkspaceControls(),
     getTbrSeasonSummaries(),
     getUserOptions(),
     selectedSeason && Number.isFinite(selectedSeason)
@@ -131,6 +138,9 @@ export default async function ExpenseManagementPage({
   const submittedCount = queue.filter((row) => row.status === "submitted").length;
   const inReviewCount = queue.filter((row) => row.status === "in_review").length;
   const clarificationCount = queue.filter((row) => row.status === "needs_clarification").length;
+  const challengedCount = queue.reduce((total, row) => total + Number(row.challengedItemCount), 0);
+  const missingReceiptCount = queue.reduce((total, row) => total + Number(row.missingReceiptCount), 0);
+  const openRuleFindingCount = queue.reduce((total, row) => total + Number(row.openRuleFindingCount), 0);
   const buildQueueHref = (overrides: { submissionStatus?: string | null; budgetSignal?: string | null }) => {
     const query = new URLSearchParams(activeFilterQuery);
     if ("submissionStatus" in overrides) {
@@ -222,6 +232,37 @@ export default async function ExpenseManagementPage({
             <span>{lane.detail}</span>
           </Link>
         ))}
+      </section>
+
+      <section className="stats-grid compact-stats">
+        <article className="metric-card accent-risk">
+          <div className="metric-topline">
+            <span className="metric-label">Challenged lines</span>
+          </div>
+          <div className="metric-value">{challengedCount}</div>
+          <span className="metric-subvalue">Rejected items challenged by submitters.</span>
+        </article>
+        <article className="metric-card accent-warn">
+          <div className="metric-topline">
+            <span className="metric-label">Receipt gaps</span>
+          </div>
+          <div className="metric-value">{missingReceiptCount}</div>
+          <span className="metric-subvalue">Items missing receipts or receipt explanations.</span>
+        </article>
+        <article className="metric-card accent-accent">
+          <div className="metric-topline">
+            <span className="metric-label">Rule findings</span>
+          </div>
+          <div className="metric-value">{openRuleFindingCount}</div>
+          <span className="metric-subvalue">Open item-level policy or race-rule findings.</span>
+        </article>
+        <article className="metric-card accent-good">
+          <div className="metric-topline">
+            <span className="metric-label">Workspace tags</span>
+          </div>
+          <div className="metric-value">{workspaceControls.tags.length}</div>
+          <span className="metric-subvalue">Active tags available to submitters.</span>
+        </article>
       </section>
 
       <section className="stats-grid compact-stats">
@@ -435,6 +476,100 @@ export default async function ExpenseManagementPage({
         </article>
       )}
 
+      <section className="grid-two">
+        <article className="card compact-section-card">
+          <div className="card-title-row">
+            <div>
+              <span className="section-kicker">Workspace tags</span>
+              <h3>Submission tags</h3>
+            </div>
+            <span className="pill">{workspaceControls.tags.length} active</span>
+          </div>
+          <div className="inline-actions">
+            {workspaceControls.tags.map((tag) => (
+              <span className="pill subtle-pill" key={tag.id}>{tag.label}</span>
+            ))}
+          </div>
+          <form action={upsertExpenseTagAction} className="stack-form">
+            <input name="returnPath" type="hidden" value={returnPath} />
+            <div className="grid-two">
+              <label className="field">
+                <span>New / updated tag</span>
+                <input name="tagLabel" placeholder="Lake Como S3, transport, meal allowance" required />
+              </label>
+              <label className="field">
+                <span>Description</span>
+                <input name="tagDescription" placeholder="When submitters should use this tag" />
+              </label>
+            </div>
+            <button className="action-button secondary" type="submit">Save tag</button>
+          </form>
+        </article>
+
+        <article className="card compact-section-card">
+          <div className="card-title-row">
+            <div>
+              <span className="section-kicker">Workspace rules</span>
+              <h3>Global expense checks</h3>
+            </div>
+            <span className="pill">{workspaceControls.rules.filter((rule) => rule.isActive).length} active</span>
+          </div>
+          <div className="table-wrapper clean-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Rule</th>
+                  <th>Severity</th>
+                  <th>Active</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workspaceControls.rules.map((rule) => (
+                  <tr key={rule.id}>
+                    <td>{rule.label}</td>
+                    <td>{rule.severity}</td>
+                    <td>{rule.isActive ? "Yes" : "No"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <form action={upsertExpenseWorkspaceRuleAction} className="stack-form">
+            <input name="returnPath" type="hidden" value={returnPath} />
+            <div className="grid-two">
+              <label className="field">
+                <span>Rule key</span>
+                <select name="ruleKey" defaultValue="tag_required">
+                  <option value="receipt_required">receipt_required</option>
+                  <option value="receipt_explanation">receipt_explanation</option>
+                  <option value="tag_required">tag_required</option>
+                  <option value="category_required">category_required</option>
+                  <option value="fx_required">fx_required</option>
+                  <option value="duplicate_check">duplicate_check</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Severity</span>
+                <select name="severity" defaultValue="warning">
+                  <option value="info">Info</option>
+                  <option value="warning">Warning</option>
+                  <option value="blocker">Blocker</option>
+                </select>
+              </label>
+            </div>
+            <label className="field">
+              <span>Rule label</span>
+              <input name="ruleLabel" placeholder="Every expense requires a tag" required />
+            </label>
+            <label className="field field-inline">
+              <input name="isActive" type="checkbox" value="true" defaultChecked />
+              <span>Active</span>
+            </label>
+            <button className="action-button secondary" type="submit">Save rule</button>
+          </form>
+        </article>
+      </section>
+
       <section className="card compact-section-card">
         <div className="card-title-row">
           <div>
@@ -452,8 +587,9 @@ export default async function ExpenseManagementPage({
                 <th>Race</th>
                 <th>Submitter</th>
                 <th>Submitted</th>
-                <th>Total</th>
-                <th>Budget signal</th>
+	                <th>Total</th>
+	                <th>Items</th>
+	                <th>Budget signal</th>
                 <th>Status</th>
                 <th>Review</th>
               </tr>
@@ -467,7 +603,22 @@ export default async function ExpenseManagementPage({
                     <td>{row.race}</td>
                     <td>{row.submitter}</td>
                     <td>{row.submittedAt}</td>
-                    <td>{row.totalAmount}</td>
+	                    <td>
+                        <div className="stacked-table-cell">
+                          <strong>{row.submittedAmountUsd}</strong>
+                          <span className="bill-subnote">
+                            Approved {row.approvedAmountUsd} · rejected {row.rejectedAmountUsd}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="stacked-table-cell">
+                          <span>{row.approvedItemCount} approved · {row.openItemCount} open</span>
+                          <span className="bill-subnote">
+                            {row.challengedItemCount} challenged · {row.missingReceiptCount} receipt gaps · {row.openRuleFindingCount} findings
+                          </span>
+                        </div>
+                      </td>
                     <td>
                       <div className="inline-actions">
                         <span className={`pill signal-pill signal-${row.budgetSignalTone}`}>
@@ -500,7 +651,7 @@ export default async function ExpenseManagementPage({
                 ))
               ) : (
                 <tr>
-                  <td className="muted" colSpan={9}>
+	                  <td className="muted" colSpan={10}>
                     No submissions matched the current filter set.
                   </td>
                 </tr>

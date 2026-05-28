@@ -66,6 +66,7 @@ type SessionShellProps = {
 
 const ALL_ADMIN: AppUserRole[] = ["super_admin", "finance_admin"];
 const ALL_ROLES: AppUserRole[] = ["super_admin", "finance_admin", "commercial_user", "viewer"];
+const EXPENSE_PORTAL_ROLES: AppUserRole[] = ["team_member", "expense_submitter"];
 
 /** Routes that appear in multiple company navs — use ?company= to disambiguate */
 const SHARED_PEOPLE_ROUTES = ["/employees", "/salary-payable"];
@@ -289,15 +290,14 @@ function getXtzNav(): CompanyNav {
 
 function getTeamMemberNav(): CompanyNav {
   return {
-    href: "/tbr",
+    href: "/tbr/my-expenses",
     label: "TBR",
-    roles: ["team_member"],
+    roles: EXPENSE_PORTAL_ROLES,
     sections: [
       {
-        label: "My Work",
+        label: "Expense Portal",
         links: [
-          { href: "/tbr/my-expenses", label: "My Expenses", roles: ["team_member"] },
-          { href: "/tbr/races", label: "Races", roles: ["team_member"] },
+          { href: "/tbr/my-expenses", label: "My Expenses", roles: EXPENSE_PORTAL_ROLES },
         ],
       },
     ],
@@ -660,7 +660,7 @@ function SessionShellInner({ children, user }: SessionShellProps) {
 
   const role = user?.role ?? null;
 
-  const companies: CompanyNav[] = role === "team_member"
+  const companies: CompanyNav[] = role === "team_member" || role === "expense_submitter"
     ? [getTeamMemberNav()]
     : [getLscNav(), getTbrNav(), getFspNav(), getXtzNav()];
 
@@ -710,7 +710,7 @@ function SessionShellInner({ children, user }: SessionShellProps) {
     : "4 entities · live finance data · canonical metrics only";
   const selectedEntity = activeCompany?.label === "XTZ India" ? "XTZ" : activeCompany?.label ?? "LSC";
   const topbarEntityOptions =
-    role === "team_member"
+    role === "team_member" || role === "expense_submitter"
       ? [{ value: "TBR", label: "TBR" }]
       : [
           { value: "LSC", label: "LSC" },

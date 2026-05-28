@@ -9,10 +9,12 @@ import {
   type QbJournalEntryLogRow,
 } from "@lsc/db";
 import { requireRole } from "../../../../lib/auth";
+import { DocumentPreviewButton } from "../../../components/inline-table-controls";
 import {
   addExpenseSplitAction,
   approveExpenseSubmissionAction,
   generateEqualSplitsAction,
+  updateExpenseItemReviewAction,
   updateExpenseSubmissionStatusAction
 } from "../actions";
 
@@ -40,6 +42,11 @@ const TIMELINE_ACTION_META: Record<
   "set-needs_clarification": { label: "Clarification requested", tone: "accent" },
   "approve-invoice-ready": { label: "Approved · invoice ready", tone: "good" },
   reject: { label: "Rejected", tone: "risk" },
+  "set-approved": { label: "Line approved", tone: "good" },
+  "set-rejected": { label: "Line rejected", tone: "risk" },
+  "set-review": { label: "Line flagged for review", tone: "accent" },
+  "set-needs_info": { label: "Line needs info", tone: "accent" },
+  "challenge-rejection": { label: "Rejection challenged", tone: "accent" },
   "regenerate-equal-splits": { label: "Splits regenerated", tone: "default" },
   "add-split": { label: "Split added", tone: "default" },
 };
@@ -132,6 +139,12 @@ export default async function ExpenseSubmissionDetailPage({
         <span className="eyebrow">Expense detail</span>
         <h2>{submission.title}</h2>
         <div className="hero-actions">
+          <a
+            className="action-button secondary"
+            href={`/api/tbr/expense-submissions/${submission.id}/csv`}
+          >
+            Export CSV
+          </a>
           <Link className="ghost-link" href="/tbr/expense-management">
             Back to expense queue
           </Link>
@@ -200,6 +213,14 @@ export default async function ExpenseSubmissionDetailPage({
             <div className="mini-metric">
               <span>Total</span>
               <strong>{submission.totalAmount}</strong>
+            </div>
+            <div className="mini-metric">
+              <span>Approved</span>
+              <strong>{submission.approvedAmountUsd}</strong>
+            </div>
+            <div className="mini-metric">
+              <span>Rejected</span>
+              <strong>{submission.rejectedAmountUsd}</strong>
             </div>
             <div className="mini-metric">
               <span>Budget signal</span>
@@ -571,6 +592,22 @@ export default async function ExpenseSubmissionDetailPage({
             </div>
             <div className="mini-metric-grid">
               <div className="mini-metric">
+                <span>Original</span>
+                <strong>{item.originalAmount}</strong>
+              </div>
+              <div className="mini-metric">
+                <span>FX to USD</span>
+                <strong>{item.fxRateToUsd ?? "N/A"}</strong>
+              </div>
+              <div className="mini-metric">
+                <span>USD reporting</span>
+                <strong>{item.reportingAmountUsd}</strong>
+              </div>
+              <div className="mini-metric">
+                <span>Review</span>
+                <strong>{item.reviewStatus}</strong>
+              </div>
+              <div className="mini-metric">
                 <span>Category</span>
                 <strong>{item.category}</strong>
               </div>
@@ -598,6 +635,13 @@ export default async function ExpenseSubmissionDetailPage({
                   </div>
                   {item.aiIntakeDraftId ? <span className="pill">AI linked</span> : <span className="pill subtle-pill">Manual</span>}
                 </div>
+                <p className="table-note">
+                  <DocumentPreviewButton
+                    documentName={item.sourceDocumentName}
+                    previewDataUrl={item.sourcePreviewDataUrl}
+                    previewMimeType={item.sourcePreviewMimeType}
+                  />
+                </p>
                 {item.sourcePreviewDataUrl && item.sourcePreviewMimeType?.startsWith("image/") ? (
                   <img
                     alt={`Receipt preview for ${item.merchantName}`}
@@ -645,7 +689,7 @@ export default async function ExpenseSubmissionDetailPage({
                   </div>
                   <div className="mini-metric">
                     <span>Currency</span>
-                    <strong>{item.currencyCode}</strong>
+                    <strong>{item.originalCurrencyCode} → USD</strong>
                   </div>
                   <div className="mini-metric">
                     <span>Approved budget</span>
@@ -657,7 +701,88 @@ export default async function ExpenseSubmissionDetailPage({
                   </div>
                 </div>
                 {item.budgetNotes ? <p className="table-note">{item.budgetNotes}</p> : null}
+                {item.ruleMessages ? (
+                  <p className="table-note">Rule findings: {item.ruleMessages}</p>
+                ) : null}
+                {item.challengeReason ? (
+                  <p className="table-note">Submitter challenge: {item.challengeReason}</p>
+                ) : null}
               </div>
+            </section>
+
+            <section className="card compact-section-card">
+              <div className="card-title-row">
+                <div>
+                  <span className="section-kicker">Item decision</span>
+                  <h4>Approve, reject, or request info</h4>
+                </div>
+                <span className={`pill signal-pill signal-${item.reviewStatusKey === "approved" ? "good" : item.reviewStatusKey === "rejected" ? "risk" : "warn"}`}>
+                  {item.reviewStatus}
+                </span>
+              </div>
+              <form action={updateExpenseItemReviewAction} className="stack-form">
+                <input name="itemId" type="hidden" value={item.id} />
+                <input name="submissionId" type="hidden" value={submission.id} />
+                <input
+                  name="returnPath"
+                  type="hidden"
+                  value={`/tbr/expense-management/${submission.id}`}
+                />
+                <div className="grid-two">
+                  <label className="field">
+                    <span>Status</span>
+                    <select name="reviewStatus" defaultValue={item.reviewStatusKey}>
+                      <option value="approved">Approve</option>
+                      <option value="rejected">Reject</option>
+                      <option value="needs_info">Needs info</option>
+                      <option value="review">Flag for review</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Approved USD</span>
+                    <input
+                      name="approvedAmountUsd"
+                      inputMode="decimal"
+                      defaultValue={item.approvedAmountUsd}
+                      placeholder="0.00"
+                    />
+                  </label>
+                </div>
+                <div className="grid-two">
+                  <label className="field">
+                    <span>Reject reason</span>
+                    <select name="rejectionReasonCode" defaultValue={item.rejectionReasonCode ?? ""}>
+                      <option value="">Not rejected</option>
+                      <option value="missing_receipts">Missing receipts</option>
+                      <option value="over_budget">Over budget</option>
+                      <option value="policy_violation">Policy violation</option>
+                      <option value="duplicate">Duplicate</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Reject / info note</span>
+                    <input
+                      name="rejectionReasonDetail"
+                      defaultValue={item.rejectionReasonDetail ?? ""}
+                      placeholder="Explain the decision"
+                    />
+                  </label>
+                </div>
+                {item.challengeReason ? (
+                  <label className="field">
+                    <span>Challenge response</span>
+                    <textarea
+                      name="challengeResponse"
+                      placeholder={`Submitter challenge: ${item.challengeReason}`}
+                      rows={3}
+                    />
+                  </label>
+                ) : null}
+                <button className="action-button primary" type="submit">
+                  Save item decision
+                </button>
+              </form>
             </section>
 
             <section className="grid-two">

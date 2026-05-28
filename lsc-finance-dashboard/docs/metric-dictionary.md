@@ -55,6 +55,31 @@ Notes:
 
 - should include both event invoices and reimbursable team expenses if approved
 
+### TBR Reimbursable Expense
+
+Definition:
+
+Approved TBR expense submission items that have passed item-level finance review and posted into canonical `expenses`.
+
+Finance treatment:
+
+- submitted, rejected, challenged, or needs-info lines do not count as approved cost
+- approved item amounts use stored USD reporting amount or approved USD override
+- original amount/currency and FX rate remain visible for audit
+- reimbursement invoice creation does not create a second cost event
+- paid reimbursement invoice status can settle the already-approved cost and drive LSC cash/cost recognition without double counting against the TBR operating baseline
+
+### TBR Expense Rule Exceptions
+
+Definition:
+
+Count and value of expense submission items with open deterministic rule findings such as missing receipt, missing tag, missing category, missing FX, duplicate risk, or over-budget/per-diem exceptions.
+
+Finance treatment:
+
+- rule findings are review controls, not costs by themselves
+- admin override can approve or partially approve a line while preserving the finding in audit history
+
 ### Direct Cost
 
 Definition:

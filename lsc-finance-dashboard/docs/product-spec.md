@@ -54,6 +54,7 @@ XTZ India is the operating payroll/vendor entity. Its invoice ladder is status-a
 - finance lead
 - commercial lead
 - operations lead for TBR
+- restricted TBR expense submitter
 
 ## V1 Navigation
 
@@ -129,6 +130,14 @@ Main sections:
   - invoice approvals
   - team management
   - AI-assisted budget and per-diem document import for each race
+- restricted submitter workflow for TBR expenses:
+  - receipt or camera upload
+  - manual no-receipt entries with required reason
+  - AI extraction and editable preview
+  - category/tag/race assignment
+  - item-level approval, rejection, needs-info, and challenge states
+  - reimbursement invoice creation to `LSC / XTZ Esports Tech Ltd (Dubai)` after review acceptance
+  - CSV export for admin processing with audit history
 
 Required filters:
 

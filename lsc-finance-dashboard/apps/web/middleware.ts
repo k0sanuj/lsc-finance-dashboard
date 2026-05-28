@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { AUTH_COOKIE_NAME, verifySessionToken } from "./lib/session";
 
 const PUBLIC_PATHS = ["/login"];
+const EXPENSE_SUBMITTER_ALLOWED_PATHS = ["/tbr/my-expenses"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
@@ -37,7 +38,8 @@ export async function middleware(request: NextRequest) {
 
   if (isPublicPath(pathname)) {
     if (session) {
-      return NextResponse.redirect(new URL("/", request.url));
+      const nextUrl = session.role === "expense_submitter" ? "/tbr/my-expenses" : "/";
+      return NextResponse.redirect(new URL(nextUrl, request.url));
     }
 
     return NextResponse.next();
@@ -46,6 +48,13 @@ export async function middleware(request: NextRequest) {
   if (!session) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (
+    session.role === "expense_submitter" &&
+    !EXPENSE_SUBMITTER_ALLOWED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+  ) {
+    return NextResponse.redirect(new URL("/tbr/my-expenses", request.url));
   }
 
   return NextResponse.next();

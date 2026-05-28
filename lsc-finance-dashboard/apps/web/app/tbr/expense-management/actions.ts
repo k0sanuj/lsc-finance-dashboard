@@ -3,12 +3,12 @@
 import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { executeAdmin, queryRowsAdmin } from "@lsc/db";
+import { executeAdmin, queryRowsAdmin, withAdminTransaction } from "@lsc/db";
 import { callLlm } from "@lsc/skills/shared/llm";
 import { cascadeUpdate } from "@lsc/skills/shared/cascade-update";
 import { notifyExpenseEvent } from "@lsc/skills/expenses/notify";
 import { postExpenseJournal } from "@lsc/skills/quickbooks/post-expense-journal";
-import { requireRole, requireSession } from "../../../lib/auth";
+import { requireRole, requireSession, requireTbrExpensePortalAccess } from "../../../lib/auth";
 
 function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -18,6 +18,29 @@ function parseAmount(value: string) {
   const normalized = value.replace(/[^0-9.-]/g, "");
   const amount = Number(normalized);
   return Number.isFinite(amount) ? amount : 0;
+}
+
+function normalizeCurrencyCode(value: string) {
+  const match = value.trim().toUpperCase().match(/[A-Z]{3}/);
+  return match?.[0] ?? "USD";
+}
+
+const EXPENSE_FX_TO_USD: Record<string, number> = {
+  USD: 1,
+  EUR: 1.1642,
+  SAR: 0.2675,
+  AED: 0.2723,
+  QAR: 0.2747,
+  GBP: 1.27,
+};
+
+function inferExpenseUsd(amount: number, currencyCode: string, explicitFxRate?: number) {
+  const rate = explicitFxRate && explicitFxRate > 0 ? explicitFxRate : EXPENSE_FX_TO_USD[currencyCode] ?? 1;
+  return {
+    fxRate: rate,
+    reportingAmountUsd: Number((amount * rate).toFixed(2)),
+    fxSource: explicitFxRate && explicitFxRate > 0 ? "manual_fx_rate" : currencyCode === "USD" ? "native_usd" : "expense_workflow_default_rate",
+  };
 }
 
 function parseNormalizedNumber(value: unknown) {
@@ -135,7 +158,7 @@ function matchBudgetCategoryId(label: string, options: BudgetCategoryOption[]) {
 }
 
 export async function createExpenseSubmissionAction(formData: FormData) {
-  await requireRole(["super_admin", "finance_admin", "team_member"]);
+  await requireTbrExpensePortalAccess();
   const session = await requireSession();
 
   const title = normalizeWhitespace(String(formData.get("submissionTitle") ?? ""));
@@ -147,11 +170,30 @@ export async function createExpenseSubmissionAction(formData: FormData) {
   const description = normalizeWhitespace(String(formData.get("description") ?? "")) || null;
   const splitMethod = normalizeWhitespace(String(formData.get("splitMethod") ?? "solo")) || "solo";
   const splitCount = Math.max(1, Number(formData.get("splitCount") ?? 1));
-  const amount = parseAmount(String(formData.get("amount") ?? "0"));
+  const originalCurrencyCode = normalizeCurrencyCode(String(formData.get("currencyCode") ?? "USD"));
+  const originalAmount = parseAmount(String(formData.get("amount") ?? "0"));
+  const manualFxRate = parseAmount(String(formData.get("fxRateToUsd") ?? "0"));
+  const { fxRate, reportingAmountUsd, fxSource } = inferExpenseUsd(
+    originalAmount,
+    originalCurrencyCode,
+    manualFxRate
+  );
   const expenseDate = normalizeWhitespace(String(formData.get("expenseDate") ?? "")) || null;
+  const noReceiptReason = normalizeWhitespace(String(formData.get("noReceiptReason") ?? "")) || null;
+  const tagId = normalizeWhitespace(String(formData.get("expenseTagId") ?? "")) || null;
+  const returnPath =
+    normalizeWhitespace(String(formData.get("returnPath") ?? "")) || "/tbr/my-expenses";
 
-  if (!title || amount <= 0) {
-    redirectToExpenseWorkflow("error", "Title and a positive amount are required.");
+  if (!title || originalAmount <= 0) {
+    redirectToExpenseWorkflow("error", "Title and a positive amount are required.", returnPath);
+  }
+
+  if (!tagId) {
+    redirectToExpenseWorkflow("error", "Choose an expense tag before submitting.", returnPath);
+  }
+
+  if (!noReceiptReason) {
+    redirectToExpenseWorkflow("error", "Manual entries without a receipt require an explanation.", returnPath);
   }
 
   const companyRows = await queryRowsAdmin<{ id: string }>(
@@ -160,7 +202,7 @@ export async function createExpenseSubmissionAction(formData: FormData) {
   const companyId = companyRows[0]?.id;
 
   if (!companyId) {
-    redirectToExpenseWorkflow("error", "TBR company record was not found.");
+    redirectToExpenseWorkflow("error", "TBR company record was not found.", returnPath);
   }
 
   const submissionRows = await queryRowsAdmin<{ id: string }>(
@@ -181,7 +223,7 @@ export async function createExpenseSubmissionAction(formData: FormData) {
   const submissionId = submissionRows[0]?.id;
 
   if (!submissionId) {
-    redirectToExpenseWorkflow("error", "Submission could not be created.");
+    redirectToExpenseWorkflow("error", "Submission could not be created.", returnPath);
   }
 
   const itemRows = await queryRowsAdmin<{ id: string }>(
@@ -192,11 +234,20 @@ export async function createExpenseSubmissionAction(formData: FormData) {
        merchant_name,
        expense_date,
        amount,
+       original_currency_code,
+       original_amount,
+       fx_rate_to_usd,
+       fx_source,
+       reporting_currency_code,
+       reporting_amount_usd,
+       approved_amount_usd,
+       receipt_status,
+       no_receipt_reason,
        description,
        split_method,
        split_count
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8::expense_split_method, $9)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'USD', $11, $11, 'missing_with_reason', $12, $13, $14::expense_split_method, $15)
      returning id`,
     [
       submissionId,
@@ -204,7 +255,13 @@ export async function createExpenseSubmissionAction(formData: FormData) {
       teamId || null,
       merchantName,
       expenseDate || null,
-      amount,
+      reportingAmountUsd,
+      originalCurrencyCode,
+      originalAmount,
+      fxRate,
+      fxSource,
+      reportingAmountUsd,
+      noReceiptReason,
       description,
       splitMethod,
       splitCount
@@ -221,16 +278,16 @@ export async function createExpenseSubmissionAction(formData: FormData) {
            app_user_id,
            split_label,
            split_percentage,
-           split_amount
+          split_amount
          )
          values ($1, $2, $3, 100, $4)`,
-        [itemId, session.id, session.fullName, amount]
+        [itemId, session.id, session.fullName, reportingAmountUsd]
       );
     }
 
     if (splitMethod === "equal") {
       const effectiveCount = Math.max(1, splitCount);
-      const splitAmount = Number((amount / effectiveCount).toFixed(2));
+      const splitAmount = Number((reportingAmountUsd / effectiveCount).toFixed(2));
       const splitPercentage = Number((100 / effectiveCount).toFixed(4));
 
       for (let index = 0; index < effectiveCount; index += 1) {
@@ -248,9 +305,19 @@ export async function createExpenseSubmissionAction(formData: FormData) {
     }
   }
 
+  if (itemId && tagId) {
+    await executeAdmin(
+      `insert into expense_submission_item_tags (expense_submission_item_id, expense_tag_id)
+       values ($1, $2)
+       on conflict do nothing`,
+      [itemId, tagId]
+    );
+    await refreshExpenseItemRuleFindings(itemId);
+  }
+
   if (submissionId) {
     await cascadeUpdate({
-      trigger: "expense-submission:approved",
+      trigger: "expense-submission:submitted",
       entityType: "expense_submission",
       entityId: submissionId,
       action: "create",
@@ -263,11 +330,12 @@ export async function createExpenseSubmissionAction(formData: FormData) {
 
   revalidatePath("/tbr");
   revalidatePath("/tbr/expense-management");
-  redirectToExpenseWorkflow("success", "Expense submission created.");
+  revalidatePath(returnPath);
+  redirectToExpenseWorkflow("success", "Expense submission created.", returnPath);
 }
 
 export async function createExpenseReportFromBillsAction(formData: FormData) {
-  await requireRole(["super_admin", "finance_admin", "team_member"]);
+  await requireTbrExpensePortalAccess();
   const session = await requireSession();
 
   const submissionTitle = normalizeWhitespace(String(formData.get("submissionTitle") ?? ""));
@@ -308,6 +376,10 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
     sourceFileName: string | null;
     amount: number;
     currencyCode: string;
+    originalAmount: number;
+    originalCurrencyCode: string;
+    fxRateToUsd: number;
+    fxSource: string;
     expenseDate: string | null;
     merchantName: string;
     description: string | null;
@@ -346,6 +418,17 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
         (String(summary.originalCurrency ?? summary.currencyCode ?? "").toUpperCase() === "USD"
           ? parseNormalizedNumber(summary.originalAmount)
           : 0);
+      const originalCurrencyCode = normalizeCurrencyCode(
+        String(summary.originalCurrency ?? summary.currencyCode ?? "USD")
+      );
+      const originalAmount = parseNormalizedNumber(summary.originalAmount) || usdAmount;
+      const inferred = usdAmount > 0 && originalAmount > 0
+        ? {
+            fxRate: Number((usdAmount / originalAmount).toFixed(6)),
+            reportingAmountUsd: usdAmount,
+            fxSource: "ai_extracted_usd_amount",
+          }
+        : inferExpenseUsd(originalAmount, originalCurrencyCode);
       const merchantName =
         normalizeWhitespace(
           String(
@@ -366,8 +449,12 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
         billRef: row.intake_event_id,
         sourceDocumentId: row.source_document_id,
         sourceFileName: row.source_file_name,
-        amount: usdAmount,
+        amount: inferred.reportingAmountUsd,
         currencyCode: "USD",
+        originalAmount,
+        originalCurrencyCode,
+        fxRateToUsd: inferred.fxRate,
+        fxSource: inferred.fxSource,
         expenseDate,
         merchantName,
         description,
@@ -375,8 +462,9 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
           analysisRunId: row.analysis_run_id,
           intakeEventId: row.intake_event_id,
           originalAmount: summary.originalAmount ?? null,
-          originalCurrency: summary.originalCurrency ?? summary.currencyCode ?? null,
-          usdAmount,
+          originalCurrency: originalCurrencyCode,
+          usdAmount: inferred.reportingAmountUsd,
+          fxRateToUsd: inferred.fxRate,
           expenseDate,
           sourceFileName: row.source_file_name ?? null
         }
@@ -406,7 +494,10 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
        ) fields on true
        where aid.id = any($1::uuid[])
          and aid.submitted_by_user_id = $2::uuid
-         and aid.workflow_context like ('tbr-race:' || $3::text || ':%')
+        and (
+          aid.workflow_context like ('tbr-race:' || $3::text || ':%')
+          or aid.workflow_context = 'tbr-my-expenses'
+        )
          and aid.target_kind in ('expense_receipt', 'reimbursement_bundle')
          and aid.status = 'approved'
          and aid.source_document_id is not null`,
@@ -432,8 +523,15 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
         "USD";
       const usdAmount = parseNormalizedNumber(readField(fields, "usd_amount"));
       const originalAmount = parseNormalizedNumber(readField(fields, "original_amount", "total_amount", "amount"));
-      const currencyCode = usdAmount > 0 ? "USD" : originalCurrency;
-      const amount = usdAmount > 0 ? usdAmount : originalAmount;
+      const inferred = usdAmount > 0 && originalAmount > 0
+        ? {
+            fxRate: Number((usdAmount / originalAmount).toFixed(6)),
+            reportingAmountUsd: usdAmount,
+            fxSource: "ai_extracted_usd_amount",
+          }
+        : inferExpenseUsd(originalAmount, originalCurrency);
+      const currencyCode = "USD";
+      const amount = inferred.reportingAmountUsd;
       const merchantName =
         normalizeWhitespace(
           readField(fields, "merchant_name", "vendor_name", "counterparty_name", "payee") ||
@@ -457,6 +555,10 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
         sourceFileName: row.source_name,
         amount,
         currencyCode,
+        originalAmount,
+        originalCurrencyCode: originalCurrency,
+        fxRateToUsd: inferred.fxRate,
+        fxSource: inferred.fxSource,
         expenseDate,
         merchantName,
         description,
@@ -468,7 +570,8 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
           currencyCode,
           originalAmount,
           originalCurrency,
-          usdAmount: usdAmount || null,
+          usdAmount: inferred.reportingAmountUsd,
+          fxRateToUsd: inferred.fxRate,
           expenseDate,
           fields
         }
@@ -535,20 +638,31 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
          expense_date,
          currency_code,
          amount,
+         original_currency_code,
+         original_amount,
+         fx_rate_to_usd,
+         fx_source,
+         reporting_currency_code,
+         reporting_amount_usd,
+         approved_amount_usd,
+         receipt_status,
          description,
          split_method,
          split_count,
          ai_summary
        )
-       values ($1, $2, $3, $4, $5, $6, $7, 'solo', 1, $8::jsonb)
+       values ($1, $2, $3, $4, 'USD', $5, $6, $7, $8, $9, 'USD', $5, $5, 'attached', $10, 'solo', 1, $11::jsonb)
        returning id`,
       [
         submissionId,
         row.sourceDocumentId,
         row.merchantName,
         row.expenseDate,
-        row.currencyCode,
         row.amount,
+        row.originalCurrencyCode,
+        row.originalAmount,
+        row.fxRateToUsd,
+        row.fxSource,
         row.description,
         JSON.stringify(row.aiSummary)
       ]
@@ -568,6 +682,7 @@ export async function createExpenseReportFromBillsAction(formData: FormData) {
          values ($1, $2, $3, 100, $4)`,
         [itemId, session.id, session.fullName, row.amount]
       );
+      await refreshExpenseItemRuleFindings(itemId);
     }
   }
 
@@ -630,6 +745,361 @@ const REJECT_REASON_LABELS: Record<string, string> = {
   duplicate: "Duplicate submission",
   other: "Other",
 };
+
+async function refreshExpenseItemRuleFindings(itemId: string) {
+  await executeAdmin(`delete from expense_item_rule_findings where expense_submission_item_id = $1`, [itemId]);
+
+  const rows = await queryRowsAdmin<{
+    item_id: string;
+    submission_id: string;
+    source_document_id: string | null;
+    cost_category_id: string | null;
+    race_event_id: string | null;
+    reporting_amount_usd: string;
+    original_currency_code: string | null;
+    fx_rate_to_usd: string | null;
+    no_receipt_reason: string | null;
+    tag_count: string;
+    category_name: string | null;
+    rule_id: string | null;
+    rule_label: string | null;
+    rule_approved_amount_usd: string | null;
+    close_threshold_ratio: string | null;
+  }>(
+    `select
+       esi.id as item_id,
+       esi.submission_id,
+       esi.source_document_id::text,
+       esi.cost_category_id::text,
+       es.race_event_id::text,
+       coalesce(esi.reporting_amount_usd, esi.amount)::text as reporting_amount_usd,
+       esi.original_currency_code,
+       esi.fx_rate_to_usd::text,
+       esi.no_receipt_reason,
+       count(esit.expense_tag_id)::text as tag_count,
+       cc.name as category_name,
+       rbr.id::text as rule_id,
+       rbr.rule_label,
+       rbr.approved_amount_usd::text as rule_approved_amount_usd,
+       rbr.close_threshold_ratio::text
+     from expense_submission_items esi
+     join expense_submissions es on es.id = esi.submission_id
+     left join cost_categories cc on cc.id = esi.cost_category_id
+     left join expense_submission_item_tags esit on esit.expense_submission_item_id = esi.id
+     left join race_budget_rules rbr
+       on rbr.race_event_id = es.race_event_id
+      and rbr.cost_category_id = esi.cost_category_id
+     where esi.id = $1
+     group by esi.id, es.race_event_id, cc.name, rbr.id`,
+    [itemId]
+  );
+
+  const item = rows[0];
+  if (!item) return;
+
+  const findings: Array<{
+    ruleKey: string;
+    severity: "info" | "warning" | "blocker";
+    suggestedStatus: "review" | "approved" | "rejected" | "needs_info" | null;
+    suggestedApprovedAmountUsd: number | null;
+    message: string;
+    raceBudgetRuleId?: string | null;
+  }> = [];
+
+  if (!item.source_document_id && !item.no_receipt_reason) {
+    findings.push({
+      ruleKey: "receipt_required",
+      severity: "blocker",
+      suggestedStatus: "needs_info",
+      suggestedApprovedAmountUsd: null,
+      message: "Receipt is missing and no explanation was provided.",
+    });
+  } else if (!item.source_document_id) {
+    findings.push({
+      ruleKey: "receipt_explanation",
+      severity: "info",
+      suggestedStatus: "review",
+      suggestedApprovedAmountUsd: null,
+      message: `No receipt attached. Submitter explanation: ${item.no_receipt_reason}`,
+    });
+  }
+
+  if (Number(item.tag_count) === 0) {
+    findings.push({
+      ruleKey: "tag_required",
+      severity: "warning",
+      suggestedStatus: "review",
+      suggestedApprovedAmountUsd: null,
+      message: "Expense is missing an operating tag.",
+    });
+  }
+
+  if (!item.cost_category_id) {
+    findings.push({
+      ruleKey: "category_required",
+      severity: "blocker",
+      suggestedStatus: "needs_info",
+      suggestedApprovedAmountUsd: null,
+      message: "Expense category is required before finance approval.",
+    });
+  }
+
+  if ((item.original_currency_code ?? "USD") !== "USD" && !item.fx_rate_to_usd) {
+    findings.push({
+      ruleKey: "fx_required",
+      severity: "blocker",
+      suggestedStatus: "needs_info",
+      suggestedApprovedAmountUsd: null,
+      message: "Non-USD expense requires an FX rate before review.",
+    });
+  }
+
+  const reportingAmount = Number(item.reporting_amount_usd);
+  if (item.rule_id && item.rule_approved_amount_usd) {
+    const approved = Number(item.rule_approved_amount_usd);
+    if (reportingAmount > approved) {
+      findings.push({
+        ruleKey: "race_budget_over_cap",
+        severity: "warning",
+        suggestedStatus: "review",
+        suggestedApprovedAmountUsd: approved,
+        raceBudgetRuleId: item.rule_id,
+        message: `${item.rule_label ?? "Race budget"} caps this item at $${approved.toFixed(2)}.`,
+      });
+    }
+  } else if (item.cost_category_id) {
+    findings.push({
+      ruleKey: "race_budget_rule_missing",
+      severity: "warning",
+      suggestedStatus: "review",
+      suggestedApprovedAmountUsd: null,
+      message: `No race budget rule matches ${item.category_name ?? "this category"}.`,
+    });
+  }
+
+  for (const finding of findings) {
+    await executeAdmin(
+      `insert into expense_item_rule_findings (
+         expense_submission_item_id,
+         race_budget_rule_id,
+         rule_key,
+         severity,
+         suggested_review_status,
+         suggested_approved_amount_usd,
+         message
+       )
+       values ($1, $2, $3, $4, $5::expense_item_review_status, $6, $7)`,
+      [
+        itemId,
+        finding.raceBudgetRuleId ?? null,
+        finding.ruleKey,
+        finding.severity,
+        finding.suggestedStatus,
+        finding.suggestedApprovedAmountUsd,
+        finding.message,
+      ]
+    );
+  }
+
+  const nextReceiptStatus = item.source_document_id
+    ? "attached"
+    : item.no_receipt_reason
+      ? "missing_with_reason"
+      : "missing";
+  const nextReviewStatus =
+    findings.some((finding) => finding.severity === "blocker")
+      ? "needs_info"
+      : findings.length > 0
+        ? "review"
+        : "pending";
+
+  await executeAdmin(
+    `update expense_submission_items
+     set receipt_status = $2,
+         review_status = case
+           when review_status in ('approved', 'rejected') then review_status
+           else $3::expense_item_review_status
+         end,
+         rule_summary = $4::jsonb,
+         updated_at = now()
+     where id = $1`,
+    [
+      itemId,
+      nextReceiptStatus,
+      nextReviewStatus,
+      JSON.stringify({
+        openFindings: findings.length,
+        blockers: findings.filter((finding) => finding.severity === "blocker").length,
+      }),
+    ]
+  );
+}
+
+async function postApprovedExpenseItems(submissionId: string, performedBy: string) {
+  const items = await queryRowsAdmin<{
+    id: string;
+    company_id: string;
+    race_event_id: string | null;
+    cost_category_id: string | null;
+    source_document_id: string | null;
+    linked_expense_id: string | null;
+    merchant_name: string | null;
+    expense_date: string | null;
+    original_currency_code: string | null;
+    original_amount: string | null;
+    fx_rate_to_usd: string | null;
+    fx_source: string | null;
+    reporting_amount_usd: string;
+    approved_amount_usd: string | null;
+    description: string | null;
+    submitter_name: string;
+  }>(
+    `select
+       esi.id,
+       es.company_id,
+       es.race_event_id::text,
+       esi.cost_category_id::text,
+       esi.source_document_id::text,
+       esi.linked_expense_id::text,
+       esi.merchant_name,
+       esi.expense_date::text,
+       esi.original_currency_code,
+       esi.original_amount::text,
+       esi.fx_rate_to_usd::text,
+       esi.fx_source,
+       coalesce(esi.reporting_amount_usd, esi.amount)::text as reporting_amount_usd,
+       coalesce(esi.approved_amount_usd, esi.reporting_amount_usd, esi.amount)::text as approved_amount_usd,
+       esi.description,
+       au.full_name as submitter_name
+     from expense_submission_items esi
+     join expense_submissions es on es.id = esi.submission_id
+     join app_users au on au.id = es.submitted_by_user_id
+     where esi.submission_id = $1
+       and esi.review_status = 'approved'
+       and coalesce(esi.approved_amount_usd, esi.reporting_amount_usd, esi.amount) > 0`,
+    [submissionId]
+  );
+
+  for (const item of items) {
+    if (item.linked_expense_id) {
+      await executeAdmin(
+        `update expenses
+         set company_id = $2,
+             race_event_id = $3,
+             cost_category_id = $4,
+             source_document_id = $5,
+             vendor_name = $6,
+             expense_status = 'approved',
+             expense_date = $7,
+             currency_code = 'USD',
+             amount = $8,
+             original_currency_code = $9,
+             original_amount = $10,
+             fx_rate_to_usd = $11,
+             fx_source = $12,
+             reporting_currency_code = 'USD',
+             reporting_amount_usd = $8,
+             description = $13,
+             is_reimbursable = true,
+             submitted_by = $14,
+             source_expense_submission_id = $15,
+             source_expense_submission_item_id = $1,
+             updated_at = now()
+         where id = $16`,
+        [
+          item.id,
+          item.company_id,
+          item.race_event_id,
+          item.cost_category_id,
+          item.source_document_id,
+          item.merchant_name,
+          item.expense_date,
+          item.approved_amount_usd,
+          item.original_currency_code ?? "USD",
+          item.original_amount ?? item.reporting_amount_usd,
+          item.fx_rate_to_usd,
+          item.fx_source,
+          item.description,
+          item.submitter_name,
+          submissionId,
+          item.linked_expense_id,
+        ]
+      );
+    } else {
+      const expenseRows = await queryRowsAdmin<{ id: string }>(
+        `insert into expenses (
+           company_id,
+           race_event_id,
+           cost_category_id,
+           source_document_id,
+           vendor_name,
+           expense_status,
+           expense_date,
+           currency_code,
+           amount,
+           original_currency_code,
+           original_amount,
+           fx_rate_to_usd,
+           fx_source,
+           reporting_currency_code,
+           reporting_amount_usd,
+           description,
+           is_reimbursable,
+           submitted_by,
+           source_expense_submission_id,
+           source_expense_submission_item_id
+         )
+         values ($1, $2, $3, $4, $5, 'approved', $6, 'USD', $7, $8, $9, $10, $11, 'USD', $7, $12, true, $13, $14, $15)
+         on conflict (source_expense_submission_item_id)
+         where source_expense_submission_item_id is not null
+         do update
+         set amount = excluded.amount,
+             reporting_amount_usd = excluded.reporting_amount_usd,
+             expense_status = 'approved',
+             updated_at = now()
+         returning id`,
+        [
+          item.company_id,
+          item.race_event_id,
+          item.cost_category_id,
+          item.source_document_id,
+          item.merchant_name,
+          item.expense_date,
+          item.approved_amount_usd,
+          item.original_currency_code ?? "USD",
+          item.original_amount ?? item.reporting_amount_usd,
+          item.fx_rate_to_usd,
+          item.fx_source,
+          item.description,
+          item.submitter_name,
+          submissionId,
+          item.id,
+        ]
+      );
+
+      const expenseId = expenseRows[0]?.id;
+      if (expenseId) {
+        await executeAdmin(
+          `update expense_submission_items
+           set linked_expense_id = $2,
+               updated_at = now()
+           where id = $1`,
+          [item.id, expenseId]
+        );
+
+        await cascadeUpdate({
+          trigger: "expense:created",
+          entityType: "expense",
+          entityId: expenseId,
+          action: "post-approved-expense-item",
+          after: { submissionId, itemId: item.id, amountUsd: item.approved_amount_usd },
+          performedBy,
+          agentId: "expense-agent",
+        });
+      }
+    }
+  }
+}
 
 export async function updateExpenseSubmissionStatusAction(formData: FormData) {
   await requireRole(["super_admin", "finance_admin"]);
@@ -747,7 +1217,8 @@ export async function approveExpenseSubmissionAction(formData: FormData) {
       and rbr.cost_category_id = esi.cost_category_id
      where esi.submission_id = $1
        and rbr.approved_amount_usd is not null
-       and esi.amount > rbr.approved_amount_usd`,
+       and coalesce(esi.approved_amount_usd, esi.reporting_amount_usd, esi.amount) > rbr.approved_amount_usd
+       and esi.review_status <> 'rejected'`,
     [submissionId]
   );
 
@@ -766,16 +1237,44 @@ export async function approveExpenseSubmissionAction(formData: FormData) {
     );
   }
 
-  await executeAdmin(
-    `update expense_submissions
-     set submission_status = 'approved',
-         reviewed_by_user_id = $2,
-         reviewed_at = now(),
-         review_note = coalesce($3, review_note, 'Approved and ready for invoice generation.'),
-         updated_at = now()
-     where id = $1`,
-    [submissionId, session.id, reviewNote]
-  );
+  await withAdminTransaction(async () => {
+    await executeAdmin(
+      `update expense_submission_items
+       set review_status = 'approved',
+           approved_amount_usd = coalesce(approved_amount_usd, reporting_amount_usd, amount),
+           reviewed_by_user_id = $2,
+           reviewed_at = now(),
+           updated_at = now()
+       where submission_id = $1
+         and review_status in ('pending', 'review')`,
+      [submissionId, session.id]
+    );
+
+    const approvedRows = await queryRowsAdmin<{ approved_count: string }>(
+      `select count(*)::text as approved_count
+       from expense_submission_items
+       where submission_id = $1
+         and review_status = 'approved'`,
+      [submissionId]
+    );
+
+    if (Number(approvedRows[0]?.approved_count ?? 0) === 0) {
+      throw new Error("At least one line item must be approved before the report can become invoice-ready.");
+    }
+
+    await executeAdmin(
+      `update expense_submissions
+       set submission_status = 'approved',
+           reviewed_by_user_id = $2,
+           reviewed_at = now(),
+           review_note = coalesce($3, review_note, 'Approved and ready for invoice generation.'),
+           updated_at = now()
+       where id = $1`,
+      [submissionId, session.id, reviewNote]
+    );
+
+    await postApprovedExpenseItems(submissionId, session.id);
+  });
 
   await cascadeUpdate({
     trigger: "expense-submission:approved",
@@ -814,6 +1313,243 @@ export async function approveExpenseSubmissionAction(formData: FormData) {
       : "Submission approved and marked invoice ready.",
     returnPath
   );
+}
+
+export async function updateExpenseItemReviewAction(formData: FormData) {
+  await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
+  const itemId = normalizeWhitespace(String(formData.get("itemId") ?? ""));
+  const submissionId = normalizeWhitespace(String(formData.get("submissionId") ?? ""));
+  const reviewStatus = normalizeWhitespace(String(formData.get("reviewStatus") ?? ""));
+  const approvedAmountUsd = parseAmount(String(formData.get("approvedAmountUsd") ?? "0"));
+  const rejectionReasonCode = normalizeWhitespace(String(formData.get("rejectionReasonCode") ?? "")) || null;
+  const rejectionReasonDetail =
+    normalizeWhitespace(String(formData.get("rejectionReasonDetail") ?? "")) || null;
+  const challengeResponse = normalizeWhitespace(String(formData.get("challengeResponse") ?? "")) || null;
+  const returnPath =
+    normalizeWhitespace(String(formData.get("returnPath") ?? "")) ||
+    `/tbr/expense-management/${submissionId}`;
+
+  if (!itemId || !submissionId || !["approved", "rejected", "needs_info", "review"].includes(reviewStatus)) {
+    redirectToExpenseWorkflow("error", "Invalid item review decision.", returnPath);
+  }
+
+  if (reviewStatus === "approved" && approvedAmountUsd <= 0) {
+    redirectToExpenseWorkflow("error", "Approved line items require a positive approved USD amount.", returnPath);
+  }
+
+  if (reviewStatus === "rejected" && (!rejectionReasonCode || !rejectionReasonDetail)) {
+    redirectToExpenseWorkflow("error", "Rejected line items require a reason and explanation.", returnPath);
+  }
+
+  await executeAdmin(
+    `update expense_submission_items
+     set review_status = $2::expense_item_review_status,
+         approved_amount_usd = case when $2 = 'approved' then $3 else approved_amount_usd end,
+         rejection_reason_code = case when $2 = 'rejected' then $4 else rejection_reason_code end,
+         rejection_reason_detail = case when $2 = 'rejected' then $5 else rejection_reason_detail end,
+         challenge_status = case
+           when challenge_status = 'challenged' and $6::text is not null then 'resolved'
+           else challenge_status
+         end,
+         challenge_response = coalesce($6, challenge_response),
+         challenge_responded_by_user_id = case when $6::text is not null then $7 else challenge_responded_by_user_id end,
+         challenge_responded_at = case when $6::text is not null then now() else challenge_responded_at end,
+         reviewed_by_user_id = $7,
+         reviewed_at = now(),
+         updated_at = now()
+     where id = $1
+       and submission_id = $8`,
+    [
+      itemId,
+      reviewStatus,
+      approvedAmountUsd,
+      rejectionReasonCode,
+      rejectionReasonDetail,
+      challengeResponse,
+      session.id,
+      submissionId,
+    ]
+  );
+
+  if (reviewStatus === "rejected") {
+    await executeAdmin(
+      `update expenses
+       set expense_status = 'rejected',
+           updated_at = now()
+       where source_expense_submission_item_id = $1`,
+      [itemId]
+    );
+  }
+
+  await cascadeUpdate({
+    trigger: reviewStatus === "rejected" ? "expense-item:rejected" : "expense-item:reviewed",
+    entityType: "expense_submission_item",
+    entityId: itemId,
+    action: `set-${reviewStatus}`,
+    after: {
+      submissionId,
+      reviewStatus,
+      approvedAmountUsd: reviewStatus === "approved" ? approvedAmountUsd : null,
+      rejectionReasonCode,
+      challengeResponse,
+    },
+    performedBy: session.id,
+    agentId: "expense-agent",
+  });
+
+  revalidatePath("/tbr/expense-management");
+  revalidatePath(`/tbr/expense-management/${submissionId}`);
+  revalidatePath("/tbr/my-expenses");
+  redirectToExpenseWorkflow("success", "Line item review updated.", returnPath);
+}
+
+export async function challengeExpenseItemRejectionAction(formData: FormData) {
+  await requireTbrExpensePortalAccess();
+  const session = await requireSession();
+  const itemId = normalizeWhitespace(String(formData.get("itemId") ?? ""));
+  const submissionId = normalizeWhitespace(String(formData.get("submissionId") ?? ""));
+  const challengeReason = normalizeWhitespace(String(formData.get("challengeReason") ?? ""));
+  const returnPath =
+    normalizeWhitespace(String(formData.get("returnPath") ?? "")) || `/tbr/my-expenses/${submissionId}`;
+
+  if (!itemId || !submissionId || !challengeReason) {
+    redirectToExpenseWorkflow("error", "Challenge reason is required.", returnPath);
+  }
+
+  const rows = await queryRowsAdmin<{ id: string }>(
+    `select esi.id
+     from expense_submission_items esi
+     join expense_submissions es on es.id = esi.submission_id
+     where esi.id = $1
+       and es.id = $2
+       and es.submitted_by_user_id = $3
+       and esi.review_status = 'rejected'
+     limit 1`,
+    [itemId, submissionId, session.id]
+  );
+
+  if (!rows[0]) {
+    redirectToExpenseWorkflow("error", "Only rejected items from your own report can be challenged.", returnPath);
+  }
+
+  await executeAdmin(
+    `update expense_submission_items
+     set challenge_status = 'challenged',
+         challenge_reason = $2,
+         challenged_at = now(),
+         updated_at = now()
+     where id = $1`,
+    [itemId, challengeReason]
+  );
+
+  await cascadeUpdate({
+    trigger: "expense-item:challenged",
+    entityType: "expense_submission_item",
+    entityId: itemId,
+    action: "challenge-rejection",
+    after: { submissionId, challengeReason },
+    performedBy: session.id,
+    agentId: "expense-agent",
+  });
+
+  revalidatePath("/tbr/my-expenses");
+  revalidatePath(`/tbr/my-expenses/${submissionId}`);
+  revalidatePath(`/tbr/expense-management/${submissionId}`);
+  redirectToExpenseWorkflow("success", "Challenge submitted for finance review.", returnPath);
+}
+
+export async function upsertExpenseTagAction(formData: FormData) {
+  await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
+  const label = normalizeWhitespace(String(formData.get("tagLabel") ?? ""));
+  const description = normalizeWhitespace(String(formData.get("tagDescription") ?? "")) || null;
+  const returnPath =
+    normalizeWhitespace(String(formData.get("returnPath") ?? "")) || "/tbr/expense-management";
+
+  if (!label) {
+    redirectToExpenseWorkflow("error", "Tag label is required.", returnPath);
+  }
+
+  const companyRows = await queryRowsAdmin<{ id: string }>(
+    `select id from companies where code = 'TBR'::company_code limit 1`
+  );
+  const companyId = companyRows[0]?.id;
+  if (!companyId) {
+    redirectToExpenseWorkflow("error", "TBR company record was not found.", returnPath);
+  }
+
+  const tagKey = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  await executeAdmin(
+    `insert into expense_tags (
+       company_id,
+       tag_key,
+       tag_label,
+       tag_description,
+       created_by_user_id,
+       updated_by_user_id
+     )
+     values ($1, $2, $3, $4, $5, $5)
+     on conflict (company_id, tag_key)
+     do update set
+       tag_label = excluded.tag_label,
+       tag_description = excluded.tag_description,
+       is_active = true,
+       updated_by_user_id = excluded.updated_by_user_id,
+       updated_at = now()`,
+    [companyId, tagKey, label, description, session.id]
+  );
+
+  revalidatePath("/tbr/expense-management");
+  revalidatePath("/tbr/my-expenses");
+  redirectToExpenseWorkflow("success", "Expense tag saved.", returnPath);
+}
+
+export async function upsertExpenseWorkspaceRuleAction(formData: FormData) {
+  await requireRole(["super_admin", "finance_admin"]);
+  const session = await requireSession();
+  const ruleKey = normalizeWhitespace(String(formData.get("ruleKey") ?? ""));
+  const ruleLabel = normalizeWhitespace(String(formData.get("ruleLabel") ?? ""));
+  const severity = normalizeWhitespace(String(formData.get("severity") ?? "warning"));
+  const isActive = normalizeWhitespace(String(formData.get("isActive") ?? "")) === "true";
+  const returnPath =
+    normalizeWhitespace(String(formData.get("returnPath") ?? "")) || "/tbr/expense-management";
+
+  if (!ruleKey || !ruleLabel || !["info", "warning", "blocker"].includes(severity)) {
+    redirectToExpenseWorkflow("error", "Rule key, label, and valid severity are required.", returnPath);
+  }
+
+  const companyRows = await queryRowsAdmin<{ id: string }>(
+    `select id from companies where code = 'TBR'::company_code limit 1`
+  );
+  const companyId = companyRows[0]?.id;
+  if (!companyId) {
+    redirectToExpenseWorkflow("error", "TBR company record was not found.", returnPath);
+  }
+
+  await executeAdmin(
+    `insert into expense_workspace_rules (
+       company_id,
+       rule_key,
+       rule_label,
+       severity,
+       is_active,
+       created_by_user_id,
+       updated_by_user_id
+     )
+     values ($1, $2, $3, $4, $5, $6, $6)
+     on conflict (company_id, rule_key)
+     do update set
+       rule_label = excluded.rule_label,
+       severity = excluded.severity,
+       is_active = excluded.is_active,
+       updated_by_user_id = excluded.updated_by_user_id,
+       updated_at = now()`,
+    [companyId, ruleKey, ruleLabel, severity, isActive, session.id]
+  );
+
+  revalidatePath("/tbr/expense-management");
+  redirectToExpenseWorkflow("success", "Workspace rule updated.", returnPath);
 }
 
 export async function analyzeRaceBudgetDocumentAction(
@@ -1169,7 +1905,7 @@ export async function deleteRaceBudgetRuleAction(formData: FormData) {
 }
 
 export async function createReimbursementInvoiceAction(formData: FormData) {
-  await requireRole(["super_admin", "finance_admin", "team_member"]);
+  await requireTbrExpensePortalAccess();
   const session = await requireSession();
   const submissionId = normalizeWhitespace(String(formData.get("submissionId") ?? ""));
   const returnPath =
@@ -1194,7 +1930,7 @@ export async function createReimbursementInvoiceAction(formData: FormData) {
        es.race_event_id,
        es.submission_title,
        es.submission_status,
-       coalesce(sum(esi.amount), 0)::text as total_amount,
+       coalesce(sum(coalesce(esi.approved_amount_usd, esi.reporting_amount_usd, esi.amount)) filter (where esi.review_status = 'approved'), 0)::text as total_amount,
        ii.id as linked_invoice_id
      from expense_submissions es
      left join expense_submission_items esi on esi.submission_id = es.id
@@ -1245,7 +1981,7 @@ export async function createReimbursementInvoiceAction(formData: FormData) {
 
   const invoiceReference = `REIMB-${submission.id.slice(0, 8).toUpperCase()}`;
 
-  await executeAdmin(
+  const invoiceRows = await queryRowsAdmin<{ id: string }>(
     `insert into invoice_intakes (
        company_id,
        race_event_id,
@@ -1254,12 +1990,14 @@ export async function createReimbursementInvoiceAction(formData: FormData) {
        intake_status,
        vendor_name,
        invoice_number,
+       currency_code,
        total_amount,
        category_hint,
        operator_note,
        submitted_at
      )
-     values ($1, $2, $3, $4, 'submitted', $5, $6, $7, 'Reimbursement', $8, now())`,
+     values ($1, $2, $3, $4, 'submitted', $5, $6, 'USD', $7, 'Reimbursement', $8, now())
+     returning id`,
     [
       submission.company_id,
       submission.race_event_id,
@@ -1268,9 +2006,34 @@ export async function createReimbursementInvoiceAction(formData: FormData) {
       session.fullName,
       invoiceReference,
       totalAmount,
-      `Generated from approved expense report "${submission.submission_title}".`
+      `Generated from approved expense report "${submission.submission_title}" for LSC / XTZ Esports Tech Ltd (Dubai).`
     ]
   );
+  const invoiceId = invoiceRows[0]?.id;
+
+  await executeAdmin(
+    `update expense_submissions
+     set accepted_review_at = now(),
+         invoice_recipient_label = 'LSC / XTZ Esports Tech Ltd (Dubai)',
+         updated_at = now()
+     where id = $1`,
+    [submission.id]
+  );
+
+  await cascadeUpdate({
+    trigger: "expense-submission:invoice-created",
+    entityType: "expense_submission",
+    entityId: submission.id,
+    action: "create-reimbursement-invoice",
+    after: {
+      invoiceId,
+      invoiceReference,
+      totalAmount,
+      recipient: "LSC / XTZ Esports Tech Ltd (Dubai)",
+    },
+    performedBy: session.id,
+    agentId: "expense-agent",
+  });
 
   revalidatePath("/tbr/my-expenses");
   revalidatePath("/tbr/invoice-hub");

@@ -1,10 +1,20 @@
 import type { Route } from "next";
 import Link from "next/link";
-import { getAiIntakeQueue, getDocumentAnalysisQueue, getMyExpenseSubmissions } from "@lsc/db";
-import { requireRole } from "../../../lib/auth";
+import {
+  getAiIntakeQueue,
+  getDocumentAnalysisQueue,
+  getExpenseFormOptions,
+  getExpenseWorkspaceControls,
+  getMyExpenseSubmissions
+} from "@lsc/db";
+import { requireTbrExpensePortalAccess } from "../../../lib/auth";
 import { AIIntakePanel } from "../../components/ai-intake-panel";
 import { AIIntakeReviewPanel } from "../../components/ai-intake-review-panel";
-import { createReimbursementInvoiceAction } from "../expense-management/actions";
+import {
+  createExpenseReportFromBillsAction,
+  createExpenseSubmissionAction,
+  createReimbursementInvoiceAction
+} from "../expense-management/actions";
 
 type RecentBillRow = {
   id?: string;
@@ -41,13 +51,20 @@ function reportStep(statusKey: string) {
 }
 
 export default async function MyExpensesPage({ searchParams }: MyExpensesPageProps) {
-  const session = await requireRole(["super_admin", "finance_admin", "team_member"]);
+  const session = await requireTbrExpensePortalAccess();
   const params = searchParams ? await searchParams : undefined;
   const status = params?.status ?? null;
   const message = params?.message ?? null;
   const aiDraftId = params?.aiDraftId ?? null;
 
-  const [submissions, rawQueue, receiptDrafts, reimbursementDrafts] = await Promise.all([
+  const [
+    submissions,
+    rawQueue,
+    receiptDrafts,
+    reimbursementDrafts,
+    formOptions,
+    workspaceControls
+  ] = await Promise.all([
     getMyExpenseSubmissions(session.id),
     getDocumentAnalysisQueue(session.id, "tbr-race:"),
     getAiIntakeQueue({
@@ -61,7 +78,9 @@ export default async function MyExpensesPage({ searchParams }: MyExpensesPagePro
       companyCode: "TBR",
       targetKind: "reimbursement_bundle",
       limit: 10,
-    })
+    }),
+    getExpenseFormOptions(),
+    getExpenseWorkspaceControls()
   ]);
   const queue = rawQueue as RecentBillRow[];
   const aiDrafts = [...receiptDrafts, ...reimbursementDrafts].slice(0, 10);
@@ -78,6 +97,23 @@ export default async function MyExpensesPage({ searchParams }: MyExpensesPagePro
   const reimbursedReports = submissions.filter((submission) => submission.linkedInvoiceId || submission.statusKey === "posted").length;
   const activeReceiptCards = aiDrafts.slice(0, 4);
   const latestReports = submissions.slice(0, 4);
+  const approvedAiDrafts = aiDrafts.filter((draft) => draft.status === "approved");
+  const manualRaceId =
+    formOptions.races.find((race) => /lake como/i.test(race.label))?.id ??
+    formOptions.races[0]?.id ??
+    "";
+  const manualTeamId =
+    formOptions.teams.find((team) => /blue rising|tbr|racing/i.test(team.label))?.id ??
+    formOptions.teams[0]?.id ??
+    "";
+  const manualCategoryId =
+    formOptions.categories.find((category) => /other/i.test(category.label))?.id ??
+    formOptions.categories[0]?.id ??
+    "";
+  const manualTagId =
+    workspaceControls.tags.find((tag) => /lake|travel|transport/i.test(tag.label))?.id ??
+    workspaceControls.tags[0]?.id ??
+    "";
 
   return (
     <div className="page-grid">
@@ -87,10 +123,14 @@ export default async function MyExpensesPage({ searchParams }: MyExpensesPagePro
           <h3>Expense submissions and analyzed receipts</h3>
         </div>
         <div className="workspace-header-right">
-          <div className="segment-row">
-            <Link className="segment-chip" href="/tbr/races">Races</Link>
-            <Link className="segment-chip" href="/tbr">Back to TBR</Link>
-          </div>
+          {session.role === "expense_submitter" ? (
+            <span className="pill subtle-pill">TBR expense portal only</span>
+          ) : (
+            <div className="segment-row">
+              <Link className="segment-chip" href="/tbr/races">Races</Link>
+              <Link className="segment-chip" href="/tbr">Back to TBR</Link>
+            </div>
+          )}
         </div>
       </section>
 
@@ -176,12 +216,179 @@ export default async function MyExpensesPage({ searchParams }: MyExpensesPagePro
         />
       </section>
 
+      <section className="grid-two">
+        <article className="card">
+          <div className="card-title-row">
+            <div>
+              <span className="section-kicker">Manual entry</span>
+              <h3>Add a no-receipt expense</h3>
+            </div>
+            <span className="pill subtle-pill">Reason required</span>
+          </div>
+          <form action={createExpenseSubmissionAction} className="stack-form">
+            <input name="returnPath" type="hidden" value="/tbr/my-expenses" />
+            <label className="field">
+              <span>Report title</span>
+              <input
+                name="submissionTitle"
+                placeholder="Expense Report 2026-05-24"
+                required
+              />
+            </label>
+            <div className="grid-two">
+              <label className="field">
+                <span>Race</span>
+                <select name="raceEventId" defaultValue={manualRaceId} required>
+                  {formOptions.races.map((race) => (
+                    <option key={race.id} value={race.id}>{race.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Team</span>
+                <select name="teamId" defaultValue={manualTeamId}>
+                  <option value="">No team</option>
+                  {formOptions.teams.map((team) => (
+                    <option key={team.id} value={team.id}>{team.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="grid-two">
+              <label className="field">
+                <span>Category</span>
+                <select name="costCategoryId" defaultValue={manualCategoryId} required>
+                  {formOptions.categories.map((category) => (
+                    <option key={category.id} value={category.id}>{category.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Tag</span>
+                <select name="expenseTagId" defaultValue={manualTagId} required>
+                  {workspaceControls.tags.map((tag) => (
+                    <option key={tag.id} value={tag.id}>{tag.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="grid-two">
+              <label className="field">
+                <span>Merchant / payee</span>
+                <input name="merchantName" placeholder="Uber, hotel, allowance, bonus" required />
+              </label>
+              <label className="field">
+                <span>Date</span>
+                <input name="expenseDate" type="date" required />
+              </label>
+            </div>
+            <div className="grid-two">
+              <label className="field">
+                <span>Currency</span>
+                <input name="currencyCode" defaultValue="EUR" maxLength={3} required />
+              </label>
+              <label className="field">
+                <span>Original amount</span>
+                <input name="amount" inputMode="decimal" placeholder="35.00" required />
+              </label>
+              <label className="field">
+                <span>FX to USD</span>
+                <input name="fxRateToUsd" inputMode="decimal" placeholder="1.1642" />
+              </label>
+            </div>
+            <label className="field">
+              <span>Description</span>
+              <input name="description" placeholder="Travel day food allowance, taxi, race support, etc." />
+            </label>
+            <label className="field">
+              <span>No-receipt reason</span>
+              <textarea
+                name="noReceiptReason"
+                placeholder="Explain why a receipt is unavailable. Finance sees this as the receipt note."
+                required
+                rows={3}
+              />
+            </label>
+            <input name="splitMethod" type="hidden" value="solo" />
+            <input name="splitCount" type="hidden" value="1" />
+            <button className="action-button primary" type="submit">
+              Submit manual expense
+            </button>
+          </form>
+        </article>
+
+        <article className="card">
+          <div className="card-title-row">
+            <div>
+              <span className="section-kicker">Workspace rules</span>
+              <h3>Current checks on your report</h3>
+            </div>
+            <span className="pill">{workspaceControls.rules.filter((rule) => rule.isActive).length} active</span>
+          </div>
+          <div className="inline-actions">
+            {workspaceControls.rules.length > 0 ? workspaceControls.rules.map((rule) => (
+              <span className={`pill signal-pill signal-${rule.severity === "blocker" ? "risk" : rule.severity === "warning" ? "warn" : "good"}`} key={rule.id}>
+                {rule.label}
+              </span>
+            )) : (
+              <p className="muted">Finance has not configured workspace rules yet.</p>
+            )}
+          </div>
+          <p className="table-note">
+            Uploads and manual items stay in preview until approved. Finance decides line-by-line; rejected items can be challenged with a reason.
+          </p>
+        </article>
+      </section>
+
       <AIIntakeReviewPanel
         draftId={aiDraftId}
         redirectPath="/tbr/my-expenses"
         restrictToUserId={session.id}
         title="Expense preview"
       />
+
+      <section className="card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">Race report</span>
+            <h3>Create report from approved AI receipts</h3>
+          </div>
+          <span className="pill">{approvedAiDrafts.length} approved draft{approvedAiDrafts.length === 1 ? "" : "s"}</span>
+        </div>
+        <form action={createExpenseReportFromBillsAction} className="stack-form">
+          <input
+            name="intakeEventIds"
+            type="hidden"
+            value={approvedAiDrafts.map((draft) => `ai:${draft.id}`).join(",")}
+          />
+          <input name="returnPath" type="hidden" value="/tbr/my-expenses" />
+          <div className="grid-two">
+            <label className="field">
+              <span>Report title</span>
+              <input
+                name="submissionTitle"
+                placeholder="Lake Como S3 reimbursement report"
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Race</span>
+              <select name="raceEventId" defaultValue={manualRaceId} required>
+                {formOptions.races.map((race) => (
+                  <option key={race.id} value={race.id}>{race.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="field">
+            <span>Report note</span>
+            <input name="operatorNote" placeholder="Travel, transport, meal allowance, or reimbursement context" />
+          </label>
+          <button className="action-button primary" disabled={approvedAiDrafts.length === 0} type="submit">
+            Add approved AI receipts to report
+          </button>
+        </form>
+      </section>
 
       {activeReceiptCards.length > 0 ? (
         <section className="receipt-wallet-grid">
@@ -289,14 +496,30 @@ export default async function MyExpensesPage({ searchParams }: MyExpensesPagePro
                 {submissions.length > 0 ? (
                   submissions.map((submission) => (
                     <tr key={submission.id}>
-                      <td>{submission.title}</td>
-                      <td>{submission.race}</td>
-                      <td>{submission.seasonLabel}</td>
-                      <td>{submission.submittedAt}</td>
-                      <td>{submission.totalAmount}</td>
-                      <td>
-                        <span className="pill subtle-pill">{submission.status}</span>
-                      </td>
+	                      <td>
+                          <Link className="ghost-link" href={`/tbr/my-expenses/${submission.id}` as Route}>
+                            {submission.title}
+                          </Link>
+                        </td>
+	                      <td>{submission.race}</td>
+	                      <td>{submission.seasonLabel}</td>
+	                      <td>{submission.submittedAt}</td>
+	                      <td>
+                          <div className="stacked-table-cell">
+                            <strong>{submission.submittedAmountUsd}</strong>
+                            <span className="bill-subnote">
+                              Approved {submission.approvedAmountUsd} · rejected {submission.rejectedAmountUsd}
+                            </span>
+                          </div>
+                        </td>
+	                      <td>
+	                        <div className="stacked-table-cell">
+                            <span className="pill subtle-pill">{submission.status}</span>
+                            <span className="bill-subnote">
+                              {submission.openItemCount} open · {submission.challengedItemCount} challenged
+                            </span>
+                          </div>
+	                      </td>
                       <td>
                         {submission.linkedInvoiceId ? (
                           <div className="stacked-table-cell">

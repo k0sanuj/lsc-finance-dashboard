@@ -9,6 +9,7 @@ import {
   formatCurrency,
   formatDateLabel,
   formatDateValue,
+  formatDecimalAmount,
   formatExpenseSubmissionStatusLabel,
   getBackend,
   getBudgetSignalFromRank,
@@ -29,9 +30,18 @@ export type ExpenseQueueRow = {
   submitter: string;
   submittedAt: string;
   totalAmount: string;
+  submittedAmountUsd: string;
+  approvedAmountUsd: string;
+  rejectedAmountUsd: string;
   status: string;
   statusLabel: string;
   itemCount: string;
+  approvedItemCount: string;
+  rejectedItemCount: string;
+  openItemCount: string;
+  challengedItemCount: string;
+  missingReceiptCount: string;
+  openRuleFindingCount: string;
   budgetSignal: string;
   budgetSignalLabel: string;
   budgetSignalTone: string;
@@ -54,11 +64,27 @@ export type ExpenseFormOption = {
   label: string;
 };
 
+export type ExpenseTagRow = {
+  id: string;
+  key: string;
+  label: string;
+  description: string;
+};
+
+export type ExpenseWorkspaceRuleRow = {
+  id: string;
+  key: string;
+  label: string;
+  severity: string;
+  isActive: boolean;
+};
+
 export type ExpenseSubmissionDetail = {
   id: string;
   title: string;
   statusKey: string;
   status: string;
+  submittedByUserId: string;
   raceEventId: string | null;
   race: string;
   submitter: string;
@@ -66,6 +92,11 @@ export type ExpenseSubmissionDetail = {
   operatorNote: string;
   reviewNote: string;
   totalAmount: string;
+  submittedAmountUsd: string;
+  approvedAmountUsd: string;
+  rejectedAmountUsd: string;
+  openItemCount: string;
+  challengedItemCount: string;
   budgetSignal: string;
   budgetSignalLabel: string;
   budgetSignalTone: string;
@@ -78,6 +109,23 @@ export type ExpenseSubmissionItemDetail = {
   expenseDate: string;
   amount: string;
   currencyCode: string;
+  originalAmount: string;
+  originalCurrencyCode: string;
+  reportingAmountUsd: string;
+  approvedAmountUsd: string;
+  fxRateToUsd: string | null;
+  fxSource: string | null;
+  reviewStatusKey: string;
+  reviewStatus: string;
+  rejectionReasonCode: string | null;
+  rejectionReasonDetail: string | null;
+  challengeStatus: string;
+  challengeReason: string | null;
+  receiptStatus: string;
+  noReceiptReason: string | null;
+  tagLabels: string;
+  ruleMessages: string;
+  openRuleFindingCount: string;
   category: string;
   team: string;
   description: string;
@@ -119,6 +167,11 @@ export type MyExpenseSubmissionRow = {
   statusKey: string;
   status: string;
   totalAmount: string;
+  submittedAmountUsd: string;
+  approvedAmountUsd: string;
+  rejectedAmountUsd: string;
+  openItemCount: string;
+  challengedItemCount: string;
   itemCount: string;
   linkedInvoiceId: string | null;
   linkedInvoiceStatus: string | null;
@@ -141,8 +194,17 @@ export type ExpenseQueueSource = {
   submitter_name: string;
   submitted_at: string | null;
   total_amount: string;
+  submitted_amount_usd: string;
+  approved_amount_usd: string;
+  rejected_amount_usd: string;
   submission_status: string;
   item_count: string;
+  approved_item_count: string;
+  rejected_item_count: string;
+  open_item_count: string;
+  challenged_item_count: string;
+  missing_receipt_count: string;
+  open_rule_finding_count: string;
   budget_signal_rank: number;
   matched_budget_count: string;
 };
@@ -152,17 +214,38 @@ export type ExpenseFormOptionSource = {
   label: string;
 };
 
+export type ExpenseTagSource = {
+  id: string;
+  tag_key: string;
+  tag_label: string;
+  tag_description: string | null;
+};
+
+export type ExpenseWorkspaceRuleSource = {
+  id: string;
+  rule_key: string;
+  rule_label: string;
+  severity: string;
+  is_active: boolean;
+};
+
 export type ExpenseSubmissionDetailSource = {
   id: string;
   submission_title: string;
   submission_status: string;
   race_event_id: string | null;
   race_name: string | null;
+  submitted_by_user_id: string;
   submitter_name: string;
   submitted_at: string | null;
   operator_note: string | null;
   review_note: string | null;
   total_amount: string;
+  submitted_amount_usd: string;
+  approved_amount_usd: string;
+  rejected_amount_usd: string;
+  open_item_count: string;
+  challenged_item_count: string;
   budget_signal_rank: number;
   matched_budget_count: string;
 };
@@ -173,6 +256,22 @@ export type ExpenseSubmissionItemSource = {
   expense_date: string | null;
   currency_code: string;
   amount: string;
+  original_currency_code: string | null;
+  original_amount: string | null;
+  fx_rate_to_usd: string | null;
+  fx_source: string | null;
+  reporting_amount_usd: string | null;
+  approved_amount_usd: string | null;
+  review_status: string;
+  rejection_reason_code: string | null;
+  rejection_reason_detail: string | null;
+  challenge_status: string;
+  challenge_reason: string | null;
+  receipt_status: string;
+  no_receipt_reason: string | null;
+  tag_labels: string | null;
+  rule_messages: string | null;
+  open_rule_finding_count: string | null;
   category_name: string | null;
   team_name: string | null;
   description: string | null;
@@ -186,7 +285,7 @@ export type ExpenseSubmissionItemSource = {
   rule_kind: string | null;
   unit_label: string | null;
   rule_label: string | null;
-  approved_amount_usd: string | null;
+  budget_approved_amount_usd: string | null;
   close_threshold_ratio: string | null;
   rule_notes: string | null;
 };
@@ -218,10 +317,38 @@ export type MyExpenseSubmissionSource = {
   submitted_at: string | null;
   submission_status: string;
   total_amount: string;
+  submitted_amount_usd: string;
+  approved_amount_usd: string;
+  rejected_amount_usd: string;
+  open_item_count: string;
+  challenged_item_count: string;
   item_count: string;
   linked_invoice_id: string | null;
   linked_invoice_status: string | null;
   linked_invoice_number: string | null;
+};
+
+export type ExpenseSubmissionExportRow = {
+  submissionTitle: string;
+  race: string;
+  submitter: string;
+  itemId: string;
+  merchant: string;
+  expenseDate: string;
+  category: string;
+  tags: string;
+  originalCurrency: string;
+  originalAmount: string;
+  fxRateToUsd: string;
+  usdAmount: string;
+  approvedUsd: string;
+  reviewStatus: string;
+  receiptStatus: string;
+  rejectionReason: string;
+  challengeReason: string;
+  ruleMessages: string;
+  sourceDocument: string;
+  description: string;
 };
 
 export async function getExpenseWorkflowSummary() {
@@ -231,7 +358,7 @@ export async function getExpenseWorkflowSummary() {
          count(*) filter (where submission_status in ('submitted', 'in_review'))::text as pending_count,
          count(*) filter (where submission_status = 'needs_clarification')::text as draft_count,
          count(*) filter (where submission_status = 'posted')::text as posted_count,
-         coalesce(sum(item.amount) filter (where es.submission_status = 'approved'), 0)::text as total_pending_amount
+         coalesce(sum(coalesce(item.approved_amount_usd, item.reporting_amount_usd, item.amount)) filter (where es.submission_status = 'approved' and item.review_status = 'approved'), 0)::text as total_pending_amount
        from expense_submissions es
        left join expense_submission_items item on item.submission_id = es.id`
     );
@@ -304,13 +431,22 @@ export async function getExpenseApprovalQueue(filters?: {
          au.full_name as submitter_name,
          es.submitted_at::text,
          es.created_at,
-         coalesce(sum(esi.amount), 0)::text as total_amount,
+         coalesce(sum(coalesce(esi.reporting_amount_usd, esi.amount)), 0)::text as total_amount,
+         coalesce(sum(coalesce(esi.reporting_amount_usd, esi.amount)), 0)::text as submitted_amount_usd,
+         coalesce(sum(coalesce(esi.approved_amount_usd, esi.reporting_amount_usd, esi.amount)) filter (where esi.review_status = 'approved'), 0)::text as approved_amount_usd,
+         coalesce(sum(coalesce(esi.reporting_amount_usd, esi.amount)) filter (where esi.review_status = 'rejected'), 0)::text as rejected_amount_usd,
          es.submission_status,
          count(esi.id)::text as item_count,
+         count(esi.id) filter (where esi.review_status = 'approved')::text as approved_item_count,
+         count(esi.id) filter (where esi.review_status = 'rejected')::text as rejected_item_count,
+         count(esi.id) filter (where esi.review_status in ('pending', 'review', 'needs_info'))::text as open_item_count,
+         count(esi.id) filter (where esi.challenge_status = 'challenged')::text as challenged_item_count,
+         count(esi.id) filter (where coalesce(esi.receipt_status, 'unknown') <> 'attached')::text as missing_receipt_count,
+         coalesce(sum(open_findings.open_count), 0)::text as open_rule_finding_count,
          coalesce(max(case
            when rbr.id is null then 0
-           when esi.amount > rbr.approved_amount_usd then 3
-           when esi.amount >= (rbr.approved_amount_usd * rbr.close_threshold_ratio) then 2
+           when coalesce(esi.reporting_amount_usd, esi.amount) > rbr.approved_amount_usd then 3
+           when coalesce(esi.reporting_amount_usd, esi.amount) >= (rbr.approved_amount_usd * rbr.close_threshold_ratio) then 2
            else 1
          end), 0)::int as budget_signal_rank,
          count(rbr.id)::text as matched_budget_count
@@ -320,7 +456,13 @@ export async function getExpenseApprovalQueue(filters?: {
          left join expense_submission_items esi on esi.submission_id = es.id
          left join race_budget_rules rbr
            on rbr.race_event_id = es.race_event_id
-          and rbr.cost_category_id = esi.cost_category_id
+         and rbr.cost_category_id = esi.cost_category_id
+         left join lateral (
+           select count(*)::int as open_count
+           from expense_item_rule_findings erf
+           where erf.expense_submission_item_id = esi.id
+             and erf.finding_status = 'open'
+         ) open_findings on true
          where ($1::int is null or re.season_year = $1)
            and ($2::uuid is null or es.race_event_id = $2::uuid)
            and ($3::uuid is null or es.submitted_by_user_id = $3::uuid)
@@ -335,8 +477,17 @@ export async function getExpenseApprovalQueue(filters?: {
          submitter_name,
          submitted_at,
          total_amount,
+         submitted_amount_usd,
+         approved_amount_usd,
+         rejected_amount_usd,
          submission_status,
          item_count,
+         approved_item_count,
+         rejected_item_count,
+         open_item_count,
+         challenged_item_count,
+         missing_receipt_count,
+         open_rule_finding_count,
          budget_signal_rank,
          matched_budget_count
        from approval_queue
@@ -372,9 +523,18 @@ export async function getExpenseApprovalQueue(filters?: {
         submitter: row.submitter_name,
         submittedAt: row.submitted_at ? formatDateLabel(row.submitted_at) : "Draft",
         totalAmount: formatCurrency(row.total_amount),
+        submittedAmountUsd: formatCurrency(row.submitted_amount_usd),
+        approvedAmountUsd: formatCurrency(row.approved_amount_usd),
+        rejectedAmountUsd: formatCurrency(row.rejected_amount_usd),
         status: row.submission_status,
         statusLabel: formatExpenseSubmissionStatusLabel(row.submission_status),
         itemCount: row.item_count,
+        approvedItemCount: row.approved_item_count,
+        rejectedItemCount: row.rejected_item_count,
+        openItemCount: row.open_item_count,
+        challengedItemCount: row.challenged_item_count,
+        missingReceiptCount: row.missing_receipt_count,
+        openRuleFindingCount: row.open_rule_finding_count,
         budgetSignal,
         budgetSignalLabel: formatBudgetSignalLabel(budgetSignal),
         budgetSignalTone: formatBudgetSignalTone(budgetSignal),
@@ -398,15 +558,21 @@ export async function getExpenseSubmissionDetail(submissionId: string) {
        es.submission_status,
        es.race_event_id::text,
        re.name as race_name,
+       es.submitted_by_user_id::text,
        au.full_name as submitter_name,
        es.submitted_at::text,
        es.operator_note,
        es.review_note,
-       coalesce(sum(esi.amount), 0)::text as total_amount,
+       coalesce(sum(coalesce(esi.reporting_amount_usd, esi.amount)), 0)::text as total_amount,
+       coalesce(sum(coalesce(esi.reporting_amount_usd, esi.amount)), 0)::text as submitted_amount_usd,
+       coalesce(sum(coalesce(esi.approved_amount_usd, esi.reporting_amount_usd, esi.amount)) filter (where esi.review_status = 'approved'), 0)::text as approved_amount_usd,
+       coalesce(sum(coalesce(esi.reporting_amount_usd, esi.amount)) filter (where esi.review_status = 'rejected'), 0)::text as rejected_amount_usd,
+       count(esi.id) filter (where esi.review_status in ('pending', 'review', 'needs_info'))::text as open_item_count,
+       count(esi.id) filter (where esi.challenge_status = 'challenged')::text as challenged_item_count,
        coalesce(max(case
          when rbr.id is null then 0
-         when esi.amount > rbr.approved_amount_usd then 3
-         when esi.amount >= (rbr.approved_amount_usd * rbr.close_threshold_ratio) then 2
+         when coalesce(esi.reporting_amount_usd, esi.amount) > rbr.approved_amount_usd then 3
+         when coalesce(esi.reporting_amount_usd, esi.amount) >= (rbr.approved_amount_usd * rbr.close_threshold_ratio) then 2
          else 1
        end), 0)::int as budget_signal_rank,
        count(rbr.id)::text as matched_budget_count
@@ -434,6 +600,7 @@ export async function getExpenseSubmissionDetail(submissionId: string) {
     title: row.submission_title,
     statusKey: row.submission_status,
     status: formatExpenseSubmissionStatusLabel(row.submission_status),
+    submittedByUserId: row.submitted_by_user_id,
     raceEventId: row.race_event_id,
     race: row.race_name ?? "Unassigned",
     submitter: row.submitter_name,
@@ -441,6 +608,11 @@ export async function getExpenseSubmissionDetail(submissionId: string) {
     operatorNote: row.operator_note ?? "No operator note.",
     reviewNote: row.review_note ?? "No finance review note yet.",
     totalAmount: formatCurrency(row.total_amount),
+    submittedAmountUsd: formatCurrency(row.submitted_amount_usd),
+    approvedAmountUsd: formatCurrency(row.approved_amount_usd),
+    rejectedAmountUsd: formatCurrency(row.rejected_amount_usd),
+    openItemCount: row.open_item_count,
+    challengedItemCount: row.challenged_item_count,
     budgetSignal,
     budgetSignalLabel: formatBudgetSignalLabel(budgetSignal),
     budgetSignalTone: formatBudgetSignalTone(budgetSignal),
@@ -460,6 +632,19 @@ export async function getExpenseSubmissionItems(submissionId: string) {
        esi.expense_date::text,
        esi.currency_code,
        esi.amount::text,
+       esi.original_currency_code,
+       esi.original_amount::text,
+       esi.fx_rate_to_usd::text,
+       esi.fx_source,
+       esi.reporting_amount_usd::text,
+       esi.approved_amount_usd::text,
+       esi.review_status::text,
+       esi.rejection_reason_code,
+       esi.rejection_reason_detail,
+       esi.challenge_status,
+       esi.challenge_reason,
+       esi.receipt_status,
+       esi.no_receipt_reason,
        cc.name as category_name,
        t.team_name,
        esi.description,
@@ -471,16 +656,19 @@ export async function getExpenseSubmissionItems(submissionId: string) {
        esi.ai_summary,
        case
          when rbr.id is null then 'no_rule'
-         when esi.amount > rbr.approved_amount_usd then 'above_budget'
-         when esi.amount >= (rbr.approved_amount_usd * rbr.close_threshold_ratio) then 'close_to_budget'
+         when coalesce(esi.reporting_amount_usd, esi.amount) > rbr.approved_amount_usd then 'above_budget'
+         when coalesce(esi.reporting_amount_usd, esi.amount) >= (rbr.approved_amount_usd * rbr.close_threshold_ratio) then 'close_to_budget'
          else 'below_budget'
        end as budget_signal,
        rbr.rule_kind::text,
        rbr.unit_label,
        rbr.rule_label,
-       rbr.approved_amount_usd::text,
+       rbr.approved_amount_usd::text as budget_approved_amount_usd,
        rbr.close_threshold_ratio::text,
-       rbr.notes as rule_notes
+       rbr.notes as rule_notes,
+       coalesce(tags.tag_labels, '') as tag_labels,
+       coalesce(findings.open_rule_finding_count, 0)::text as open_rule_finding_count,
+       coalesce(findings.rule_messages, '') as rule_messages
      from expense_submission_items esi
      join expense_submissions es on es.id = esi.submission_id
      left join cost_categories cc on cc.id = esi.cost_category_id
@@ -489,6 +677,19 @@ export async function getExpenseSubmissionItems(submissionId: string) {
      left join race_budget_rules rbr
        on rbr.race_event_id = es.race_event_id
       and rbr.cost_category_id = esi.cost_category_id
+     left join lateral (
+       select string_agg(et.tag_label, ', ' order by et.tag_label) as tag_labels
+       from expense_submission_item_tags esit
+       join expense_tags et on et.id = esit.expense_tag_id
+       where esit.expense_submission_item_id = esi.id
+     ) tags on true
+     left join lateral (
+       select
+         count(*) filter (where erf.finding_status = 'open')::int as open_rule_finding_count,
+         string_agg(erf.message, ' | ' order by erf.created_at) filter (where erf.finding_status = 'open') as rule_messages
+       from expense_item_rule_findings erf
+       where erf.expense_submission_item_id = esi.id
+     ) findings on true
      where esi.submission_id = $1
      order by esi.created_at`,
     [submissionId]
@@ -526,8 +727,10 @@ export async function getExpenseSubmissionItems(submissionId: string) {
   }
 
   return Promise.all(itemRows.map(async (row) => {
+    const reportingAmount = row.reporting_amount_usd ?? row.amount;
+    const approvedAmount = row.approved_amount_usd ?? reportingAmount;
     const variance =
-      row.approved_amount_usd !== null ? Number(row.amount) - Number(row.approved_amount_usd) : null;
+      row.approved_amount_usd !== null ? Number(reportingAmount) - Number(row.approved_amount_usd) : null;
     const preview = await resolveDocumentPreview(row.source_document_metadata);
     const aiSummary = row.ai_summary ?? {};
     const aiIntakeDraftId = typeof aiSummary.aiIntakeDraftId === "string" ? aiSummary.aiIntakeDraftId : null;
@@ -541,6 +744,23 @@ export async function getExpenseSubmissionItems(submissionId: string) {
       expenseDate: row.expense_date ? formatDateLabel(row.expense_date) : "No date",
       amount: formatCurrency(row.amount),
       currencyCode: row.currency_code,
+      originalAmount: formatDecimalAmount(row.original_amount ?? row.amount, row.original_currency_code ?? row.currency_code),
+      originalCurrencyCode: row.original_currency_code ?? row.currency_code,
+      reportingAmountUsd: formatCurrency(reportingAmount),
+      approvedAmountUsd: formatCurrency(approvedAmount),
+      fxRateToUsd: row.fx_rate_to_usd,
+      fxSource: row.fx_source,
+      reviewStatusKey: row.review_status,
+      reviewStatus: row.review_status.replace(/_/g, " "),
+      rejectionReasonCode: row.rejection_reason_code,
+      rejectionReasonDetail: row.rejection_reason_detail,
+      challengeStatus: row.challenge_status,
+      challengeReason: row.challenge_reason,
+      receiptStatus: row.receipt_status.replace(/_/g, " "),
+      noReceiptReason: row.no_receipt_reason,
+      tagLabels: row.tag_labels ?? "",
+      ruleMessages: row.rule_messages ?? "",
+      openRuleFindingCount: row.open_rule_finding_count ?? "0",
       category: row.category_name ?? "Uncategorized",
       team: row.team_name ?? "No team",
       description: row.description ?? "No description",
@@ -560,7 +780,7 @@ export async function getExpenseSubmissionItems(submissionId: string) {
       budgetRuleKind: row.rule_kind ? row.rule_kind.replace(/_/g, " ") : null,
       budgetUnitLabel: row.unit_label ? formatBudgetUnitLabel(row.unit_label) : null,
       budgetRuleLabel: row.rule_label,
-      budgetApprovedAmount: row.approved_amount_usd ? formatCurrency(row.approved_amount_usd) : null,
+      budgetApprovedAmount: row.budget_approved_amount_usd ? formatCurrency(row.budget_approved_amount_usd) : null,
       budgetVariance:
         variance !== null ? `${variance >= 0 ? "+" : "-"}${formatCurrency(Math.abs(variance))}` : null,
       budgetNotes: row.rule_notes ?? null,
@@ -582,7 +802,12 @@ export async function getMyExpenseSubmissions(appUserId: string, raceId?: string
        re.season_year,
        es.submitted_at::text,
        es.submission_status,
-       coalesce(sum(esi.amount), 0)::text as total_amount,
+       coalesce(sum(coalesce(esi.reporting_amount_usd, esi.amount)), 0)::text as total_amount,
+       coalesce(sum(coalesce(esi.reporting_amount_usd, esi.amount)), 0)::text as submitted_amount_usd,
+       coalesce(sum(coalesce(esi.approved_amount_usd, esi.reporting_amount_usd, esi.amount)) filter (where esi.review_status = 'approved'), 0)::text as approved_amount_usd,
+       coalesce(sum(coalesce(esi.reporting_amount_usd, esi.amount)) filter (where esi.review_status = 'rejected'), 0)::text as rejected_amount_usd,
+       count(esi.id) filter (where esi.review_status in ('pending', 'review', 'needs_info'))::text as open_item_count,
+       count(esi.id) filter (where esi.challenge_status = 'challenged')::text as challenged_item_count,
        count(esi.id)::text as item_count,
        ii.id as linked_invoice_id,
        ii.intake_status as linked_invoice_status,
@@ -619,6 +844,11 @@ export async function getMyExpenseSubmissions(appUserId: string, raceId?: string
     statusKey: row.submission_status,
     status: formatExpenseSubmissionStatusLabel(row.submission_status),
     totalAmount: formatCurrency(row.total_amount),
+    submittedAmountUsd: formatCurrency(row.submitted_amount_usd),
+    approvedAmountUsd: formatCurrency(row.approved_amount_usd),
+    rejectedAmountUsd: formatCurrency(row.rejected_amount_usd),
+    openItemCount: row.open_item_count,
+    challengedItemCount: row.challenged_item_count,
     itemCount: row.item_count,
     linkedInvoiceId: row.linked_invoice_id,
     linkedInvoiceStatus: row.linked_invoice_status,
@@ -704,6 +934,130 @@ export async function getExpenseFormOptions() {
     categories: [] satisfies ExpenseFormOption[],
     users: [] satisfies ExpenseFormOption[]
   };
+}
+
+export async function getExpenseWorkspaceControls() {
+  if (getBackend() !== "database") {
+    return {
+      tags: [] satisfies ExpenseTagRow[],
+      rules: [] satisfies ExpenseWorkspaceRuleRow[],
+    };
+  }
+
+  const [tags, rules] = await Promise.all([
+    queryRows<ExpenseTagSource>(
+      `select et.id, et.tag_key, et.tag_label, et.tag_description
+       from expense_tags et
+       join companies c on c.id = et.company_id
+       where c.code = 'TBR'::company_code
+         and et.is_active = true
+       order by et.tag_label`
+    ),
+    queryRows<ExpenseWorkspaceRuleSource>(
+      `select ewr.id, ewr.rule_key, ewr.rule_label, ewr.severity, ewr.is_active
+       from expense_workspace_rules ewr
+       join companies c on c.id = ewr.company_id
+       where c.code = 'TBR'::company_code
+       order by ewr.rule_key`
+    )
+  ]);
+
+  return {
+    tags: tags.map((tag) => ({
+      id: tag.id,
+      key: tag.tag_key,
+      label: tag.tag_label,
+      description: tag.tag_description ?? "No description.",
+    })) satisfies ExpenseTagRow[],
+    rules: rules.map((rule) => ({
+      id: rule.id,
+      key: rule.rule_key,
+      label: rule.rule_label,
+      severity: rule.severity,
+      isActive: rule.is_active,
+    })) satisfies ExpenseWorkspaceRuleRow[],
+  };
+}
+
+export async function getExpenseSubmissionExportRows(submissionId: string) {
+  if (getBackend() !== "database") {
+    return [] satisfies ExpenseSubmissionExportRow[];
+  }
+
+  const rows = await queryRows<{
+    submission_title: string;
+    race_name: string | null;
+    submitter_name: string;
+    item_id: string;
+    merchant_name: string | null;
+    expense_date: string | null;
+    category_name: string | null;
+    tag_labels: string | null;
+    original_currency_code: string | null;
+    original_amount: string | null;
+    fx_rate_to_usd: string | null;
+    reporting_amount_usd: string | null;
+    approved_amount_usd: string | null;
+    review_status: string;
+    receipt_status: string;
+    rejection_reason_detail: string | null;
+    challenge_reason: string | null;
+    rule_messages: string | null;
+    source_document_name: string | null;
+    description: string | null;
+  }>(
+    `select
+       es.submission_title,
+       re.name as race_name,
+       au.full_name as submitter_name,
+       item.item_id,
+       item.merchant_name,
+       item.expense_date::text,
+       item.category_name,
+       item.tag_labels,
+       item.original_currency_code,
+       item.original_amount::text,
+       item.fx_rate_to_usd::text,
+       item.reporting_amount_usd::text,
+       item.approved_amount_usd::text,
+       item.review_status,
+       item.receipt_status,
+       item.rejection_reason_detail,
+       item.challenge_reason,
+       item.rule_messages,
+       item.source_document_name,
+       item.description
+     from v_tbr_expense_item_review item
+     join expense_submissions es on es.id = item.submission_id
+     join app_users au on au.id = es.submitted_by_user_id
+     left join race_events re on re.id = es.race_event_id
+     where item.submission_id = $1
+     order by item.expense_date nulls last, item.merchant_name`,
+    [submissionId]
+  );
+
+  return rows.map((row) => ({
+    submissionTitle: row.submission_title,
+    race: row.race_name ?? "Unassigned race",
+    submitter: row.submitter_name,
+    itemId: row.item_id,
+    merchant: row.merchant_name ?? "Unknown merchant",
+    expenseDate: row.expense_date ?? "",
+    category: row.category_name ?? "Uncategorized",
+    tags: row.tag_labels ?? "",
+    originalCurrency: row.original_currency_code ?? "USD",
+    originalAmount: row.original_amount ?? "0",
+    fxRateToUsd: row.fx_rate_to_usd ?? "",
+    usdAmount: row.reporting_amount_usd ?? "0",
+    approvedUsd: row.approved_amount_usd ?? "",
+    reviewStatus: row.review_status,
+    receiptStatus: row.receipt_status,
+    rejectionReason: row.rejection_reason_detail ?? "",
+    challengeReason: row.challenge_reason ?? "",
+    ruleMessages: row.rule_messages ?? "",
+    sourceDocument: row.source_document_name ?? "",
+    description: row.description ?? "",
+  })) satisfies ExpenseSubmissionExportRow[];
 }
 
 // ─── Email-notification helper (minimal fields for templates) ─────────

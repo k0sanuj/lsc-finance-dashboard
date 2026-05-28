@@ -75,6 +75,32 @@ Expense should be linkable to:
 - invoice if applicable
 - payment if applicable
 
+Approved TBR reimbursement expense lines should preserve the source `expense_submission`, source `expense_submission_item`, original amount/currency, FX rate/source, reporting currency, and USD reporting amount.
+
+### ExpenseSubmission
+
+Represents a controlled reimbursement report before canonical expense posting. A submission belongs to a submitter, may be race-specific, and carries review, invoice readiness, export, and source lineage metadata.
+
+### ExpenseSubmissionItem
+
+Represents one receipt-backed or no-receipt reimbursement line. It stores original currency/amount, FX, USD reporting amount, receipt status, no-receipt reason, item review status, approved amount, rejection reason, challenge state, and lineage to the uploaded source document or AI intake draft.
+
+### ExpenseWorkspaceRule
+
+Represents an admin-maintained validation rule for expense submission and review, such as receipt required, tag required, category required, FX required, duplicate checks, and no-receipt explanation required.
+
+### ExpenseTag
+
+Represents an admin-maintained tag used by submitters and reviewers to classify race expenses consistently.
+
+### ExpenseItemRuleFinding
+
+Represents a deterministic validation finding attached to one submission item. Findings are rendered as review warnings and remain auditable even when overridden.
+
+### ExpenseReportExport
+
+Represents an audited CSV export/download event for one expense submission.
+
 ### RaceEvent
 
 Represents a TBR operating event or race.
@@ -210,6 +236,10 @@ Represents the link between E1 accounting rows and matching operating expense ba
 - expense may relate to invoice
 - expense may relate to payment
 - expense may relate to race event
+- expense may originate from an approved expense submission item
+- expense submissions have many expense submission items
+- expense submission items may have many tags and rule findings
+- expense report exports belong to expense submissions and preserve exported-by audit metadata
 - commercial target may relate to company and owner
 - source document connects raw imports to canonical records
 - document analysis run belongs to a source document
@@ -259,6 +289,12 @@ Exposes filtered views, APIs, and page-level read models.
 - invoices
 - payments
 - expenses
+- expense_submissions
+- expense_submission_items
+- expense_workspace_rules
+- expense_tags
+- expense_item_rule_findings
+- expense_report_exports
 - race_events
 - cost_categories
 - commercial_targets
@@ -300,6 +336,9 @@ Exposes filtered views, APIs, and page-level read models.
 - finance_recognition_by_entity
 - finance_reporting_exclusion_summary
 - fsp_consolidation_eligible_actuals
+- v_tbr_expense_submission_review
+- v_tbr_expense_item_review
+- v_tbr_expense_cost_recognition
 
 ## Current Ontology Notes
 
@@ -307,6 +346,9 @@ Exposes filtered views, APIs, and page-level read models.
 - FSP is a visible portfolio entity. Its sport scenario/planning values are entity-local until explicitly approved as consolidation-eligible actuals.
 - XTZ is a visible India operating/payroll/vendor entity. XTZ invoice status drives committed payable, paid cost, and XTZ revenue recognition by status.
 - Race events are central to TBR reporting and should not be treated as optional tags.
+- TBR expense submission items are workflow records until approved. Approved items post into canonical `expenses`; rejected or unresolved items remain workflow/audit records only.
+- Restricted expense submitter accounts can access only the TBR expense portal and related upload/session endpoints.
+- TBR expense reports must show original currency and USD reporting values together. FX assumptions are stored on each item.
 - TBR Financial Plan summary rows live in season-control tables, not the generic expense ledger.
 - Overall TBR P&L applies a variance-only E1 reconciliation policy: operating baseline counts once, matched E1 overlap rows are visible in E1 Accounting, only positive E1 variance above the matched baseline flows into P&L, and non-overlapping confirmed E1 obligations count as incremental cost.
 - Legacy entity aliases normalize internally to LSC/Dubai compatibility reads and must not appear in visible navigation, prompts, or new writes.

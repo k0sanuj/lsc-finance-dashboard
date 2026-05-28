@@ -21,8 +21,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <span className="eyebrow">League Sports Co</span>
         <h2>Sign in to Finance Control Center</h2>
         <p>
-          Use your approved email and password. Access is restricted to three allowlisted LSC
-          finance accounts and sessions stay active for 90 days unless access is revoked.
+          Use your approved email and password. Access is restricted to allowlisted LSC
+          accounts and sessions stay active for 90 days unless access is revoked.
         </p>
         {error ? <div className="login-notice error">{error}</div> : null}
         {sent ? (
