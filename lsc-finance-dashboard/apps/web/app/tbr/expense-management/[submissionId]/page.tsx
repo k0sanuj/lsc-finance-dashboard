@@ -11,9 +11,7 @@ import {
 import { requireRole } from "../../../../lib/auth";
 import { DocumentPreviewButton } from "../../../components/inline-table-controls";
 import {
-  addExpenseSplitAction,
   approveExpenseSubmissionAction,
-  generateEqualSplitsAction,
   updateExpenseItemReviewAction,
   updateExpenseSubmissionStatusAction
 } from "../actions";
@@ -40,19 +38,25 @@ const TIMELINE_ACTION_META: Record<
   create: { label: "Submitted", tone: "default" },
   "set-in_review": { label: "Moved into review", tone: "accent" },
   "set-needs_clarification": { label: "Clarification requested", tone: "accent" },
-  "approve-invoice-ready": { label: "Approved · invoice ready", tone: "good" },
+  "approve-invoice-ready": { label: "Approved, invoice ready", tone: "good" },
   reject: { label: "Rejected", tone: "risk" },
   "set-approved": { label: "Line approved", tone: "good" },
   "set-rejected": { label: "Line rejected", tone: "risk" },
   "set-review": { label: "Line flagged for review", tone: "accent" },
   "set-needs_info": { label: "Line needs info", tone: "accent" },
   "challenge-rejection": { label: "Rejection challenged", tone: "accent" },
-  "regenerate-equal-splits": { label: "Splits regenerated", tone: "default" },
-  "add-split": { label: "Split added", tone: "default" },
 };
 
 function timelineLabel(action: string): { label: string; tone: "good" | "risk" | "accent" | "default" } {
   return TIMELINE_ACTION_META[action] ?? { label: action, tone: "default" };
+}
+
+function reviewTone(statusKey: string) {
+  if (statusKey === "approved") return "signal-good";
+  if (statusKey === "rejected") return "signal-risk";
+  if (statusKey === "needs_info") return "signal-warn";
+  if (statusKey === "review") return "signal-warn";
+  return "signal-muted";
 }
 
 type ExpenseSubmissionDetailPageProps = {
@@ -78,6 +82,7 @@ export default async function ExpenseSubmissionDetailPage({
     getAuditLog({ entityType: "expense_submission", entityId: submissionId, limit: 50 }),
     getQbJournalEntriesForSource("expense_submission", submissionId),
   ]);
+
   const raceBudgetRules = submission?.raceEventId
     ? await getRaceBudgetRules(submission.raceEventId)
     : [];
@@ -85,7 +90,7 @@ export default async function ExpenseSubmissionDetailPage({
   const itemAudit = items.length > 0
     ? (await Promise.all(
         items.map((it) =>
-          getAuditLog({ entityType: "expense_item_split", entityId: it.id, limit: 25 })
+          getAuditLog({ entityType: "expense_submission_item", entityId: it.id, limit: 25 })
         )
       )).flat()
     : [];
@@ -94,9 +99,6 @@ export default async function ExpenseSubmissionDetailPage({
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
 
-  // Merge QB journal entries into the timeline. They sort by createdAt
-  // alongside audit rows; we render them with a separate "QuickBooks" label
-  // so they visually stand out from user-driven actions.
   type QbTimelineEntry = QbJournalEntryLogRow & { kind: "qb-je" };
   const qbEntries: QbTimelineEntry[] = qbJournalLog.map((row) => ({
     ...row,
@@ -123,22 +125,20 @@ export default async function ExpenseSubmissionDetailPage({
   }
 
   const overBudgetItemCount = items.filter((item) => item.budgetStatusKey === "above_budget").length;
-  const noRuleItemCount = items.filter((item) => item.budgetStatusKey === "no_rule").length;
-  const aiLinkedItemCount = items.filter((item) => item.aiIntakeDraftId).length;
-  const splitRowCount = items.reduce((total, item) => total + item.splits.length, 0);
-  const priorityItem =
-    items.find((item) => item.budgetStatusKey === "above_budget") ??
-    items.find((item) => item.budgetStatusKey === "no_rule") ??
-    items.find((item) => item.budgetStatusKey === "close_to_budget") ??
-    items[0] ??
-    null;
+  const openItemCount = items.filter((item) => ["pending", "review", "needs_info"].includes(item.reviewStatusKey)).length;
+  const rejectedItemCount = items.filter((item) => item.reviewStatusKey === "rejected").length;
+  const challengedItemCount = items.filter((item) => item.challengeStatus === "challenged").length;
+  const approvedItemCount = items.filter((item) => item.reviewStatusKey === "approved").length;
+  const returnPath = `/tbr/expense-management/${submission.id}`;
 
   return (
     <div className="page-grid">
-      <section className="hero">
-        <span className="eyebrow">Expense detail</span>
-        <h2>{submission.title}</h2>
-        <div className="hero-actions">
+      <section className="workspace-header">
+        <div className="workspace-header-left">
+          <span className="section-kicker">Expense detail</span>
+          <h3>{submission.title}</h3>
+        </div>
+        <div className="workspace-header-right">
           <a
             className="action-button secondary"
             href={`/api/tbr/expense-submissions/${submission.id}/csv`}
@@ -146,7 +146,7 @@ export default async function ExpenseSubmissionDetailPage({
             Export CSV
           </a>
           <Link className="ghost-link" href="/tbr/expense-management">
-            Back to expense queue
+            Back to queue
           </Link>
         </div>
       </section>
@@ -158,84 +158,348 @@ export default async function ExpenseSubmissionDetailPage({
         </section>
       ) : null}
 
-      <section className="stats-grid compact-stats">
+      <section className="stats-grid compact-stats ops-kpi-strip">
         <article className="metric-card accent-brand">
           <div className="metric-topline">
             <span className="metric-label">Items</span>
           </div>
           <div className="metric-value">{items.length}</div>
-          <span className="metric-subvalue">{aiLinkedItemCount} AI-linked receipt cards.</span>
+          <span className="metric-subvalue">{approvedItemCount} approved, {openItemCount} open.</span>
         </article>
         <article className="metric-card accent-risk">
           <div className="metric-topline">
             <span className="metric-label">Over budget</span>
           </div>
           <div className="metric-value">{overBudgetItemCount}</div>
-          <span className="metric-subvalue">Requires override note before approval.</span>
+          <span className="metric-subvalue">Needs finance decision.</span>
         </article>
-        <article className="metric-card accent-accent">
+        <article className="metric-card accent-warn">
           <div className="metric-topline">
-            <span className="metric-label">No rule</span>
+            <span className="metric-label">Rejected</span>
           </div>
-          <div className="metric-value">{noRuleItemCount}</div>
-          <span className="metric-subvalue">Budget lookup did not find a category match.</span>
+          <div className="metric-value">{rejectedItemCount}</div>
+          <span className="metric-subvalue">{challengedItemCount} challenged.</span>
         </article>
         <article className="metric-card accent-good">
           <div className="metric-topline">
-            <span className="metric-label">Split rows</span>
+            <span className="metric-label">Total</span>
           </div>
-          <div className="metric-value">{splitRowCount}</div>
-          <span className="metric-subvalue">Participant allocation rows on this report.</span>
+          <div className="metric-value">{submission.totalAmount}</div>
+          <span className="metric-subvalue">Approved {submission.approvedAmountUsd}.</span>
         </article>
       </section>
 
+      <section className="card compact-section-card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">{submission.status}</span>
+            <h3>{submission.race}</h3>
+          </div>
+          <div className="inline-actions">
+            <span className="pill subtle-pill">{submission.submitter}</span>
+            <span className="pill subtle-pill">{submission.submittedAt}</span>
+          </div>
+        </div>
+        <div className="mini-metric-grid compact-mini-metrics">
+          <div className="mini-metric">
+            <span>Submitted</span>
+            <strong>{submission.submittedAmountUsd}</strong>
+          </div>
+          <div className="mini-metric">
+            <span>Approved</span>
+            <strong>{submission.approvedAmountUsd}</strong>
+          </div>
+          <div className="mini-metric">
+            <span>Rejected</span>
+            <strong>{submission.rejectedAmountUsd}</strong>
+          </div>
+          <div className="mini-metric">
+            <span>Budget signal</span>
+            <strong>
+              <span className={`pill signal-pill signal-${submission.budgetSignalTone}`}>
+                {submission.budgetSignalLabel}
+              </span>
+            </strong>
+          </div>
+        </div>
+        {submission.operatorNote ? <p className="table-note">{submission.operatorNote}</p> : null}
+        {submission.reviewNote ? <p className="table-note">{submission.reviewNote}</p> : null}
+      </section>
+
+      <section className="card compact-section-card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">Line review</span>
+            <h3>Approve, reject, or ask clarification per item</h3>
+          </div>
+          <span className="pill">{items.length} rows</span>
+        </div>
+        <div className="table-wrapper clean-table compact-review-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Merchant / item</th>
+                <th>Category / tag</th>
+                <th>Race</th>
+                <th>Original</th>
+                <th>USD</th>
+                <th>Receipt</th>
+                <th>Rules</th>
+                <th>Status</th>
+                <th>Decision</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.length > 0 ? (
+                items.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.expenseDate}</td>
+                    <td>
+                      <details className="row-evidence-details">
+                        <summary>
+                          <strong>{item.merchantName}</strong>
+                          <span>{item.description}</span>
+                        </summary>
+                        <div className="row-evidence-panel">
+                          <div>
+                            <span className="section-kicker">Source evidence</span>
+                            <p>
+                              <DocumentPreviewButton
+                                documentName={item.sourceDocumentName}
+                                previewDataUrl={item.sourcePreviewDataUrl}
+                                previewMimeType={item.sourcePreviewMimeType}
+                              />
+                            </p>
+                            {item.sourcePreviewDataUrl && item.sourcePreviewMimeType?.startsWith("image/") ? (
+                              <img
+                                alt={`Receipt preview for ${item.merchantName}`}
+                                className="expense-evidence-preview compact"
+                                src={item.sourcePreviewDataUrl}
+                              />
+                            ) : (
+                              <p className="table-note">
+                                {item.aiIntakeDraftId
+                                  ? `AI draft ${item.aiIntakeDraftId} supplied this item.`
+                                  : "No receipt preview is attached to this item."}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <span className="section-kicker">Splits submitted by operator</span>
+                            {item.splits.length > 0 ? (
+                              <table className="embedded-table">
+                                <thead>
+                                  <tr>
+                                    <th>Participant</th>
+                                    <th>Share</th>
+                                    <th>Amount</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {item.splits.map((split) => (
+                                    <tr key={split.id}>
+                                      <td>{split.participant}</td>
+                                      <td>{split.percentage}</td>
+                                      <td>{split.amount}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            ) : (
+                              <p className="table-note">No split rows submitted. Ask clarification if splits are required.</p>
+                            )}
+                            {item.budgetNotes ? <p className="table-note">{item.budgetNotes}</p> : null}
+                            {item.challengeReason ? <p className="table-note">Challenge: {item.challengeReason}</p> : null}
+                          </div>
+                        </div>
+                      </details>
+                    </td>
+                    <td>
+                      <div className="stacked-table-cell">
+                        <span>{item.category}</span>
+                        <span className="bill-subnote">{item.tagLabels || "No tag"}</span>
+                      </div>
+                    </td>
+                    <td>{submission.race}</td>
+                    <td>{item.originalAmount}</td>
+                    <td>
+                      <div className="stacked-table-cell">
+                        <strong>{item.reportingAmountUsd}</strong>
+                        <span className="bill-subnote">FX {item.fxRateToUsd ?? "N/A"}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <DocumentPreviewButton
+                        documentName={item.sourceDocumentName}
+                        previewDataUrl={item.sourcePreviewDataUrl}
+                        previewMimeType={item.sourcePreviewMimeType}
+                      />
+                    </td>
+                    <td>
+                      <div className="stacked-table-cell">
+                        <span className={`pill signal-pill signal-${item.budgetStatusTone}`}>
+                          {item.budgetStatusLabel}
+                        </span>
+                        <span className="bill-subnote">{item.ruleMessages || item.budgetVariance || "No open finding"}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`pill signal-pill ${reviewTone(item.reviewStatusKey)}`}>
+                        {item.reviewStatus}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="inline-review-actions">
+                        <form action={updateExpenseItemReviewAction}>
+                          <input name="itemId" type="hidden" value={item.id} />
+                          <input name="submissionId" type="hidden" value={submission.id} />
+                          <input name="returnPath" type="hidden" value={returnPath} />
+                          <input name="reviewStatus" type="hidden" value="approved" />
+                          <input name="approvedAmountUsd" type="hidden" value={item.approvedAmountUsd} />
+                          <button className="action-button compact-action success" type="submit">
+                            Approve
+                          </button>
+                        </form>
+                        <details className="inline-action-details">
+                          <summary className="action-button compact-action risk">Reject</summary>
+                          <form action={updateExpenseItemReviewAction} className="inline-action-form">
+                            <input name="itemId" type="hidden" value={item.id} />
+                            <input name="submissionId" type="hidden" value={submission.id} />
+                            <input name="returnPath" type="hidden" value={returnPath} />
+                            <input name="reviewStatus" type="hidden" value="rejected" />
+                            <input name="approvedAmountUsd" type="hidden" value={item.approvedAmountUsd} />
+                            <select name="rejectionReasonCode" defaultValue="" required>
+                              <option value="" disabled>Reason</option>
+                              <option value="missing_receipts">Missing receipts</option>
+                              <option value="over_budget">Over budget</option>
+                              <option value="policy_violation">Policy violation</option>
+                              <option value="duplicate">Duplicate</option>
+                              <option value="other">Other</option>
+                            </select>
+                            <textarea
+                              name="rejectionReasonDetail"
+                              placeholder="Explain the rejection"
+                              required
+                              rows={2}
+                            />
+                            <button className="action-button compact-action risk" type="submit">
+                              Save reject
+                            </button>
+                          </form>
+                        </details>
+                        <details className="inline-action-details">
+                          <summary className="action-button compact-action secondary">Ask clarification</summary>
+                          <form action={updateExpenseItemReviewAction} className="inline-action-form">
+                            <input name="itemId" type="hidden" value={item.id} />
+                            <input name="submissionId" type="hidden" value={submission.id} />
+                            <input name="returnPath" type="hidden" value={returnPath} />
+                            <input name="reviewStatus" type="hidden" value="needs_info" />
+                            <input name="approvedAmountUsd" type="hidden" value={item.approvedAmountUsd} />
+                            <textarea
+                              name="rejectionReasonDetail"
+                              placeholder="What should the submitter clarify or fix?"
+                              required
+                              rows={2}
+                            />
+                            <button className="action-button compact-action secondary" type="submit">
+                              Send question
+                            </button>
+                          </form>
+                        </details>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="muted" colSpan={10}>
+                    No expense items are linked to this submission.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section className="support-grid">
-        <article className="card">
+        <article className="card compact-section-card">
           <div className="card-title-row">
             <div>
-              <span className="section-kicker">Submission summary</span>
+              <span className="section-kicker">Report decision</span>
+              <h3>Finalize after line review</h3>
             </div>
-            <span className="pill">{submission.status}</span>
+            <span className="pill subtle-pill">{submission.status}</span>
           </div>
-          <div className="mini-metric-grid">
-            <div className="mini-metric">
-              <span>Race</span>
-              <strong>{submission.race}</strong>
-            </div>
-            <div className="mini-metric">
-              <span>Submitter</span>
-              <strong>{submission.submitter}</strong>
-            </div>
-            <div className="mini-metric">
-              <span>Submitted</span>
-              <strong>{submission.submittedAt}</strong>
-            </div>
-            <div className="mini-metric">
-              <span>Total</span>
-              <strong>{submission.totalAmount}</strong>
-            </div>
-            <div className="mini-metric">
-              <span>Approved</span>
-              <strong>{submission.approvedAmountUsd}</strong>
-            </div>
-            <div className="mini-metric">
-              <span>Rejected</span>
-              <strong>{submission.rejectedAmountUsd}</strong>
-            </div>
-            <div className="mini-metric">
-              <span>Budget signal</span>
-              <strong>
-                <span className={`pill signal-pill signal-${submission.budgetSignalTone}`}>
-                  {submission.budgetSignalLabel}
-                </span>
-              </strong>
-            </div>
-          </div>
-          {submission.operatorNote ? <p className="table-note">{submission.operatorNote}</p> : null}
-          {submission.reviewNote ? <p className="table-note">{submission.reviewNote}</p> : null}
+          {(() => {
+            const aboveBudgetCount = items.filter(
+              (it) => it.budgetStatusKey === "above_budget"
+            ).length;
+            return (
+              <div className="stack-form">
+                <form action={approveExpenseSubmissionAction} className="stack-form">
+                  <input name="submissionId" type="hidden" value={submission.id} />
+                  <input name="returnPath" type="hidden" value={returnPath} />
+                  {aboveBudgetCount > 0 ? (
+                    <div className="notice warning" role="alert">
+                      <strong>{aboveBudgetCount} over-budget line{aboveBudgetCount === 1 ? "" : "s"}</strong>
+                      <span>Add a finance note and tick override to approve anyway.</span>
+                    </div>
+                  ) : null}
+                  <label className="field">
+                    <span>Finance note</span>
+                    <textarea
+                      name="reviewNote"
+                      placeholder="Report-level decision note."
+                      rows={3}
+                    />
+                  </label>
+                  {aboveBudgetCount > 0 ? (
+                    <label className="field field-inline">
+                      <input name="budgetOverride" type="checkbox" value="true" />
+                      <span>Override race-budget limit</span>
+                    </label>
+                  ) : null}
+                  <button className="action-button primary" type="submit">
+                    Mark invoice ready
+                  </button>
+                </form>
+                <div className="actions-row">
+                  {submission.statusKey === "submitted" ? (
+                    <form action={updateExpenseSubmissionStatusAction}>
+                      <input name="submissionId" type="hidden" value={submission.id} />
+                      <input name="nextStatus" type="hidden" value="in_review" />
+                      <input name="returnPath" type="hidden" value={returnPath} />
+                      <button className="action-button secondary" type="submit">
+                        Start review
+                      </button>
+                    </form>
+                  ) : null}
+                  <details className="inline-action-details">
+                    <summary className="action-button secondary">Return report</summary>
+                    <form action={updateExpenseSubmissionStatusAction} className="inline-action-form">
+                      <input name="submissionId" type="hidden" value={submission.id} />
+                      <input name="nextStatus" type="hidden" value="needs_clarification" />
+                      <input name="returnPath" type="hidden" value={returnPath} />
+                      <textarea
+                        name="rejectReasonDetail"
+                        placeholder="What should the submitter fix?"
+                        required
+                        rows={3}
+                      />
+                      <button className="action-button compact-action secondary" type="submit">
+                        Send clarification
+                      </button>
+                    </form>
+                  </details>
+                </div>
+              </div>
+            );
+          })()}
         </article>
 
-        <article className="card">
+        <article className="card compact-section-card">
           <div className="card-title-row">
             <div>
               <span className="section-kicker">Race budget</span>
@@ -268,619 +532,99 @@ export default async function ExpenseSubmissionDetailPage({
             <p className="muted">No approved budget rules loaded for this race yet.</p>
           )}
         </article>
-
-        <article className="card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">Review decision</span>
-            </div>
-            <span className="pill subtle-pill">{submission.status}</span>
-          </div>
-          {(() => {
-            const aboveBudgetCount = items.filter(
-              (it) => it.budgetStatusKey === "above_budget"
-            ).length;
-            return (
-              <form action={approveExpenseSubmissionAction} className="stack-form">
-                <input name="submissionId" type="hidden" value={submission.id} />
-                <input
-                  name="returnPath"
-                  type="hidden"
-                  value={`/tbr/expense-management/${submission.id}`}
-                />
-                {aboveBudgetCount > 0 ? (
-                  <div className="notice warning" role="alert">
-                    <strong>
-                      {aboveBudgetCount} item
-                      {aboveBudgetCount === 1 ? "" : "s"} over approved race
-                      budget
-                    </strong>
-                    <span>
-                      Tick the override below and add a finance review note to
-                      approve anyway. The override is recorded in the audit log.
-                    </span>
-                  </div>
-                ) : null}
-                <label className="field">
-                  <span>
-                    Finance review note
-                    {aboveBudgetCount > 0 ? " (required for override)" : ""}
-                  </span>
-                  <textarea
-                    name="reviewNote"
-                    placeholder="What finance approved, rejected, or needs clarified."
-                    rows={3}
-                  />
-                </label>
-                {aboveBudgetCount > 0 ? (
-                  <label className="field field-inline">
-                    <input
-                      name="budgetOverride"
-                      type="checkbox"
-                      value="true"
-                    />
-                    <span>
-                      Override race-budget limit and approve{" "}
-                      {aboveBudgetCount} over-budget item
-                      {aboveBudgetCount === 1 ? "" : "s"}
-                    </span>
-                  </label>
-                ) : null}
-                <div className="actions-row">
-                  {submission.statusKey === "submitted" ? (
-                    <button
-                      className="action-button secondary"
-                      formAction={updateExpenseSubmissionStatusAction}
-                      name="nextStatus"
-                      type="submit"
-                      value="in_review"
-                    >
-                      Start review
-                    </button>
-                  ) : null}
-                  <button className="action-button primary" type="submit">
-                    Approve as invoice ready
-                  </button>
-                  <button
-                    className="action-button secondary"
-                    formAction={updateExpenseSubmissionStatusAction}
-                    name="nextStatus"
-                    type="submit"
-                    value="needs_clarification"
-                  >
-                    Request clarification
-                  </button>
-                </div>
-              </form>
-            );
-          })()}
-
-          <details className="reject-disclosure">
-            <summary className="action-button secondary">Reject with reason…</summary>
-            <form action={updateExpenseSubmissionStatusAction} className="stack-form">
-              <input name="submissionId" type="hidden" value={submission.id} />
-              <input name="nextStatus" type="hidden" value="rejected" />
-              <input
-                name="returnPath"
-                type="hidden"
-                value={`/tbr/expense-management/${submission.id}`}
-              />
-              <label className="field">
-                <span>Rejection reason (required)</span>
-                <select name="rejectReasonCode" defaultValue="" required>
-                  <option value="" disabled>
-                    Pick a reason…
-                  </option>
-                  <option value="missing_receipts">Missing receipts</option>
-                  <option value="over_budget">Over budget</option>
-                  <option value="policy_violation">Policy violation</option>
-                  <option value="needs_team_split">Needs team split</option>
-                  <option value="duplicate">Duplicate submission</option>
-                  <option value="other">Other</option>
-                </select>
-              </label>
-              <label className="field">
-                <span>Explanation for submitter (required)</span>
-                <textarea
-                  name="rejectReasonDetail"
-                  placeholder="Tell the submitter exactly what to fix before resubmitting."
-                  rows={3}
-                  required
-                />
-              </label>
-              <div className="actions-row">
-                <button className="action-button risk" type="submit">
-                  Reject submission
-                </button>
-              </div>
-            </form>
-          </details>
-        </article>
       </section>
 
-      {priorityItem ? (
-        <section className="grid-two expense-evidence-cockpit">
-          <article className="card">
-            <div className="card-title-row">
-              <div>
-                <span className="section-kicker">Receipt evidence</span>
-                <h3>{priorityItem.merchantName}</h3>
-              </div>
-              <span className={`pill signal-pill signal-${priorityItem.budgetStatusTone}`}>
-                {priorityItem.budgetStatusLabel}
-              </span>
-            </div>
-            {priorityItem.sourcePreviewDataUrl && priorityItem.sourcePreviewMimeType?.startsWith("image/") ? (
-              <img
-                alt={`Receipt preview for ${priorityItem.merchantName}`}
-                className="expense-evidence-preview"
-                src={priorityItem.sourcePreviewDataUrl}
-              />
-            ) : (
-              <div className="expense-evidence-placeholder">
-                <strong>{priorityItem.sourceDocumentName}</strong>
-                <span>
-                  {priorityItem.aiIntakeDraftId
-                    ? `AI draft ${priorityItem.aiIntakeDraftId} supplied this item.`
-                    : "No preview image attached."}
-                </span>
-              </div>
-            )}
-          </article>
-
-          <article className="card">
-            <div className="card-title-row">
-              <div>
-                <span className="section-kicker">Mapped fields</span>
-                <h3>Finance inputs</h3>
-              </div>
-              {priorityItem.aiIntakeDraftId ? <span className="pill">AI linked</span> : <span className="pill subtle-pill">Manual</span>}
-            </div>
-            <div className="mini-metric-grid">
-              <div className="mini-metric">
-                <span>Amount</span>
-                <strong>{priorityItem.amount}</strong>
-              </div>
-              <div className="mini-metric">
-                <span>Date</span>
-                <strong>{priorityItem.expenseDate}</strong>
-              </div>
-              <div className="mini-metric">
-                <span>Category</span>
-                <strong>{priorityItem.aiCategory || priorityItem.category}</strong>
-              </div>
-              <div className="mini-metric">
-                <span>Paid by</span>
-                <strong>{priorityItem.paidBy || submission.submitter}</strong>
-              </div>
-              <div className="mini-metric">
-                <span>Budget</span>
-                <strong>{priorityItem.budgetApprovedAmount ?? "No rule"}</strong>
-              </div>
-              <div className="mini-metric">
-                <span>Variance</span>
-                <strong>{priorityItem.budgetVariance ?? "N/A"}</strong>
-              </div>
-            </div>
-            {priorityItem.description ? <p className="table-note">{priorityItem.description}</p> : null}
-          </article>
-        </section>
-      ) : null}
-
-      <section>
-        <article className="card">
-          <div className="card-title-row">
-            <div>
-              <span className="section-kicker">History</span>
-              <h3>Audit trail</h3>
-            </div>
-            <span className="pill subtle-pill">
-              {auditEntries.length + qbEntries.length} event
-              {auditEntries.length + qbEntries.length === 1 ? "" : "s"}
-            </span>
+      <section className="card compact-section-card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">History</span>
+            <h3>Audit trail</h3>
           </div>
-          {auditEntries.length === 0 && qbEntries.length === 0 ? (
-            <p className="muted">
-              No recorded events yet. Status transitions, split changes, and
-              QuickBooks postings will appear here.
-            </p>
-          ) : (
-            <div className="audit-timeline">
-              {/* Merge audit + QB entries by createdAt */}
-              {[
-                ...auditEntries.map((e) => ({
-                  kind: "audit" as const,
-                  createdAt: e.createdAt,
-                  payload: e,
-                })),
-                ...qbEntries.map((e) => ({
-                  kind: "qb" as const,
-                  createdAt: e.createdAt,
-                  payload: e,
-                })),
-              ]
-                .sort(
-                  (a, b) =>
-                    new Date(a.createdAt).getTime() -
-                    new Date(b.createdAt).getTime()
-                )
-                .map((row) => {
-                  if (row.kind === "audit") {
-                    const entry = row.payload;
-                    const meta = timelineLabel(entry.action);
-                    const actor = entry.performedBy
-                      ? userNameById.get(entry.performedBy) ?? "Unknown user"
-                      : entry.agentId ?? "System";
-                    const rawNote = entry.afterState
-                      ? (entry.afterState as Record<string, unknown>)["reviewNote"]
-                      : null;
-                    const note = typeof rawNote === "string" ? rawNote : null;
-                    const override = entry.afterState
-                      ? (entry.afterState as Record<string, unknown>)[
-                          "budgetOverride"
-                        ] === true
-                      : false;
-                    return (
-                      <div className="audit-timeline-entry" key={`a:${entry.id}`}>
-                        <div className={`audit-timeline-dot ${meta.tone}`} />
-                        <div className="audit-timeline-body">
-                          <strong>
-                            {meta.label}
-                            {override ? " (budget override)" : ""}
-                          </strong>
-                          <span className="audit-timeline-meta">
-                            {actor} · {formatTimestamp(entry.createdAt)}
-                          </span>
-                          {note ? (
-                            <span className="audit-timeline-note">{note}</span>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  }
-                  // QB journal entry row
-                  const je = row.payload;
-                  const tone =
-                    je.status === "posted"
-                      ? "good"
-                      : je.status === "failed"
-                        ? "risk"
-                        : "accent";
-                  const label =
-                    je.status === "posted"
-                      ? `QuickBooks JE posted (${je.qbJournalEntryId ?? "id?"})`
-                      : je.status === "failed"
-                        ? "QuickBooks JE failed"
-                        : "QuickBooks JE skipped";
-                  const actor = je.initiatedByUserId
-                    ? userNameById.get(je.initiatedByUserId) ?? "Unknown user"
-                    : "System";
+          <span className="pill subtle-pill">
+            {auditEntries.length + qbEntries.length} event
+            {auditEntries.length + qbEntries.length === 1 ? "" : "s"}
+          </span>
+        </div>
+        {auditEntries.length === 0 && qbEntries.length === 0 ? (
+          <p className="muted">No recorded events yet.</p>
+        ) : (
+          <div className="audit-timeline">
+            {[
+              ...auditEntries.map((e) => ({
+                kind: "audit" as const,
+                createdAt: e.createdAt,
+                payload: e,
+              })),
+              ...qbEntries.map((e) => ({
+                kind: "qb" as const,
+                createdAt: e.createdAt,
+                payload: e,
+              })),
+            ]
+              .sort(
+                (a, b) =>
+                  new Date(a.createdAt).getTime() -
+                  new Date(b.createdAt).getTime()
+              )
+              .map((row) => {
+                if (row.kind === "audit") {
+                  const entry = row.payload;
+                  const meta = timelineLabel(entry.action);
+                  const actor = entry.performedBy
+                    ? userNameById.get(entry.performedBy) ?? "Unknown user"
+                    : entry.agentId ?? "System";
+                  const rawNote = entry.afterState
+                    ? (entry.afterState as Record<string, unknown>)["reviewNote"] ??
+                      (entry.afterState as Record<string, unknown>)["rejectionReasonDetail"]
+                    : null;
+                  const note = typeof rawNote === "string" ? rawNote : null;
                   return (
-                    <div className="audit-timeline-entry" key={`q:${je.id}`}>
-                      <div className={`audit-timeline-dot ${tone}`} />
+                    <div className="audit-timeline-entry" key={`a:${entry.id}`}>
+                      <div className={`audit-timeline-dot ${meta.tone}`} />
                       <div className="audit-timeline-body">
-                        <strong>{label}</strong>
+                        <strong>{meta.label}</strong>
                         <span className="audit-timeline-meta">
-                          {actor} · {formatTimestamp(je.createdAt)}
-                          {je.totalAmountUsd > 0
-                            ? ` · $${je.totalAmountUsd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`
-                            : ""}
+                          {actor} · {formatTimestamp(entry.createdAt)}
                         </span>
-                        {je.errorMessage ? (
-                          <span className="audit-timeline-note">
-                            {je.errorMessage}
-                          </span>
-                        ) : null}
+                        {note ? <span className="audit-timeline-note">{note}</span> : null}
                       </div>
                     </div>
                   );
-                })}
-            </div>
-          )}
-        </article>
-      </section>
+                }
 
-      <section className="page-grid">
-        {items.map((item) => (
-          <article className="card" key={item.id}>
-            <div className="card-title-row">
-              <div>
-                <span className="section-kicker">Expense item</span>
-                <h3>{item.merchantName}</h3>
-              </div>
-              <span className="pill">{item.amount}</span>
-            </div>
-            <div className="mini-metric-grid">
-              <div className="mini-metric">
-                <span>Original</span>
-                <strong>{item.originalAmount}</strong>
-              </div>
-              <div className="mini-metric">
-                <span>FX to USD</span>
-                <strong>{item.fxRateToUsd ?? "N/A"}</strong>
-              </div>
-              <div className="mini-metric">
-                <span>USD reporting</span>
-                <strong>{item.reportingAmountUsd}</strong>
-              </div>
-              <div className="mini-metric">
-                <span>Review</span>
-                <strong>{item.reviewStatus}</strong>
-              </div>
-              <div className="mini-metric">
-                <span>Category</span>
-                <strong>{item.category}</strong>
-              </div>
-              <div className="mini-metric">
-                <span>Team</span>
-                <strong>{item.team}</strong>
-              </div>
-              <div className="mini-metric">
-                <span>Split method</span>
-                <strong>{item.splitMethod}</strong>
-              </div>
-              <div className="mini-metric">
-                <span>Split count</span>
-                <strong>{item.splitCount}</strong>
-              </div>
-            </div>
-            {item.description ? <p className="table-note">{item.description}</p> : null}
-
-            <section className="grid-two compact-grid">
-              <div className="compact-section-card">
-                <div className="card-title-row compact-card-title-row">
-                  <div>
-                    <span className="section-kicker">Source evidence</span>
-                    <h4>{item.sourceDocumentName}</h4>
+                const je = row.payload;
+                const tone =
+                  je.status === "posted"
+                    ? "good"
+                    : je.status === "failed"
+                      ? "risk"
+                      : "accent";
+                const label =
+                  je.status === "posted"
+                    ? `QuickBooks JE posted (${je.qbJournalEntryId ?? "id?"})`
+                    : je.status === "failed"
+                      ? "QuickBooks JE failed"
+                      : "QuickBooks JE skipped";
+                const actor = je.initiatedByUserId
+                  ? userNameById.get(je.initiatedByUserId) ?? "Unknown user"
+                  : "System";
+                return (
+                  <div className="audit-timeline-entry" key={`q:${je.id}`}>
+                    <div className={`audit-timeline-dot ${tone}`} />
+                    <div className="audit-timeline-body">
+                      <strong>{label}</strong>
+                      <span className="audit-timeline-meta">
+                        {actor} · {formatTimestamp(je.createdAt)}
+                      </span>
+                      {je.errorMessage ? (
+                        <span className="audit-timeline-note">{je.errorMessage}</span>
+                      ) : null}
+                    </div>
                   </div>
-                  {item.aiIntakeDraftId ? <span className="pill">AI linked</span> : <span className="pill subtle-pill">Manual</span>}
-                </div>
-                <p className="table-note">
-                  <DocumentPreviewButton
-                    documentName={item.sourceDocumentName}
-                    previewDataUrl={item.sourcePreviewDataUrl}
-                    previewMimeType={item.sourcePreviewMimeType}
-                  />
-                </p>
-                {item.sourcePreviewDataUrl && item.sourcePreviewMimeType?.startsWith("image/") ? (
-                  <img
-                    alt={`Receipt preview for ${item.merchantName}`}
-                    src={item.sourcePreviewDataUrl}
-                    style={{
-                      border: "1px solid var(--border)",
-                      borderRadius: 8,
-                      display: "block",
-                      maxHeight: 260,
-                      maxWidth: "100%",
-                      objectFit: "contain",
-                    }}
-                  />
-                ) : (
-                  <p className="table-note">
-                    {item.aiIntakeDraftId
-                      ? `AI draft ${item.aiIntakeDraftId} supplied the mapped fields for this item.`
-                      : "No receipt preview is attached to this item."}
-                  </p>
-                )}
-              </div>
-
-              <div className="compact-section-card">
-                <div className="card-title-row compact-card-title-row">
-                  <div>
-                    <span className="section-kicker">Extracted fields and budget</span>
-                    <h4>Finance review inputs</h4>
-                  </div>
-                  <span className={`pill signal-pill signal-${item.budgetStatusTone}`}>
-                    {item.budgetStatusLabel}
-                  </span>
-                </div>
-                <div className="mini-metric-grid">
-                  <div className="mini-metric">
-                    <span>AI target</span>
-                    <strong>{item.aiTargetKind?.replace(/_/g, " ") ?? "Not AI-linked"}</strong>
-                  </div>
-                  <div className="mini-metric">
-                    <span>AI category</span>
-                    <strong>{item.aiCategory || item.category}</strong>
-                  </div>
-                  <div className="mini-metric">
-                    <span>Paid by</span>
-                    <strong>{item.paidBy || submission.submitter}</strong>
-                  </div>
-                  <div className="mini-metric">
-                    <span>Currency</span>
-                    <strong>{item.originalCurrencyCode} → USD</strong>
-                  </div>
-                  <div className="mini-metric">
-                    <span>Approved budget</span>
-                    <strong>{item.budgetApprovedAmount ?? "No rule"}</strong>
-                  </div>
-                  <div className="mini-metric">
-                    <span>Variance</span>
-                    <strong>{item.budgetVariance ?? "N/A"}</strong>
-                  </div>
-                </div>
-                {item.budgetNotes ? <p className="table-note">{item.budgetNotes}</p> : null}
-                {item.ruleMessages ? (
-                  <p className="table-note">Rule findings: {item.ruleMessages}</p>
-                ) : null}
-                {item.challengeReason ? (
-                  <p className="table-note">Submitter challenge: {item.challengeReason}</p>
-                ) : null}
-              </div>
-            </section>
-
-            <section className="card compact-section-card">
-              <div className="card-title-row">
-                <div>
-                  <span className="section-kicker">Item decision</span>
-                  <h4>Approve, reject, or request info</h4>
-                </div>
-                <span className={`pill signal-pill signal-${item.reviewStatusKey === "approved" ? "good" : item.reviewStatusKey === "rejected" ? "risk" : "warn"}`}>
-                  {item.reviewStatus}
-                </span>
-              </div>
-              <form action={updateExpenseItemReviewAction} className="stack-form">
-                <input name="itemId" type="hidden" value={item.id} />
-                <input name="submissionId" type="hidden" value={submission.id} />
-                <input
-                  name="returnPath"
-                  type="hidden"
-                  value={`/tbr/expense-management/${submission.id}`}
-                />
-                <div className="grid-two">
-                  <label className="field">
-                    <span>Status</span>
-                    <select name="reviewStatus" defaultValue={item.reviewStatusKey}>
-                      <option value="approved">Approve</option>
-                      <option value="rejected">Reject</option>
-                      <option value="needs_info">Needs info</option>
-                      <option value="review">Flag for review</option>
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>Approved USD</span>
-                    <input
-                      name="approvedAmountUsd"
-                      inputMode="decimal"
-                      defaultValue={item.approvedAmountUsd}
-                      placeholder="0.00"
-                    />
-                  </label>
-                </div>
-                <div className="grid-two">
-                  <label className="field">
-                    <span>Reject reason</span>
-                    <select name="rejectionReasonCode" defaultValue={item.rejectionReasonCode ?? ""}>
-                      <option value="">Not rejected</option>
-                      <option value="missing_receipts">Missing receipts</option>
-                      <option value="over_budget">Over budget</option>
-                      <option value="policy_violation">Policy violation</option>
-                      <option value="duplicate">Duplicate</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>Reject / info note</span>
-                    <input
-                      name="rejectionReasonDetail"
-                      defaultValue={item.rejectionReasonDetail ?? ""}
-                      placeholder="Explain the decision"
-                    />
-                  </label>
-                </div>
-                {item.challengeReason ? (
-                  <label className="field">
-                    <span>Challenge response</span>
-                    <textarea
-                      name="challengeResponse"
-                      placeholder={`Submitter challenge: ${item.challengeReason}`}
-                      rows={3}
-                    />
-                  </label>
-                ) : null}
-                <button className="action-button primary" type="submit">
-                  Save item decision
-                </button>
-              </form>
-            </section>
-
-            <section className="grid-two">
-              <article className="card">
-                <div className="card-title-row">
-                  <div>
-                    <span className="section-kicker">Split rows</span>
-                  </div>
-                  <form action={generateEqualSplitsAction}>
-                    <input name="itemId" type="hidden" value={item.id} />
-                    <input name="submissionId" type="hidden" value={submission.id} />
-                    <input
-                      name="returnPath"
-                      type="hidden"
-                      value={`/tbr/expense-management/${submission.id}`}
-                    />
-                    <button className="action-button secondary" type="submit">
-                      Generate equal splits
-                    </button>
-                  </form>
-                </div>
-                <div className="table-wrapper">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Participant</th>
-                        <th>Percentage</th>
-                        <th>Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {item.splits.length > 0 ? (
-                        item.splits.map((split) => (
-                          <tr key={split.id}>
-                            <td>{split.participant}</td>
-                            <td>{split.percentage}</td>
-                            <td>{split.amount}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td className="muted" colSpan={3}>
-                            No split rows yet.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </article>
-
-              <article className="card">
-                <div className="card-title-row">
-                  <div>
-                    <span className="section-kicker">Add split row</span>
-                  </div>
-                </div>
-                <form action={addExpenseSplitAction} className="stack-form">
-                  <input name="itemId" type="hidden" value={item.id} />
-                  <input name="submissionId" type="hidden" value={submission.id} />
-                  <input
-                    name="returnPath"
-                    type="hidden"
-                    value={`/tbr/expense-management/${submission.id}`}
-                  />
-                  <label className="field">
-                    <span>Existing user</span>
-                    <select name="participantId" defaultValue="">
-                      <option value="">No linked user</option>
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>Label</span>
-                    <input name="splitLabel" placeholder="Driver share or Team ops share" />
-                  </label>
-                  <div className="grid-two">
-                    <label className="field">
-                      <span>Percentage</span>
-                      <input name="splitPercentage" inputMode="decimal" placeholder="50" />
-                    </label>
-                    <label className="field">
-                      <span>Amount</span>
-                      <input name="splitAmount" inputMode="decimal" placeholder="210" required />
-                    </label>
-                  </div>
-                  <button className="action-button primary" type="submit">
-                    Add split row
-                  </button>
-                </form>
-              </article>
-            </section>
-          </article>
-        ))}
+                );
+              })}
+          </div>
+        )}
       </section>
     </div>
   );

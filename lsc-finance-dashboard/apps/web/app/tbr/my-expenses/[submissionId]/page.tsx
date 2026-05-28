@@ -8,8 +8,10 @@ import {
 import { requireTbrExpensePortalAccess } from "../../../../lib/auth";
 import { DocumentPreviewButton } from "../../../components/inline-table-controls";
 import {
+  addExpenseSplitAction,
   challengeExpenseItemRejectionAction,
-  createReimbursementInvoiceAction
+  createReimbursementInvoiceAction,
+  generateEqualSplitsAction
 } from "../../expense-management/actions";
 
 type MyExpenseReportPageProps = {
@@ -81,6 +83,7 @@ export default async function MyExpenseReportPage({
     (total, item) => total + Number(item.openRuleFindingCount),
     0
   );
+  const canEditSplits = ["submitted", "needs_clarification"].includes(submission.statusKey);
 
   return (
     <div className="page-grid">
@@ -236,12 +239,88 @@ export default async function MyExpenseReportPage({
                     <td>
                       <div className="stacked-table-cell">
                         <span>{item.ruleMessages || item.noReceiptReason || "No notes"}</span>
-                        {item.rejectionReasonDetail ? (
+                        {item.reviewStatusKey === "needs_info" && item.rejectionReasonDetail ? (
+                          <span className="bill-subnote">Finance question: {item.rejectionReasonDetail}</span>
+                        ) : null}
+                        {item.reviewStatusKey === "rejected" && item.rejectionReasonDetail ? (
                           <span className="bill-subnote">Rejected: {item.rejectionReasonDetail}</span>
                         ) : null}
                         {item.challengeReason ? (
                           <span className="bill-subnote">Challenge: {item.challengeReason}</span>
                         ) : null}
+                        <details className="reject-disclosure">
+                          <summary className="ghost-link">Splits</summary>
+                          <div className="table-wrapper clean-table">
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th>Participant</th>
+                                  <th>Share</th>
+                                  <th>Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {item.splits.length > 0 ? (
+                                  item.splits.map((split) => (
+                                    <tr key={split.id}>
+                                      <td>{split.participant}</td>
+                                      <td>{split.percentage}</td>
+                                      <td>{split.amount}</td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td className="muted" colSpan={3}>No splits added.</td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                          {canEditSplits ? (
+                            <div className="stack-form">
+                              <form action={generateEqualSplitsAction}>
+                                <input name="itemId" type="hidden" value={item.id} />
+                                <input name="submissionId" type="hidden" value={submission.id} />
+                                <input
+                                  name="returnPath"
+                                  type="hidden"
+                                  value={`/tbr/my-expenses/${submission.id}`}
+                                />
+                                <button className="action-button secondary" type="submit">
+                                  Generate equal splits
+                                </button>
+                              </form>
+                              <form action={addExpenseSplitAction} className="stack-form">
+                                <input name="itemId" type="hidden" value={item.id} />
+                                <input name="submissionId" type="hidden" value={submission.id} />
+                                <input
+                                  name="returnPath"
+                                  type="hidden"
+                                  value={`/tbr/my-expenses/${submission.id}`}
+                                />
+                                <label className="field">
+                                  <span>Split label</span>
+                                  <input name="splitLabel" placeholder="Mashael share, team ops share" required />
+                                </label>
+                                <div className="grid-two">
+                                  <label className="field">
+                                    <span>Percentage</span>
+                                    <input name="splitPercentage" inputMode="decimal" placeholder="50" />
+                                  </label>
+                                  <label className="field">
+                                    <span>Amount</span>
+                                    <input name="splitAmount" inputMode="decimal" required />
+                                  </label>
+                                </div>
+                                <button className="action-button secondary" type="submit">
+                                  Add split row
+                                </button>
+                              </form>
+                            </div>
+                          ) : (
+                            <p className="table-note">Splits are locked while finance is reviewing this report.</p>
+                          )}
+                        </details>
                       </div>
                       {item.reviewStatusKey === "rejected" ? (
                         <details className="reject-disclosure">

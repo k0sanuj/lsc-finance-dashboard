@@ -4,7 +4,6 @@ import {
   getExpenseApprovalQueue,
   getExpenseFormOptions,
   getExpenseWorkspaceControls,
-  getExpenseWorkflowSummary,
   getNextUpcomingTbrRace,
   getRaceBudgetRules,
   getTbrRaceCards,
@@ -29,6 +28,7 @@ type ExpenseManagementPageProps = {
     submitterId?: string;
     submissionStatus?: string;
     budgetSignal?: string;
+    focus?: string;
   }>;
 };
 
@@ -69,6 +69,7 @@ export default async function ExpenseManagementPage({
   const selectedSubmitterId = params?.submitterId ?? "";
   const selectedStatus = params?.submissionStatus ?? "";
   const selectedBudgetSignal = params?.budgetSignal ?? "";
+  const selectedFocus = params?.focus ?? "";
 
   // Auto-select the next upcoming race when no filters have been applied
   if (!hasAnyFilter) {
@@ -79,8 +80,7 @@ export default async function ExpenseManagementPage({
     }
   }
 
-  const [summary, queue, formOptions, workspaceControls, seasons, users, seasonRaceCards] = await Promise.all([
-    getExpenseWorkflowSummary(),
+  const [queue, formOptions, workspaceControls, seasons, users, seasonRaceCards] = await Promise.all([
     getExpenseApprovalQueue({
       seasonYear: Number.isFinite(selectedSeason) ? selectedSeason : null,
       raceEventId: selectedRaceId || null,
@@ -134,13 +134,12 @@ export default async function ExpenseManagementPage({
   const overBudgetCount = queue.filter((row) => row.budgetSignal === "above_budget").length;
   const closeToBudgetCount = queue.filter((row) => row.budgetSignal === "close_to_budget").length;
   const noRuleCount = queue.filter((row) => row.budgetSignal === "no_rule").length;
-  const cleanCount = queue.filter((row) => row.budgetSignal === "below_budget").length;
   const submittedCount = queue.filter((row) => row.status === "submitted").length;
   const inReviewCount = queue.filter((row) => row.status === "in_review").length;
   const clarificationCount = queue.filter((row) => row.status === "needs_clarification").length;
+  const invoiceReadyCount = queue.filter((row) => row.status === "approved").length;
   const challengedCount = queue.reduce((total, row) => total + Number(row.challengedItemCount), 0);
   const missingReceiptCount = queue.reduce((total, row) => total + Number(row.missingReceiptCount), 0);
-  const openRuleFindingCount = queue.reduce((total, row) => total + Number(row.openRuleFindingCount), 0);
   const buildQueueHref = (overrides: { submissionStatus?: string | null; budgetSignal?: string | null }) => {
     const query = new URLSearchParams(activeFilterQuery);
     if ("submissionStatus" in overrides) {
@@ -160,6 +159,68 @@ export default async function ExpenseManagementPage({
     const qs = query.toString();
     return qs ? `/tbr/expense-management?${qs}` : "/tbr/expense-management";
   };
+  const buildFocusHref = (focus: string) => {
+    const query = new URLSearchParams(activeFilterQuery);
+    query.set("focus", focus);
+    return `/tbr/expense-management?${query.toString()}`;
+  };
+  const focusCards = [
+    {
+      key: "awaiting-review",
+      label: "Awaiting review",
+      value: submittedCount + inReviewCount,
+      detail: "Submitted or in-review reports.",
+      tone: "accent-warn",
+      rows: queue.filter((row) => row.status === "submitted" || row.status === "in_review"),
+      href: buildQueueHref({ submissionStatus: null, budgetSignal: null }),
+    },
+    {
+      key: "needs-clarification",
+      label: "Needs clarification",
+      value: clarificationCount,
+      detail: "Reports already returned to submitters.",
+      tone: "accent-brand",
+      rows: queue.filter((row) => row.status === "needs_clarification"),
+      href: buildQueueHref({ submissionStatus: "needs_clarification", budgetSignal: null }),
+    },
+    {
+      key: "exceptions",
+      label: "Exceptions",
+      value: overBudgetCount + closeToBudgetCount + noRuleCount,
+      detail: "Budget signals that need a finance decision.",
+      tone: "accent-risk",
+      rows: queue.filter((row) => row.budgetSignal !== "below_budget"),
+      href: buildQueueHref({ submissionStatus: null, budgetSignal: "exception" }),
+    },
+    {
+      key: "receipt-gaps",
+      label: "Receipt gaps",
+      value: missingReceiptCount,
+      detail: "Items missing receipts or explanations.",
+      tone: "accent-warn",
+      rows: queue.filter((row) => Number(row.missingReceiptCount) > 0),
+      href: buildQueueHref({ submissionStatus: null, budgetSignal: null }),
+    },
+    {
+      key: "challenged-lines",
+      label: "Challenged lines",
+      value: challengedCount,
+      detail: "Rejected lines challenged by submitters.",
+      tone: "accent-accent",
+      rows: queue.filter((row) => Number(row.challengedItemCount) > 0),
+      href: buildQueueHref({ submissionStatus: null, budgetSignal: null }),
+    },
+    {
+      key: "invoice-ready",
+      label: "Invoice ready",
+      value: invoiceReadyCount,
+      detail: "Approved reports ready for invoice flow.",
+      tone: "accent-good",
+      rows: queue.filter((row) => row.status === "approved"),
+      href: buildQueueHref({ submissionStatus: "approved", budgetSignal: null }),
+    },
+  ];
+  const activeFocus = focusCards.find((card) => card.key === selectedFocus) ?? null;
 
   return (
     <div className="page-grid">
@@ -180,121 +241,65 @@ export default async function ExpenseManagementPage({
         </section>
       ) : null}
 
-      <section className="stats-grid compact-stats">
-        {summary.map((item, i) => {
-          const accent = i === 0 ? "accent-warn" : i === 1 ? "accent-brand" : "accent-good";
-          return (
-            <article className={`metric-card ${accent}`} key={item.label}>
-              <div className="metric-topline">
-                <span className="metric-label">{item.label}</span>
-              </div>
-              <div className="metric-value">{item.value}</div>
-              <span className="metric-subvalue">{item.detail}</span>
-            </article>
-          );
-        })}
-      </section>
-
-      <section className="review-lane-grid">
-        {[
-          {
-            label: "Exceptions",
-            value: overBudgetCount + closeToBudgetCount + noRuleCount,
-            detail: "Budget signals that need a finance decision.",
-            href: buildQueueHref({ submissionStatus: null, budgetSignal: "exception" }),
-            tone: "risk",
-          },
-          {
-            label: "New",
-            value: submittedCount,
-            detail: "Fresh reports waiting to be opened.",
-            href: buildQueueHref({ submissionStatus: "submitted", budgetSignal: null }),
-            tone: "accent",
-          },
-          {
-            label: "In review",
-            value: inReviewCount,
-            detail: "Reports already picked up by finance.",
-            href: buildQueueHref({ submissionStatus: "in_review", budgetSignal: null }),
-            tone: "brand",
-          },
-          {
-            label: "Returned",
-            value: clarificationCount,
-            detail: "Clarification loops with submitters.",
-            href: buildQueueHref({ submissionStatus: "needs_clarification", budgetSignal: null }),
-            tone: "warn",
-          },
-        ].map((lane) => (
-          <Link className={`review-lane-card ${lane.tone}`} href={lane.href as Route} key={lane.label}>
-            <span className="section-kicker">{lane.label}</span>
-            <strong>{lane.value}</strong>
-            <span>{lane.detail}</span>
+      <section className="stats-grid compact-stats ops-kpi-strip">
+        {focusCards.map((card) => (
+          <Link
+            className={`metric-card ${card.tone} ops-focus-card`}
+            href={buildFocusHref(card.key) as Route}
+            key={card.key}
+          >
+            <div className="metric-topline">
+              <span className="metric-label">{card.label}</span>
+            </div>
+            <div className="metric-value">{card.value}</div>
+            <span className="metric-subvalue">{card.detail}</span>
           </Link>
         ))}
       </section>
 
-      <section className="stats-grid compact-stats">
-        <article className="metric-card accent-risk">
-          <div className="metric-topline">
-            <span className="metric-label">Challenged lines</span>
+      {activeFocus ? (
+        <aside className="review-focus-drawer" aria-label={`${activeFocus.label} review drawer`}>
+          <div className="review-focus-drawer-header">
+            <div>
+              <span className="section-kicker">Focused queue</span>
+              <h3>{activeFocus.label}</h3>
+            </div>
+            <Link className="ghost-link" href={returnPath as Route}>
+              Close
+            </Link>
           </div>
-          <div className="metric-value">{challengedCount}</div>
-          <span className="metric-subvalue">Rejected items challenged by submitters.</span>
-        </article>
-        <article className="metric-card accent-warn">
-          <div className="metric-topline">
-            <span className="metric-label">Receipt gaps</span>
+          <p className="table-note">{activeFocus.detail}</p>
+          <div className="review-focus-list">
+            {activeFocus.rows.length > 0 ? (
+              activeFocus.rows.slice(0, 12).map((row) => (
+                <div className="review-focus-row" key={row.id}>
+                  <div className="stacked-table-cell">
+                    <strong>{row.title}</strong>
+                    <span className="bill-subnote">{row.submitter} · {row.race}</span>
+                  </div>
+                  <div className="stacked-table-cell">
+                    <span>{row.submittedAmountUsd}</span>
+                    <span className="bill-subnote">
+                      {row.openItemCount} open · {row.missingReceiptCount} receipt gaps · {row.challengedItemCount} challenged
+                    </span>
+                  </div>
+                  <span className={`pill signal-pill signal-${row.budgetSignalTone}`}>
+                    {row.budgetSignalLabel}
+                  </span>
+                  <Link className="action-button compact-action primary" href={`/tbr/expense-management/${row.id}`}>
+                    Take me there
+                  </Link>
+                </div>
+              ))
+            ) : (
+              <p className="muted">No reports currently match this focus queue.</p>
+            )}
           </div>
-          <div className="metric-value">{missingReceiptCount}</div>
-          <span className="metric-subvalue">Items missing receipts or receipt explanations.</span>
-        </article>
-        <article className="metric-card accent-accent">
-          <div className="metric-topline">
-            <span className="metric-label">Rule findings</span>
-          </div>
-          <div className="metric-value">{openRuleFindingCount}</div>
-          <span className="metric-subvalue">Open item-level policy or race-rule findings.</span>
-        </article>
-        <article className="metric-card accent-good">
-          <div className="metric-topline">
-            <span className="metric-label">Workspace tags</span>
-          </div>
-          <div className="metric-value">{workspaceControls.tags.length}</div>
-          <span className="metric-subvalue">Active tags available to submitters.</span>
-        </article>
-      </section>
-
-      <section className="stats-grid compact-stats">
-        <article className="metric-card accent-risk">
-          <div className="metric-topline">
-            <span className="metric-label">Over budget</span>
-          </div>
-          <div className="metric-value">{overBudgetCount}</div>
-          <span className="metric-subvalue">Open reports requiring override or clarification.</span>
-        </article>
-        <article className="metric-card accent-warn">
-          <div className="metric-topline">
-            <span className="metric-label">Close to budget</span>
-          </div>
-          <div className="metric-value">{closeToBudgetCount}</div>
-          <span className="metric-subvalue">Reports finance should inspect before approval.</span>
-        </article>
-        <article className="metric-card accent-accent">
-          <div className="metric-topline">
-            <span className="metric-label">No budget rule</span>
-          </div>
-          <div className="metric-value">{noRuleCount}</div>
-          <span className="metric-subvalue">Reports missing a race/category budget match.</span>
-        </article>
-        <article className="metric-card accent-good">
-          <div className="metric-topline">
-            <span className="metric-label">Clean</span>
-          </div>
-          <div className="metric-value">{cleanCount}</div>
-          <span className="metric-subvalue">Reports currently below matched budget thresholds.</span>
-        </article>
-      </section>
+          <Link className="action-button secondary" href={activeFocus.href as Route}>
+            Take Me There
+          </Link>
+        </aside>
+      ) : null}
 
       <section className="card compact-section-card">
         <div className="card-title-row">
@@ -369,6 +374,99 @@ export default async function ExpenseManagementPage({
             </button>
           </div>
         </form>
+      </section>
+
+      <section className="card compact-section-card">
+        <div className="card-title-row">
+          <div>
+            <span className="section-kicker">Exception-first finance review</span>
+            <h3>Approval queue</h3>
+          </div>
+          <span className="pill">{queue.length} reports</span>
+        </div>
+        <div className="table-wrapper clean-table compact-review-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Submission</th>
+                <th>Season</th>
+                <th>Race</th>
+                <th>Submitter</th>
+                <th>Submitted</th>
+                <th>Total</th>
+                <th>Items</th>
+                <th>Budget signal</th>
+                <th>Status</th>
+                <th>Review</th>
+              </tr>
+            </thead>
+            <tbody>
+              {queue.length > 0 ? (
+                queue.map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      <div className="stacked-table-cell">
+                        <strong>{row.title}</strong>
+                        <span className="bill-subnote">
+                          {row.challengedItemCount} challenged · {row.missingReceiptCount} receipt gaps
+                        </span>
+                      </div>
+                    </td>
+                    <td>{row.seasonLabel}</td>
+                    <td>{row.race}</td>
+                    <td>{row.submitter}</td>
+                    <td>{row.submittedAt}</td>
+                    <td>
+                      <div className="stacked-table-cell">
+                        <strong>{row.submittedAmountUsd}</strong>
+                        <span className="bill-subnote">
+                          Approved {row.approvedAmountUsd} · rejected {row.rejectedAmountUsd}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="stacked-table-cell">
+                        <span>{row.approvedItemCount} approved · {row.openItemCount} open</span>
+                        <span className="bill-subnote">{row.openRuleFindingCount} rule findings</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`pill signal-pill signal-${row.budgetSignalTone}`}>
+                        {row.budgetSignalLabel}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="pill subtle-pill">{row.statusLabel}</span>
+                    </td>
+                    <td>
+                      <div className="inline-actions">
+                        <Link className="ghost-link" href={`/tbr/expense-management/${row.id}`}>
+                          Open review
+                        </Link>
+                        {row.status === "submitted" ? (
+                          <form action={updateExpenseSubmissionStatusAction}>
+                            <input name="submissionId" type="hidden" value={row.id} />
+                            <input name="nextStatus" type="hidden" value="in_review" />
+                            <input name="returnPath" type="hidden" value={returnPath} />
+                            <button className="action-button compact-action secondary" type="submit">
+                              Start
+                            </button>
+                          </form>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="muted" colSpan={10}>
+                    No submissions matched the current filter set.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {selectedRaceId ? (
@@ -570,96 +668,6 @@ export default async function ExpenseManagementPage({
         </article>
       </section>
 
-      <section className="card compact-section-card">
-        <div className="card-title-row">
-          <div>
-            <span className="section-kicker">Exception-first finance review</span>
-            <h3>Approval queue</h3>
-          </div>
-          <span className="pill">{queue.length} reports</span>
-        </div>
-        <div className="table-wrapper clean-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Submission</th>
-                <th>Season</th>
-                <th>Race</th>
-                <th>Submitter</th>
-                <th>Submitted</th>
-	                <th>Total</th>
-	                <th>Items</th>
-	                <th>Budget signal</th>
-                <th>Status</th>
-                <th>Review</th>
-              </tr>
-            </thead>
-            <tbody>
-              {queue.length > 0 ? (
-                queue.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.title}</td>
-                    <td>{row.seasonLabel}</td>
-                    <td>{row.race}</td>
-                    <td>{row.submitter}</td>
-                    <td>{row.submittedAt}</td>
-	                    <td>
-                        <div className="stacked-table-cell">
-                          <strong>{row.submittedAmountUsd}</strong>
-                          <span className="bill-subnote">
-                            Approved {row.approvedAmountUsd} · rejected {row.rejectedAmountUsd}
-                          </span>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="stacked-table-cell">
-                          <span>{row.approvedItemCount} approved · {row.openItemCount} open</span>
-                          <span className="bill-subnote">
-                            {row.challengedItemCount} challenged · {row.missingReceiptCount} receipt gaps · {row.openRuleFindingCount} findings
-                          </span>
-                        </div>
-                      </td>
-                    <td>
-                      <div className="inline-actions">
-                        <span className={`pill signal-pill signal-${row.budgetSignalTone}`}>
-                          {row.budgetSignalLabel}
-                        </span>
-                        <span className="pill subtle-pill">{row.matchedBudgetCount} matched</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="pill subtle-pill">{row.statusLabel}</span>
-                    </td>
-                    <td>
-                      <div className="inline-actions">
-                        <Link className="ghost-link" href={`/tbr/expense-management/${row.id}`}>
-                          Open review
-                        </Link>
-                        {row.status === "submitted" ? (
-                          <form action={updateExpenseSubmissionStatusAction}>
-                            <input name="submissionId" type="hidden" value={row.id} />
-                            <input name="nextStatus" type="hidden" value="in_review" />
-                            <input name="returnPath" type="hidden" value={returnPath} />
-                            <button className="action-button secondary" type="submit">
-                              Start review
-                            </button>
-                          </form>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-	                  <td className="muted" colSpan={10}>
-                    No submissions matched the current filter set.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
     </div>
   );
 }

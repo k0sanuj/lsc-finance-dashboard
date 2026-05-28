@@ -43,6 +43,80 @@ function inferExpenseUsd(amount: number, currencyCode: string, explicitFxRate?: 
   };
 }
 
+async function queueExpenseItemNotification(input: {
+  event: "expense_item_rejected" | "expense_item_needs_clarification" | "expense_item_clarification_replied";
+  submissionId: string;
+  itemId: string;
+  note: string | null;
+}) {
+  try {
+    const rows = await queryRowsAdmin<{
+      submitter_email: string | null;
+      submission_title: string;
+      merchant_name: string | null;
+    }>(
+      `select
+         au.email as submitter_email,
+         es.submission_title,
+         esi.merchant_name
+       from expense_submission_items esi
+       join expense_submissions es on es.id = esi.submission_id
+       join app_users au on au.id = es.submitted_by_user_id
+       where esi.id = $1
+         and es.id = $2
+       limit 1`,
+      [input.itemId, input.submissionId]
+    );
+    const row = rows[0];
+    if (!row?.submitter_email) return;
+
+    const eventLabel =
+      input.event === "expense_item_rejected"
+        ? "Expense item rejected"
+        : input.event === "expense_item_needs_clarification"
+          ? "Expense item needs clarification"
+          : "Expense clarification replied";
+
+    await executeAdmin(
+      `insert into outbound_notifications (
+         channel,
+         recipient,
+         subject,
+         body,
+         status,
+         source_agent_id,
+         source_skill,
+         idempotency_key,
+         metadata
+       )
+       values ('internal', $1, $2, $3, 'queued', 'expense-agent', $4, $5, $6::jsonb)`,
+      [
+        row.submitter_email,
+        eventLabel,
+        [
+          `${eventLabel}: ${row.merchant_name ?? "Expense item"}`,
+          `Report: ${row.submission_title}`,
+          input.note ? `Note: ${input.note}` : null,
+          `/tbr/my-expenses/${input.submissionId}`,
+        ].filter(Boolean).join("\n"),
+        input.event,
+        `${input.event}:${input.itemId}:${Date.now()}`,
+        JSON.stringify({
+          submissionId: input.submissionId,
+          itemId: input.itemId,
+          event: input.event,
+        }),
+      ]
+    );
+  } catch (err) {
+    console.warn(
+      `[expense-item-notify] ${input.event} failed item=${input.itemId} error=${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+  }
+}
+
 function parseNormalizedNumber(value: unknown) {
   const amount = Number(String(value ?? "").replace(/[^0-9.-]/g, ""));
   return Number.isFinite(amount) ? amount : 0;
@@ -1342,12 +1416,16 @@ export async function updateExpenseItemReviewAction(formData: FormData) {
     redirectToExpenseWorkflow("error", "Rejected line items require a reason and explanation.", returnPath);
   }
 
+  if (reviewStatus === "needs_info" && !rejectionReasonDetail) {
+    redirectToExpenseWorkflow("error", "Clarification requests require a question for the submitter.", returnPath);
+  }
+
   await executeAdmin(
     `update expense_submission_items
      set review_status = $2::expense_item_review_status,
          approved_amount_usd = case when $2 = 'approved' then $3 else approved_amount_usd end,
          rejection_reason_code = case when $2 = 'rejected' then $4 else rejection_reason_code end,
-         rejection_reason_detail = case when $2 = 'rejected' then $5 else rejection_reason_detail end,
+         rejection_reason_detail = case when $2 in ('rejected', 'needs_info', 'review') then $5 else rejection_reason_detail end,
          challenge_status = case
            when challenge_status = 'challenged' and $6::text is not null then 'resolved'
            else challenge_status
@@ -1382,8 +1460,20 @@ export async function updateExpenseItemReviewAction(formData: FormData) {
     );
   }
 
+  if (reviewStatus === "rejected" || reviewStatus === "needs_info") {
+    await queueExpenseItemNotification({
+      event: reviewStatus === "rejected" ? "expense_item_rejected" : "expense_item_needs_clarification",
+      submissionId,
+      itemId,
+      note: rejectionReasonDetail,
+    });
+  }
+
   await cascadeUpdate({
-    trigger: reviewStatus === "rejected" ? "expense-item:rejected" : "expense-item:reviewed",
+    trigger:
+      reviewStatus === "rejected"
+        ? "expense-item:rejected"
+        : "expense-item:reviewed",
     entityType: "expense_submission_item",
     entityId: itemId,
     action: `set-${reviewStatus}`,
@@ -1392,6 +1482,7 @@ export async function updateExpenseItemReviewAction(formData: FormData) {
       reviewStatus,
       approvedAmountUsd: reviewStatus === "approved" ? approvedAmountUsd : null,
       rejectionReasonCode,
+      rejectionReasonDetail,
       challengeResponse,
     },
     performedBy: session.id,
@@ -1442,6 +1533,13 @@ export async function challengeExpenseItemRejectionAction(formData: FormData) {
      where id = $1`,
     [itemId, challengeReason]
   );
+
+  await queueExpenseItemNotification({
+    event: "expense_item_clarification_replied",
+    submissionId,
+    itemId,
+    note: challengeReason,
+  });
 
   await cascadeUpdate({
     trigger: "expense-item:challenged",
@@ -2045,9 +2143,37 @@ export async function createReimbursementInvoiceAction(formData: FormData) {
   );
 }
 
+async function ensureSubmitterCanEditSplits(input: {
+  itemId: string;
+  submissionId: string;
+  userId: string;
+  returnPath: string;
+}) {
+  const rows = await queryRowsAdmin<{ id: string; submission_status: string }>(
+    `select es.id, es.submission_status::text
+     from expense_submission_items esi
+     join expense_submissions es on es.id = esi.submission_id
+     where esi.id = $1
+       and es.id = $2
+       and es.submitted_by_user_id = $3
+     limit 1`,
+    [input.itemId, input.submissionId, input.userId]
+  );
+  const row = rows[0];
+  if (!row) {
+    redirectToExpenseWorkflow("error", "Only the submitter can edit split allocations.", input.returnPath);
+  }
+  if (!["submitted", "needs_clarification"].includes(row.submission_status)) {
+    redirectToExpenseWorkflow(
+      "error",
+      "Splits can only be edited before finance review or after finance asks for clarification.",
+      input.returnPath
+    );
+  }
+}
+
 export async function generateEqualSplitsAction(formData: FormData) {
-  await requireRole(["super_admin", "finance_admin", "team_member"]);
-  const session = await requireSession();
+  const session = await requireTbrExpensePortalAccess();
   const itemId = normalizeWhitespace(String(formData.get("itemId") ?? ""));
   const submissionId = normalizeWhitespace(String(formData.get("submissionId") ?? ""));
   const returnPath =
@@ -2057,6 +2183,8 @@ export async function generateEqualSplitsAction(formData: FormData) {
   if (!itemId || !submissionId) {
     redirectToExpenseWorkflow("error", "Missing item context for split generation.", returnPath);
   }
+
+  await ensureSubmitterCanEditSplits({ itemId, submissionId, userId: session.id, returnPath });
 
   const itemRows = await queryRowsAdmin<{ amount: string; split_count: string }>(
     `select amount::text, split_count::text
@@ -2107,8 +2235,7 @@ export async function generateEqualSplitsAction(formData: FormData) {
 }
 
 export async function addExpenseSplitAction(formData: FormData) {
-  await requireRole(["super_admin", "finance_admin", "team_member"]);
-  const session = await requireSession();
+  const session = await requireTbrExpensePortalAccess();
   const itemId = normalizeWhitespace(String(formData.get("itemId") ?? ""));
   const submissionId = normalizeWhitespace(String(formData.get("submissionId") ?? ""));
   const returnPath =
@@ -2122,6 +2249,8 @@ export async function addExpenseSplitAction(formData: FormData) {
   if (!itemId || !submissionId || splitAmount <= 0) {
     redirectToExpenseWorkflow("error", "Split amount and item context are required.", returnPath);
   }
+
+  await ensureSubmitterCanEditSplits({ itemId, submissionId, userId: session.id, returnPath });
 
   await executeAdmin(
     `insert into expense_item_splits (

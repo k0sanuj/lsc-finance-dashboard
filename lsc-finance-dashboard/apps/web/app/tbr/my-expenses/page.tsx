@@ -309,8 +309,20 @@ export default async function MyExpensesPage({ searchParams }: MyExpensesPagePro
                 rows={3}
               />
             </label>
-            <input name="splitMethod" type="hidden" value="solo" />
-            <input name="splitCount" type="hidden" value="1" />
+            <div className="grid-two">
+              <label className="field">
+                <span>Split method</span>
+                <select name="splitMethod" defaultValue="solo">
+                  <option value="solo">Solo</option>
+                  <option value="equal">Equal split</option>
+                  <option value="custom">Custom split after submission</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Split count</span>
+                <input name="splitCount" inputMode="numeric" min="1" defaultValue="1" />
+              </label>
+            </div>
             <button className="action-button primary" type="submit">
               Submit manual expense
             </button>

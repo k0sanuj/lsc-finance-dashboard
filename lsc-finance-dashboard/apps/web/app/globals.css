@@ -6266,3 +6266,185 @@ textarea:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+/* Operator UX: table-first expense review */
+.ops-kpi-strip {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.ops-focus-card {
+  color: inherit;
+  text-decoration: none;
+}
+
+.ops-focus-card:hover {
+  transform: translateY(-1px);
+}
+
+.review-focus-drawer {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--brand);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.14);
+  display: grid;
+  gap: 14px;
+  max-width: 520px;
+  padding: 18px;
+  position: sticky;
+  top: 16px;
+  z-index: 8;
+}
+
+.review-focus-drawer-header,
+.review-focus-row {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.review-focus-list {
+  display: grid;
+  gap: 10px;
+}
+
+.review-focus-row {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  flex-wrap: wrap;
+  padding: 12px;
+}
+
+.compact-review-table table {
+  min-width: 1120px;
+}
+
+.inline-review-actions {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.action-button.compact-action {
+  min-height: 34px;
+  padding: 7px 11px;
+  white-space: nowrap;
+}
+
+.action-button.success {
+  border-color: rgba(25, 135, 84, 0.3);
+  color: var(--good);
+}
+
+.inline-action-details {
+  position: relative;
+}
+
+.inline-action-details > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.inline-action-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.inline-action-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
+  display: grid;
+  gap: 8px;
+  min-width: 260px;
+  padding: 10px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 12;
+}
+
+.inline-action-form select,
+.inline-action-form textarea,
+.inline-action-form input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  padding: 8px 10px;
+}
+
+.row-evidence-details > summary {
+  cursor: pointer;
+  display: grid;
+  gap: 3px;
+  list-style: none;
+}
+
+.row-evidence-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.row-evidence-panel {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(260px, 1fr);
+  margin-top: 10px;
+  padding: 12px;
+}
+
+.expense-evidence-preview.compact {
+  max-height: 220px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.embedded-table {
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+.embedded-table td,
+.embedded-table th {
+  border-bottom: 1px solid var(--border);
+  padding: 6px 4px;
+  text-align: left;
+}
+
+.compact-mini-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1100px) {
+  .ops-kpi-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .row-evidence-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .ops-kpi-strip,
+  .compact-mini-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .review-focus-drawer {
+    border-radius: 12px;
+    max-width: none;
+    position: static;
+  }
+
+  .inline-action-form {
+    left: 0;
+    right: auto;
+  }
+}

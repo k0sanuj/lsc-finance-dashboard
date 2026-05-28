@@ -9,6 +9,7 @@
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web typecheck",
     "audit:table-ux": "node scripts/audit-table-ux.mjs",
+    "audit:ops-ux-density": "node scripts/audit-ops-ux-density.mjs",
     "audit:lsc-blue-ui": "node scripts/audit-lsc-blue-ui.mjs",
     "test:fsp-ai-intake": "node scripts/test-fsp-ai-intake-workflow.mjs",
     "test:xtz-invoice-workflow": "node scripts/test-xtz-invoice-workflow.mjs",
