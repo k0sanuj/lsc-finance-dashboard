@@ -9,7 +9,7 @@ import {
   type QbJournalEntryLogRow,
 } from "@lsc/db";
 import { requireRole } from "../../../../lib/auth";
-import { DocumentPreviewButton } from "../../../components/inline-table-controls";
+import { DocumentPreviewButton, PendingActionButton } from "../../../components/inline-table-controls";
 import {
   approveExpenseSubmissionAction,
   updateExpenseItemReviewAction,
@@ -372,9 +372,12 @@ export default async function ExpenseSubmissionDetailPage({
                           <input name="returnPath" type="hidden" value={returnPath} />
                           <input name="reviewStatus" type="hidden" value="approved" />
                           <input name="approvedAmountUsd" type="hidden" value={item.approvedAmountUsd} />
-                          <button className="action-button compact-action success" type="submit">
+                          <PendingActionButton
+                            className="action-button compact-action success"
+                            pendingLabel="Approving"
+                          >
                             Approve
-                          </button>
+                          </PendingActionButton>
                         </form>
                         <details className="inline-action-details">
                           <summary className="action-button compact-action risk">Reject</summary>
@@ -398,9 +401,12 @@ export default async function ExpenseSubmissionDetailPage({
                               required
                               rows={2}
                             />
-                            <button className="action-button compact-action risk" type="submit">
+                            <PendingActionButton
+                              className="action-button compact-action risk"
+                              pendingLabel="Rejecting"
+                            >
                               Save reject
-                            </button>
+                            </PendingActionButton>
                           </form>
                         </details>
                         <details className="inline-action-details">
@@ -417,9 +423,12 @@ export default async function ExpenseSubmissionDetailPage({
                               required
                               rows={2}
                             />
-                            <button className="action-button compact-action secondary" type="submit">
+                            <PendingActionButton
+                              className="action-button compact-action secondary"
+                              pendingLabel="Sending"
+                            >
                               Send question
-                            </button>
+                            </PendingActionButton>
                           </form>
                         </details>
                       </div>

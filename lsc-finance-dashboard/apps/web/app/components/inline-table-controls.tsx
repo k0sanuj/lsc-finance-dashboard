@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState, type ChangeEvent, type ReactNode, type Ref } from "react";
+import { useFormStatus } from "react-dom";
 
 const FILE_INPUT_TYPE = "file";
 
@@ -38,6 +39,38 @@ export function AutoSubmitSelect({
         </option>
       ))}
     </select>
+  );
+}
+
+type PendingActionButtonProps = {
+  children: ReactNode;
+  className?: string;
+  pendingLabel?: string;
+};
+
+export function PendingActionButton({
+  children,
+  className = "action-button",
+  pendingLabel = "Working"
+}: PendingActionButtonProps) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      aria-busy={pending}
+      className={`${className}${pending ? " is-pending" : ""}`}
+      disabled={pending}
+      type="submit"
+    >
+      {pending ? (
+        <>
+          <span aria-hidden="true" className="donut-button-loader" />
+          <span>{pendingLabel}</span>
+        </>
+      ) : (
+        children
+      )}
+    </button>
   );
 }
 

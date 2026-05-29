@@ -6507,6 +6507,33 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
+.action-button.is-pending {
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.donut-button-loader {
+  animation: donut-button-spin 0.72s linear infinite;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999px;
+  display: inline-block;
+  height: 14px;
+  width: 14px;
+}
+
+@keyframes donut-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .donut-button-loader {
+    animation-duration: 1.6s;
+  }
+}
+
 .action-button.success {
   border-color: rgba(25, 135, 84, 0.3);
   color: var(--good);

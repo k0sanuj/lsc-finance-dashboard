@@ -146,9 +146,14 @@ function redirectToExpenseWorkflow(
   message: string,
   returnPath = "/tbr/expense-management"
 ): never {
-  redirect(
-    `${returnPath}?status=${encodeURIComponent(status)}&message=${encodeURIComponent(message)}` as Route
-  );
+  const [pathAndSearch, hash] = returnPath.split("#");
+  const [pathname, search] = pathAndSearch.split("?");
+  const searchParams = new URLSearchParams(search ?? "");
+  searchParams.set("status", status);
+  searchParams.set("message", message);
+  searchParams.set("updated", String(Date.now()));
+  const nextPath = `${pathname}?${searchParams.toString()}${hash ? `#${hash}` : ""}`;
+  redirect(nextPath as Route);
 }
 
 type RaceBudgetRuleDraft = {
@@ -1492,6 +1497,7 @@ export async function updateExpenseItemReviewAction(formData: FormData) {
   revalidatePath("/tbr/expense-management");
   revalidatePath(`/tbr/expense-management/${submissionId}`);
   revalidatePath("/tbr/my-expenses");
+  revalidatePath(returnPath);
   redirectToExpenseWorkflow("success", "Line item review updated.", returnPath);
 }
 
