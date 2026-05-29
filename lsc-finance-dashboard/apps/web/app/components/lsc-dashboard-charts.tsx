@@ -37,15 +37,16 @@ export type SeriesConfig = {
 
 const CHART_COLORS: Record<ChartTone, string> = {
   brand: "#1f5d84",
-  good: "#2f8f6b",
-  amber: "#c9892d",
-  ruby: "#c94a4a",
-  iris: "#6567b8",
-  slate: "#64748b",
+  good: "#17785b",
+  amber: "#c98220",
+  ruby: "#cb3f55",
+  iris: "#5d61c8",
+  slate: "#5c687a",
 };
 
 const GRID_COLOR = "#e5edf4";
-const TEXT_SOFT = "#64748b";
+const TEXT_SOFT = "#5c687a";
+const ANIMATION_DURATION = 460;
 
 function colorFor(tone: ChartTone | undefined, index = 0) {
   if (tone) return CHART_COLORS[tone];
@@ -154,7 +155,8 @@ export function FinanceTrendChart({
                 stroke={colorFor(item.tone, index)}
                 strokeWidth={2.6}
                 dot={false}
-                isAnimationActive={false}
+                isAnimationActive
+                animationDuration={ANIMATION_DURATION}
               />
             ) : (
               <Area
@@ -166,7 +168,8 @@ export function FinanceTrendChart({
                 fill={colorFor(item.tone, index)}
                 fillOpacity={0.12}
                 strokeWidth={2}
-                isAnimationActive={false}
+                isAnimationActive
+                animationDuration={ANIMATION_DURATION}
               />
             )
           )}
@@ -188,9 +191,9 @@ export function CashMovementChart({ data, height = 260 }: { data: readonly Chart
           <YAxis tickLine={false} axisLine={false} tick={{ fill: TEXT_SOFT, fontSize: 11 }} tickFormatter={compactNumber} width={42} />
           <Tooltip content={<LscTooltip />} />
           <Legend iconType="circle" wrapperStyle={{ fontSize: 11, color: TEXT_SOFT }} />
-          <Bar dataKey="cashIn" name="Cash in" fill={CHART_COLORS.good} radius={[8, 8, 0, 0]} isAnimationActive={false} />
-          <Bar dataKey="cashOut" name="Cash out" fill={CHART_COLORS.ruby} radius={[8, 8, 0, 0]} isAnimationActive={false} />
-          <Line type="monotone" dataKey="net" name="Net" stroke={CHART_COLORS.brand} strokeWidth={2.4} dot={false} isAnimationActive={false} />
+          <Bar dataKey="cashIn" name="Cash in" fill={CHART_COLORS.good} radius={[8, 8, 0, 0]} isAnimationActive animationDuration={ANIMATION_DURATION} />
+          <Bar dataKey="cashOut" name="Cash out" fill={CHART_COLORS.ruby} radius={[8, 8, 0, 0]} isAnimationActive animationDuration={ANIMATION_DURATION} />
+          <Line type="monotone" dataKey="net" name="Net" stroke={CHART_COLORS.brand} strokeWidth={2.4} dot={false} isAnimationActive animationDuration={ANIMATION_DURATION} />
         </ComposedChart>
       </ChartContainer>
     </div>
@@ -216,7 +219,7 @@ export function HorizontalComparisonChart({
           <XAxis type="number" tickLine={false} axisLine={false} tick={{ fill: TEXT_SOFT, fontSize: 11 }} tickFormatter={compactNumber} />
           <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} tick={{ fill: TEXT_SOFT, fontSize: 11 }} width={118} />
           <Tooltip content={<LscTooltip />} />
-          <Bar dataKey={dataKey} name="Amount" radius={[0, 8, 8, 0]} barSize={14} isAnimationActive={false}>
+          <Bar dataKey={dataKey} name="Amount" radius={[0, 8, 8, 0]} barSize={14} isAnimationActive animationDuration={ANIMATION_DURATION}>
             {data.map((entry, index) => (
               <Cell key={entry.name} fill={colorFor(entry.tone, index)} />
             ))}
@@ -243,7 +246,7 @@ export function StatusDonutChart({
         <ChartContainer height={height} minWidth={170}>
           <PieChart>
             <Tooltip content={<LscTooltip />} />
-            <Pie data={visibleData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3} isAnimationActive={false}>
+            <Pie data={visibleData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3} isAnimationActive animationDuration={ANIMATION_DURATION}>
               {visibleData.map((entry, index) => (
                 <Cell key={entry.name} fill={colorFor(entry.tone, index)} />
               ))}
@@ -295,7 +298,7 @@ export function WaterfallBridgeChart({
           <YAxis tickLine={false} axisLine={false} tick={{ fill: TEXT_SOFT, fontSize: 11 }} tickFormatter={compactNumber} width={42} />
           <Tooltip content={<LscTooltip />} />
           <Bar dataKey="base" stackId="bridge" fill="transparent" isAnimationActive={false} />
-          <Bar dataKey="amount" name="Amount" stackId="bridge" radius={[8, 8, 0, 0]} isAnimationActive={false}>
+          <Bar dataKey="amount" name="Amount" stackId="bridge" radius={[8, 8, 0, 0]} isAnimationActive animationDuration={ANIMATION_DURATION}>
             {bridgeData.map((entry, index) => (
               <Cell key={entry.name} fill={colorFor(entry.tone, index)} />
             ))}
@@ -313,7 +316,7 @@ export function MiniSparkline({ data, dataKey = "value" }: { data: readonly Char
     <div className="lsc-mini-sparkline" aria-hidden="true">
       <ChartContainer height={38} minWidth={80}>
         <AreaChart data={data} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
-          <Area type="monotone" dataKey={dataKey} stroke={CHART_COLORS.brand} fill={CHART_COLORS.brand} fillOpacity={0.16} strokeWidth={2} isAnimationActive={false} />
+          <Area type="monotone" dataKey={dataKey} stroke={CHART_COLORS.brand} fill={CHART_COLORS.brand} fillOpacity={0.16} strokeWidth={2} isAnimationActive animationDuration={ANIMATION_DURATION} />
         </AreaChart>
       </ChartContainer>
     </div>
